@@ -27,7 +27,12 @@ DB_NAME = os.getenv("DB_NAME", "ecommerce_analysis")
 
 USE_MYSQL = bool(DB_USER and DB_PASSWORD)
 
-BUSINESS_CONTEXT = """## 业务指标定义
+BUSINESS_CONTEXT = """## 数据时间范围
+- 数据时间范围：2025-01-01 至 2025-12-31（共1年数据）
+- 当前日期：2026年（数据截止到2025年12月31日）
+- 【重要】当用户提到"最近N天"时，指的是数据中的最近N天，而非当前日期
+
+## 业务指标定义
 - 付款金额 = 实际销售额（非订单金额）
 - 平台类型枚举值：APP、微信公众号、Web网站、其他
 - 是否退款：1=已退款，0=未退款
@@ -41,13 +46,16 @@ BUSINESS_CONTEXT = """## 业务指标定义
 ## 回答规则
 1. 始终先查看表结构确认列名，再编写 SQL
 2. 日期筛选使用 order_date 列，格式 'YYYY-MM-DD'
-3. 金额查询使用 payment_amount（实际付款金额）
-4. 退款相关使用 is_refunded = 1 表示已退款
-5. SQL 结果较大时使用 LIMIT 限制
-6. 先给出数据结论，再附上 SQL 语句
-7. 用中文回答
-8. 仅回答电商数据相关问题
-9. 如果发现某指标明显异常（如某渠道退款率远超平均值），请在回答末尾添加【⚠️ 异常预警】段落，给出业务建议"""
+3. 【重要】当用户提到"最近N天"时，自动替换为数据中的最近N天。例如：
+   - "最近7天" → 数据中最近7天：2025-12-25 至 2025-12-31
+   - "最近30天" → 数据中最近30天
+4. 金额查询使用 payment_amount（实际付款金额）
+5. 退款相关使用 is_refunded = 1 表示已退款
+6. SQL 结果较大时使用 LIMIT 限制
+7. 先给出数据结论，再附上 SQL 语句
+8. 用中文回答
+9. 仅回答电商数据相关问题
+10. 如果发现某指标明显异常（如某渠道退款率远超平均值），请在回答末尾添加【⚠️ 异常预警】段落，给出业务建议"""
 
 SENSITIVE_PATTERNS = [
     r"密码", r"手机号", r"身份证", r"地址.*具体", r"订单明细.*用户名",
@@ -178,8 +186,7 @@ def init_agent(_db):
         toolkit=toolkit,
         prefix=prefix,
         verbose=True,
-        handle_parsing_errors=True,
-        agent_type="openai-tools",
+        agent_type="zero-shot-react-description",
     )
 
 
@@ -196,21 +203,40 @@ def detect_chart_type(df: pd.DataFrame, question: str = "") -> str:
     
     question_lower = question.lower()
     col1_lower = col1.lower()
+    col2_lower = col2.lower() if col2 else ""
     
-    first_col_str = df[col1].astype(str)
-    date_patterns = [r'\d{4}', r'\d{2}-\d{2}', r'周', r'月', r'日']
-    is_time_col = any(first_col_str.str.contains(p, regex=True).any() for p in date_patterns)
+    rank_keywords = ['top', '最高', '排名', '排行', r'前\d+', '销量最高', '销售额最高']
+    if any(re.search(k, question_lower) for k in rank_keywords):
+        return "bar"
     
-    if is_time_col or any(k in col1_lower for k in ['date', '日期', '时间', 'time', 'hour', '小时', 'weekday', '星期', 'month']):
-        return "line"
+    compare_keywords = ['哪个', '谁', '比较', '对比', 'vs', '更多', '更高', '更低', '差异']
+    if any(k in question_lower for k in compare_keywords):
+        return "bar"
     
-    if any(k in question_lower for k in ['退款率', '占比', '比例', '分布', 'percent', 'ratio', 'rate']) and len(df) <= 8:
-        return "pie"
-    
-    if any(k in question_lower for k in ['top', '最高', '排名', '排行']):
+    rate_keywords = ['退款率', '转化率', '点击率', '复购率', 'rate', 'ratio', '比例对比', '各.*率']
+    if any(k in question_lower for k in rate_keywords) or \
+       (any(k in col2_lower for k in ['rate', 'ratio', '率']) and len(df) > 2):
         return "bar_h"
     
-    if len(df) <= 5 and not is_time_col:
+    first_col_str = df[col1].astype(str)
+    
+    is_date_format = first_col_str.str.match(r'^\d{4}-\d{2}-\d{2}').any() or \
+                     first_col_str.str.match(r'^\d{2}/\d{2}').any() or \
+                     (first_col_str.str.contains(r'^(0?[1-9]|1[0-9]|2[0-3])$', regex=True).any() and len(df) >= 12)
+    
+    time_col_names = ['date', '时间', 'time', 'hour', 'weekday', '星期', 'month', '月', 'order_date', 'order_hour']
+    
+    time_keywords = ['每天', '每日', '趋势', '变化', '时间段', '24小时', '最近', '周', '月份']
+    if is_date_format or \
+       (any(k in col1_lower for k in time_col_names)) or \
+       (any(k in question_lower for k in time_keywords) and not any(k in question_lower for k in ['top', '最高'])):
+        return "line"
+    
+    share_keywords = ['占比', '份额', '构成', '组成', '分布情况', 'percent of total']
+    if any(k in question_lower for k in share_keywords) and len(df) <= 8:
+        return "pie"
+    
+    if len(df) <= 4:
         return "pie"
     
     return "bar"
@@ -225,35 +251,119 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
     cols = df.columns.tolist()
     x_col, y_col = cols[0], cols[1]
 
+    if not title or title == "undefined" or not title.strip():
+        title = f"{y_col} 分析"
+
     if chart_type == "line":
         fig = px.line(df, x=x_col, y=y_col, template="plotly_dark", title=title,
                       markers=True, color_discrete_sequence=["#818CF8"])
-        fig.update_traces(line_width=2.5, marker_size=7)
+        fig.update_traces(line_width=3, marker_size=10,
+                          fill='tozeroy', fillcolor='rgba(129,140,248,0.1)')
         fig.add_scatter(x=df[x_col], y=df[y_col], mode='markers',
-                        marker=dict(size=9, color="#FACC15"), showlegend=False)
+                        marker=dict(size=12, color="#FACC15", line=dict(width=2, color='#fff')), showlegend=False)
 
     elif chart_type == "pie":
         fig = px.pie(df, names=x_col, values=y_col, template="plotly_dark", title=title,
-                     hole=0.35, color_discrete_sequence=px.colors.qualitative.Set2)
-        fig.update_traces(textposition='inside', textinfo='percent+label+value')
+                     hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
+        fig.update_traces(textposition='inside', textinfo='percent+label',
+                          textfont=dict(size=13, color='white'),
+                          hovertemplate='<b>%{label}</b><br>数值: %{value:,.2f}<br>占比: %{percent}<extra></extra>',
+                          pull=[0.02] * len(df))
 
-    elif chart_type == "bar_h":
-        fig = px.bar(df, x=y_col, y=x_col, template="plotly_dark", title=title,
-                     orientation='h', color_discrete_sequence=["#818CF8"],
-                     text_auto='.2f')
-        fig.update_traces(textposition='outside')
+    elif chart_type in ["bar_h", "bar"]:
+        n_items = len(df)
+        
+        df_plot = df.copy()
+        
+        bar_colors = ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEF2F2']
+        
+        if chart_type == "bar_h":
+            fig = go.Figure()
+            for i in range(n_items):
+                y_val = df_plot[y_col].iloc[i]
+                try:
+                    y_num = float(y_val)
+                    y_text = f'{y_num:,.0f}'
+                except (ValueError, TypeError):
+                    y_num = 0
+                    y_text = str(y_val)
+                
+                fig.add_trace(go.Bar(
+                    x=[y_num],
+                    y=[df_plot[x_col].iloc[i]],
+                    orientation='h',
+                    name=df_plot[x_col].iloc[i],
+                    marker=dict(
+                        color=bar_colors[i % len(bar_colors)],
+                        line=dict(width=0.5, color='rgba(255,255,255,0.3)'),
+                    ),
+                    text=y_text,
+                    textposition='outside',
+                    textfont=dict(size=12, color='#E4E4E7', family='monospace'),
+                    hovertemplate=f'<b>{df_plot[x_col].iloc[i]}</b><br>%{{x:,.0f}}<extra></extra>',
+                ))
+            
+            dynamic_height = 300 + max(n_items * 35, 100)
+            fig.update_layout(height=dynamic_height, barmode='group')
+            
+        else:
+            df_sorted = df_plot.sort_values(by=y_col, ascending=True).reset_index(drop=True)
+            fig = go.Figure()
+            for i in range(n_items):
+                y_val = df_sorted[y_col].iloc[i]
+                try:
+                    y_num = float(y_val)
+                    y_text = f'{y_num:,.0f}'
+                except (ValueError, TypeError):
+                    y_num = 0
+                    y_text = str(y_val)
+                
+                fig.add_trace(go.Bar(
+                    x=[y_num],
+                    y=[df_sorted[x_col].iloc[i]],
+                    orientation='h',
+                    name=df_sorted[x_col].iloc[i],
+                    marker=dict(
+                        color=bar_colors[(n_items - 1 - i) % len(bar_colors)],
+                        line=dict(width=0.5, color='rgba(255,255,255,0.3)'),
+                    ),
+                    text=y_text,
+                    textposition='outside',
+                    textfont=dict(size=12, color='#E4E4E7', family='monospace'),
+                    hovertemplate=f'<b>{df_sorted[x_col].iloc[i]}</b><br>%{{x:,.0f}}<extra></extra>',
+                ))
+            
+            dynamic_height = 300 + max(n_items * 35, 100)
+            fig.update_layout(height=dynamic_height, barmode='group')
 
     else:
-        fig = px.bar(df, x=x_col, y=y_col, template="plotly_dark", title=title,
-                     color_discrete_sequence=["#818CF8"], text_auto='.2f')
-        fig.update_traces(textposition='outside')
+        fig = go.Figure()
 
     fig.update_layout(
-        margin=dict(l=20, r=20, t=50, b=20),
+        margin=dict(l=80 if chart_type in ["bar_h", "bar"] else 30, 
+                    r=100 if chart_type in ["bar_h", "bar"] else 30,
+                    t=50, b=50),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,17,23,0.8)',
         font=dict(color='#E4E4E7', size=13),
         title_font=dict(size=16, color='#818CF8'),
+        showlegend=False,
+        xaxis=dict(
+            showgrid=False if chart_type in ["bar_h", "bar"] else True,
+            gridcolor='rgba(255,255,255,0.05)',
+            showticklabels=False if chart_type in ["bar_h", "bar"] else True,
+            tickangle=-20 if chart_type == "line" else 0,
+            tickfont=dict(size=11),
+            zeroline=False,
+            range=[0, None] if chart_type in ["bar_h", "bar"] else None,
+        ),
+        yaxis=dict(
+            showgrid=True if chart_type in ["bar_h", "bar"] else True,
+            gridcolor='rgba(255,255,255,0.05)',
+            tickfont=dict(size=11),
+        ),
+        hovermode='closest',
+        bargap=0.5,
     )
 
     return fig
@@ -412,7 +522,8 @@ def run_sql_query(sql: str) -> pd.DataFrame | None:
                 return df
             except json.JSONDecodeError:
                 try:
-                    data = ast.literal_eval(result)
+                    result_cleaned = re.sub(r"Decimal\(([^)]+)\)", r"\1", result)
+                    data = ast.literal_eval(result_cleaned)
                     if isinstance(data, list) and len(data) > 0 and isinstance(data[0], tuple):
                         cols = extract_column_names(sql)
                         if cols and len(cols) == len(data[0]):
@@ -423,7 +534,8 @@ def run_sql_query(sql: str) -> pd.DataFrame | None:
                     elif isinstance(data, list):
                         return pd.DataFrame(data)
                     return None
-                except Exception:
+                except Exception as e:
+                    st.warning(f"解析数据库结果失败：{e}")
                     return None
         
         if isinstance(result, list):
@@ -441,6 +553,12 @@ def run_sql_query(sql: str) -> pd.DataFrame | None:
         if isinstance(result, tuple) and len(result) == 2:
             cols, data = result
             return pd.DataFrame(data, columns=cols)
+        
+        if isinstance(result, (int, float, str)):
+            cols = extract_column_names(sql)
+            if not cols:
+                cols = ['value']
+            return pd.DataFrame([{cols[0]: result}])
         
         return None
         
@@ -546,13 +664,64 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
+    st.header("🎯 智能推荐")
+    
+    RECOMMENDATIONS = {
+        '退款': ['哪个平台退款金额最多？', '退款率最高的时间段是？', '哪些商品退款最多？'],
+        '销售': ['各平台销售额占比', '最近7天销售额趋势', 'TOP10热销商品'],
+        '订单': ['哪个时间段订单量最多？', 'APP和微信订单量对比', '日均订单量是多少'],
+        '用户': ['用户复购率是多少？', '客单价分布情况', '高价值用户特征'],
+        '平台': ['各平台的转化率对比', '哪个渠道用户增长最快？', '平台留存率分析'],
+        '商品': ['销量最高的TOP5商品', '库存周转快的商品', '新品表现如何'],
+        '时间': ['周末和工作日订单对比', '节假日销售高峰', '月度销售趋势'],
+    }
+    
+    last_questions = [h.get("question", "") for h in st.session_state.query_history[-3:]]
+    recommended = set()
+    
+    for q in last_questions:
+        for keyword, recs in RECOMMENDATIONS.items():
+            if keyword in q:
+                for rec in recs[:2]:
+                    if rec not in [h.get("question", "") for h in st.session_state.query_history]:
+                        recommended.add(rec)
+    
+    if recommended:
+        for rec in list(recommended)[:3]:
+            if st.button(f"💡 {rec}", key=f"rec_{rec[:20]}", use_container_width=True):
+                st.session_state.pending_question = rec
+    else:
+        st.caption("查询后显示相关推荐")
+
+    st.divider()
     db_type = "MySQL" if USE_MYSQL else "SQLite"
     db_label = "MySQL (ecommerce_analysis)" if USE_MYSQL else "SQLite (本地)"
     st.caption(f"🗄️ 数据库：{db_label}")
     st.caption(f"🧠 模型：{MODEL_NAME}")
 
-for msg in st.session_state.messages:
+for msg_idx, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
+        if msg["role"] == "assistant" and msg.get("question"):
+            col1, col2, col3 = st.columns([1, 1, 3])
+            with col1:
+                if st.button("🔄 重新生成", key=f"regen_{msg_idx}", use_container_width=True):
+                    st.session_state.pending_question = msg["question"]
+                    if f"msg_{msg_idx}" in st.session_state.messages:
+                        st.session_state.messages.pop(msg_idx)
+                    st.rerun()
+            with col2:
+                feedback_key = f"feedback_{msg_idx}"
+                if "feedbacks" not in st.session_state:
+                    st.session_state.feedbacks = {}
+                thumbs_up = st.button("👍", key=f"up_{msg_idx}")
+                thumbs_down = st.button("👎", key=f"down_{msg_idx}")
+                if thumbs_up:
+                    st.session_state.feedbacks[feedback_key] = "👍 有帮助"
+                    st.success("感谢反馈！")
+                elif thumbs_down:
+                    st.session_state.feedbacks[feedback_key] = "👎 需改进"
+                    st.info("我们会持续优化，谢谢反馈！")
+        
         render_answer_with_highlights(msg["content"])
         if msg.get("csv_data"):
             try:
@@ -563,14 +732,15 @@ for msg in st.session_state.messages:
         if msg.get("chart_data"):
             try:
                 chart_df = pd.DataFrame(msg["chart_data"])
-                fig = create_chart(chart_df, msg.get("chart_title", ""), msg.get("question", ""))
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True, config={
-                        'displaylogo': False,
-                        'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
-                    })
-            except Exception:
-                pass
+                if len(chart_df) > 0 and len(chart_df.columns) >= 2:
+                    fig = create_chart(chart_df, msg.get("chart_title", ""), msg.get("question", ""))
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, key=f"msg_chart_{msg_idx}", config={
+                            'displaylogo': False,
+                            'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
+                        })
+            except Exception as e:
+                st.caption(f"⚠️ 图表加载失败: {str(e)[:50]}")
         if msg.get("csv_data"):
             try:
                 csv_df = pd.DataFrame(msg["csv_data"])
@@ -630,14 +800,15 @@ if prompt:
             if cached.get("chart_data"):
                 try:
                     chart_df = pd.DataFrame(cached["chart_data"])
-                    fig = create_chart(chart_df, cached.get("chart_title", ""), prompt)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config={
-                            'displaylogo': False,
-                            'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
-                        })
-                except Exception:
-                    pass
+                    if len(chart_df) > 0 and len(chart_df.columns) >= 2:
+                        fig = create_chart(chart_df, cached.get("chart_title", ""), prompt)
+                        if fig:
+                            st.plotly_chart(fig, use_container_width=True, key=f"cache_chart_{cache_key}", config={
+                                'displaylogo': False,
+                                'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
+                            })
+                except Exception as e:
+                    st.caption(f"⚠️ 缓存图表加载失败: {str(e)[:50]}")
             if cached.get("csv_data"):
                 try:
                     csv_df = pd.DataFrame(cached["csv_data"])
@@ -682,126 +853,146 @@ if prompt:
             response = agent.invoke({"input": prompt})
             query_time = time.time() - start_time
             answer = response.get("output", "抱歉，我暂时无法回答这个问题。")
-
-            step_placeholder.markdown(show_step_progress(3), unsafe_allow_html=True)
-            time.sleep(0.2)
-            step_placeholder.markdown(show_step_progress(4), unsafe_allow_html=True)
-            time.sleep(0.2)
-            step_placeholder.empty()
-
-            chart_data = None
-            chart_title = prompt[:30]
-            csv_data = None
-            extracted_sql = None
-
-            extracted_sql = extract_sql_from_intermediate(response)
-            if not extracted_sql:
-                extracted_sql = extract_sql_from_answer(answer)
-            
-            with st.expander("🔧 调试信息", expanded=False):
-                st.json({
-                    "SQL提取结果": extracted_sql[:100] + "..." if extracted_sql and len(extracted_sql) > 100 else extracted_sql,
-                    "响应键": list(response.keys()),
-                    "intermediate_steps数量": len(response.get("intermediate_steps", [])),
+        except Exception as e:
+            error_str = str(e)
+            if "Could not parse LLM output:" in error_str or "output parsing error" in error_str.lower():
+                match = re.search(r'Could not parse LLM output:\s*`(.*)`', error_str, re.DOTALL)
+                if match:
+                    answer = match.group(1)
+                else:
+                    answer = re.sub(r'.*This is the error:.*?`', '', error_str, flags=re.DOTALL).strip()
+                query_time = time.time() - start_time
+                response = {"output": answer, "intermediate_steps": []}
+            else:
+                step_placeholder.empty()
+                st.error(f"⚠️ 执行出错：{error_str}")
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": "执行失败，请检查数据表结构或重试。",
+                    "chart_data": None, "chart_title": "", "csv_data": None,
+                    "sql": None, "query_time": None,
                 })
+                st.stop()
 
-            render_answer_with_highlights(answer)
+        step_placeholder.markdown(show_step_progress(3), unsafe_allow_html=True)
+        time.sleep(0.2)
+        step_placeholder.markdown(show_step_progress(4), unsafe_allow_html=True)
+        time.sleep(0.2)
+        step_placeholder.empty()
 
-            result_df = None
-            full_data_query = False
+        chart_data = None
+        chart_title = prompt[:30]
+        csv_data = None
+        extracted_sql = None
+
+        extracted_sql = extract_sql_from_intermediate(response)
+        if not extracted_sql:
+            extracted_sql = extract_sql_from_answer(answer)
+
+        render_answer_with_highlights(answer)
+
+        result_df = None
+        full_data_query = False
+        
+        if extracted_sql:
+            result_df = run_sql_query(extracted_sql)
             
-            if extracted_sql:
-                result_df = run_sql_query(extracted_sql)
+            time_keywords = ['时间段', '小时', 'hour', '天', '日期', '趋势', '分布', '变化', '每天', '每日', '24']
+            is_time_question = any(k in prompt.lower() or k in prompt for k in time_keywords)
+            has_limit = re.search(r'\bLIMIT\s+\d+', extracted_sql, re.IGNORECASE)
+            too_few_rows = result_df is not None and len(result_df) <= 2
+            
+            if is_time_question and too_few_rows and has_limit:
+                cols = result_df.columns.tolist()
+                time_col = cols[0] if cols else 'order_hour'
                 
-                time_keywords = ['时间段', '小时', 'hour', '天', '日期', '趋势', '分布', '变化', '每天', '每日', '24']
-                is_time_question = any(k in prompt.lower() or k in prompt for k in time_keywords)
-                has_limit = re.search(r'\bLIMIT\s+\d+', extracted_sql, re.IGNORECASE)
-                too_few_rows = result_df is not None and len(result_df) <= 2
+                base_sql = re.sub(r'\bLIMIT\s+\d+', '', extracted_sql, flags=re.IGNORECASE)
+                base_sql = re.sub(r'\bORDER\s+BY\s+[\w.,`\(\)\*\s]+DESC\b', '', base_sql, flags=re.IGNORECASE)
                 
-                if is_time_question and too_few_rows and has_limit:
-                    cols = result_df.columns.tolist()
-                    time_col = cols[0] if cols else 'order_hour'
-                    
-                    base_sql = re.sub(r'\bLIMIT\s+\d+', '', extracted_sql, flags=re.IGNORECASE)
-                    base_sql = re.sub(r'\bORDER\s+BY\s+[\w.,`\(\)\*\s]+DESC\b', '', base_sql, flags=re.IGNORECASE)
-                    
-                    if 'GROUP BY' in base_sql.upper():
-                        full_sql = f"{base_sql.strip().rstrip(';')} ORDER BY {time_col} ASC"
-                    else:
-                        full_sql = extracted_sql
-                    
-                    if full_sql != extracted_sql:
-                        full_data_query = True
-                        full_df = run_sql_query(full_sql)
-                        if full_df is not None and len(full_df) > len(result_df):
-                            result_df = full_df
-                            extracted_sql = full_sql
-            
-            if result_df is None or (isinstance(result_df, pd.DataFrame) and len(result_df) == 0):
-                result_df = parse_data_from_answer(answer)
-                if result_df is not None and len(result_df) > 0:
-                    st.info(f"📊 从回答文本解析数据成功，行数: {len(result_df)}")
-            
+                if 'GROUP BY' in base_sql.upper():
+                    full_sql = f"{base_sql.strip().rstrip(';')} ORDER BY {time_col} ASC"
+                else:
+                    full_sql = extracted_sql
+                
+                if full_sql != extracted_sql:
+                    full_data_query = True
+                    full_df = run_sql_query(full_sql)
+                    if full_df is not None and len(full_df) > len(result_df):
+                        result_df = full_df
+                        extracted_sql = full_sql
+        
+        if result_df is None or (isinstance(result_df, pd.DataFrame) and len(result_df) == 0):
+            result_df = parse_data_from_answer(answer)
             if result_df is not None and len(result_df) > 0:
-                st.dataframe(result_df, use_container_width=True, hide_index=True)
-                chart_data = result_df.to_dict(orient="records")
-                csv_data = result_df.to_dict(orient="records")
+                st.info(f"📊 从回答文本解析数据成功，行数: {len(result_df)}")
+        
+        if result_df is not None and len(result_df) > 0:
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
+            chart_data = result_df.to_dict(orient="records")
+            csv_data = result_df.to_dict(orient="records")
 
+            is_single_value = len(result_df) == 1 and len(result_df.columns) == 1
+            is_avg_question = any(k in prompt.lower() or k in prompt for k in ['平均', 'avg', 'mean', 'per capita'])
+            
+            if is_single_value or (is_avg_question and len(result_df) == 1):
+                if is_avg_question and len(result_df.columns) > 1:
+                    avg_cols = [c for c in result_df.columns if 'avg' in c.lower() or 'freq' in c.lower() or 'per' in c.lower()]
+                    if avg_cols:
+                        target_col = avg_cols[0]
+                    else:
+                        target_col = result_df.columns[-1]
+                else:
+                    target_col = result_df.columns[0]
+                
+                single_val = result_df.iloc[0][target_col]
+                st.metric(label="查询结果", value=f"{single_val:.2f}" if isinstance(single_val, (int, float)) else str(single_val))
+                chart_data = None
+            else:
                 chart_type = detect_chart_type(result_df, prompt)
                 
                 fig = create_chart(result_df, chart_title, prompt)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config={
+                    st.plotly_chart(fig, use_container_width=True, key=f"live_chart_{cache_key}", config={
                         'displaylogo': False,
                         'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
                     })
-                
-                st.download_button(
-                    "📥 导出 CSV",
-                    result_df.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="query_result.csv",
-                    mime="text/csv",
-                    key=f"dl_{cache_key}",
-                )
             
-            elif extracted_sql:
-                st.warning("⚠️ SQL 执行无结果")
+            st.download_button(
+                "📥 导出 CSV",
+                result_df.to_csv(index=False).encode("utf-8-sig"),
+                file_name="query_result.csv",
+                mime="text/csv",
+                key=f"dl_{cache_key}",
+            )
+        
+        elif extracted_sql:
+            st.warning("⚠️ SQL 执行无结果")
 
-            if extracted_sql:
-                render_sql_block(extracted_sql, query_time)
+        if extracted_sql:
+            render_sql_block(extracted_sql, query_time)
 
-            msg_data = {
-                "role": "assistant",
-                "content": answer,
-                "chart_data": chart_data,
-                "chart_title": chart_title,
-                "csv_data": csv_data,
-                "sql": extracted_sql,
-                "query_time": query_time,
-                "question": prompt,
-            }
-            st.session_state.messages.append(msg_data)
+        msg_data = {
+            "role": "assistant",
+            "content": answer,
+            "chart_data": chart_data,
+            "chart_title": chart_title,
+            "csv_data": csv_data,
+            "sql": extracted_sql,
+            "query_time": query_time,
+            "question": prompt,
+        }
+        st.session_state.messages.append(msg_data)
 
-            st.session_state.query_cache[cache_key] = {
-                "answer": answer,
-                "chart_data": chart_data,
-                "chart_title": chart_title,
-                "csv_data": csv_data,
-                "sql": extracted_sql,
-                "query_time": query_time,
-            }
+        st.session_state.query_cache[cache_key] = {
+            "answer": answer,
+            "chart_data": chart_data,
+            "chart_title": chart_title,
+            "csv_data": csv_data,
+            "sql": extracted_sql,
+            "query_time": query_time,
+        }
 
-            st.session_state.query_history.append({
-                "question": prompt,
-                "answer": answer[:100],
-            })
-
-        except Exception as e:
-            step_placeholder.empty()
-            st.error(f"⚠️ 执行出错：{str(e)}")
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": "执行失败，请检查数据表结构或重试。",
-                "chart_data": None, "chart_title": "", "csv_data": None,
-                "sql": None, "query_time": None,
-            })
+        st.session_state.query_history.append({
+            "question": prompt,
+            "answer": answer[:100],
+        })
