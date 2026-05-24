@@ -14,9 +14,19 @@ st.set_page_config(
 st.title("🛒 电商订单数据分析看板")
 st.markdown("---")
 
+def _find_repo_root():
+    p = os.path.dirname(os.path.abspath(__file__))
+    while p != os.path.dirname(p):
+        if os.path.exists(os.path.join(p, 'data', 'cleaned_orders.csv')):
+            return p
+        p = os.path.dirname(p)
+    return os.path.dirname(os.path.abspath(__file__))
+
+_REPO_ROOT = _find_repo_root()
+
 @st.cache_data
 def load_data():
-    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'cleaned_orders.csv')
+    data_path = os.path.join(_REPO_ROOT, 'data', 'cleaned_orders.csv')
     df = pd.read_csv(data_path, parse_dates=['下单时间', '付款时间'])
     return df
 
