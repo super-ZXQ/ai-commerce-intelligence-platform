@@ -15,18 +15,19 @@
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手** | LangChain + Qwen + MySQL | 自然语言提问，自动生成 SQL 并绘图 |
-| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 22 个 RESTful API，含 JWT 认证/限流/缓存/监控 |
+| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 23 个 RESTful API，含 JWT 认证/限流/缓存/监控 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 
 ## 在线演示
 
 | 应用 | 链接 | 说明 |
 |------|------|------|
-| **BI 数据看板** | [点击体验](https://ecommerce-analysis-system-cqd8tpywoxneg8n3wqexfm.streamlit.app) | 交互式数据分析大屏 |
-| **AI 分析助手** | 本地部署 `streamlit run ai-ecommerce-assistant/app.py` | 自然语言查数，自动 SQL + 图表 |
-| **API 文档** | 本地启动后访问 `http://localhost:8000/docs` | Swagger UI 交互式文档 |
-| **API 体验页面** | 本地启动后访问 `http://localhost:8000/demo` | 可视化数据大屏 + AI 查询 |
-| **系统监控面板** | 本地启动后访问 `http://localhost:8000/monitor` | 可视化监控仪表盘 |
+| **BI 数据看板** | [点击体验](https://ecommerce-analysis-system-cqd8tpywoxneg8n3wqexfm.streamlit.app) | Streamlit Cloud 在线部署 |
+| **AI 分析助手** | 本地 `http://localhost:8502` | 自然语言查数，自动 SQL + 图表 |
+| **API 文档** | 本地 `http://localhost:8000/docs` | Swagger UI 交互式文档 |
+| **API 体验页面** | 本地 `http://localhost:8000/demo` | 可视化数据大屏 + AI 查询 |
+| **系统监控面板** | 本地 `http://localhost:8000/monitor` | 可视化监控仪表盘 |
+| **健康检查面板** | 本地 `http://localhost:8000/health-panel` | 组件健康状态与指标看板 |
 
 ---
 
@@ -39,7 +40,7 @@
 | 模块 | 接口数 | 说明 | 认证 |
 |------|--------|------|------|
 | **认证系统** | 3 | 登录 / 刷新Token / 当前用户 | 公开 |
-| **系统接口** | 5 | 首页 / 健康检查 / 体验页 / 监控面板 / API文档 | 公开 |
+| **系统接口** | 6 | 首页 / 健康检查 / 体验页 / 监控面板 / 健康面板 / API文档 | 公开 |
 | **订单查询** | 3 | 列表（分页+排序）、详情、多条件筛选 | 公开 |
 | **商品与用户** | 2 | 商品销售排名、用户消费排名 | 公开 |
 | **数据分析** | 5 | 销售总览(缓存)、趋势、热销商品、用户行为(缓存)、平台分析 | 公开 |
@@ -171,7 +172,7 @@ curl -o report.xlsx "http://localhost:8000/api/export/analytics?export_format=ex
 | 时间跨度 | 2025.01-2026.01 | 全年销售数据 |
 | 总销售额 | 101,776,848.74 元 | 实际付款金额 |
 | 复购率 | 25.39% | 消费 >=2 次的用户占比 |
-| API 接口 | 22 个 | 含认证/限流/监控 |
+| API 接口 | 23 个 | 含认证/限流/监控 |
 | 默认账号 | admin/admin123 | JWT 认证账号 |
 | 测试用例 | 27 个 | 异步单元测试 |
 | 支持平台 | 6 个 | APP/微信公众号/Web网站/淘宝/微信小商店/wap网站 |
@@ -210,7 +211,8 @@ ecommerce_analysis/
 │   │
 │   ├── static/
 │   │   ├── index.html              # 统一入口导航页面
-│   │   └── monitor.html            # 系统监控可视化面板
+│   │   ├── monitor.html            # 系统监控可视化面板
+│   │   └── health.html             # 健康检查可视化面板
 │   │
 │   ├── utils/
 │   │   ├── auth.py                 # JWT 工具（生成/验证/密码哈希）
@@ -226,8 +228,9 @@ ecommerce_analysis/
 │   └── sql/
 │       └── optimize_indexes.sql    # 数据库索引优化脚本（7个索引）
 │
-├── ai-ecommerce-assistant/          # AI Streamlit 助手
-├── app/bi_dashboard.py             # Streamlit BI 看板
+├── ai-ecommerce-assistant/          # AI Streamlit 助手（LangChain + Qwen）
+├── streamlit_app.py                 # Streamlit BI 看板主程序
+├── app/bi_dashboard.py             # Streamlit Cloud 部署入口
 ├── data/cleaned_orders.csv         # 清洗后数据
 ├── notebook/                       # 5 个分析 Notebook
 ├── sql/                            # 建表/导入/高级分析 SQL
@@ -256,6 +259,7 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 # Swagger 文档: http://localhost:8000/docs
 # 体验页面:    http://localhost:8000/demo
 # 监控面板:    http://localhost:8000/monitor
+# 健康面板:    http://localhost:8000/health-panel
 ```
 
 ### 完整部署
@@ -272,11 +276,13 @@ pip install -r backend/requirements.txt
 
 # 启动三个服务（可同时运行）
 streamlit run app/bi_dashboard.py                          # BI 看板 :8501
-streamlit run ai-ecommerce-assistant/app.py                # AI 助手 :8501
+streamlit run ai-ecommerce-assistant/app.py                # AI 助手 :8502
 python -m uvicorn backend.main:app --port 8000              # API 服务 :8000
 ```
 
-### 环境变量配置 (`backend/.env`)
+### 环境变量配置
+
+**`backend/.env`（FastAPI 后端）**：
 
 ```env
 # 数据库
@@ -290,6 +296,20 @@ DB_NAME=ecommerce_analysis
 JWT_SECRET=your-secret-key-change-in-production
 
 # AI 助手（可选）
+LLM_API_KEY=sk-你的阿里云Key
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_MODEL=qwen-plus
+```
+
+**`ai-ecommerce-assistant/.env`（AI 分析助手）**：
+```env
+# 数据库
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=你的MySQL密码
+DB_NAME=ecommerce_analysis
+
+# LLM 配置（阿里云通义千问）
 LLM_API_KEY=sk-你的阿里云Key
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL=qwen-plus
@@ -345,5 +365,5 @@ pytest-asyncio>=0.21.0
 ## 迭代规划
 
 - **v1.0**：17 个基础 API + Swagger 文档 + AI 查询 + 数据导出
-- **v1.1**：JWT 认证 + API 限流 + 响应缓存 + 监控指标 + 27 个测试用例 + Postman Collection + 数据库索引优化 + 可视化监控面板 + 统一入口导航
+- **v1.1**：JWT 认证 + API 限流 + 响应缓存 + 监控指标 + 27 个测试用例 + Postman Collection + 数据库索引优化 + 可视化监控面板 + 健康检查面板 + 统一入口导航
 - **规划中**：接入 Redis 生产级缓存、Airflow 定时调度、Docker 容器化部署
