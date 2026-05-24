@@ -4,7 +4,6 @@ data/datas.xlsx
 
 # 环境变量（含 API 密钥）
 .env
-*.env
 
 # 数据库文件（体积大）
 *.db
@@ -17,3 +16,11 @@ __pycache__/
 # 系统隐藏文件
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# 虚拟环境
+venv/
+.venv/

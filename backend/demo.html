@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商数据分析API - 可视化体验</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+.header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 24px 32px; border-bottom: 1px solid #475569; display: flex; align-items: center; gap: 16px; }
+.header h1 { font-size: 22px; font-weight: 600; }
+.header .badge { background: #818cf8; color: white; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+.header .url { margin-left: auto; color: #94a3b8; font-size: 14px; font-family: monospace; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+
+.card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(129, 140, 248, 0.15); }
+.card-header { padding: 16px 20px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; }
+.card-header h3 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.card-header .status { width: 10px; height: 10px; border-radius: 50%; background: #64748b; }
+.card-header .status.ok { background: #22c55e; box-shadow: 0 0 10px rgba(34,197,94,0.5); }
+.card-header .status.err { background: #ef4444; }
+.card-body { padding: 20px; min-height: 200px; position: relative; }
+
+/* 指标卡片 */
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.metric-item { background: #0f172a; border-radius: 8px; padding: 14px; text-align: center; }
+.metric-value { font-size: 24px; font-weight: 700; color: #818cf8; }
+.metric-label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+/* 排名列表 */
+.rank-list { list-style: none; }
+.rank-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1e293b; }
+.rank-item:last-child { border-bottom: none; }
+.rank-num { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; margin-right: 12px; }
+.rank-num.top1 { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+.rank-num.top2 { background: linear-gradient(135deg, #94a3b8, #64748b); color: white; }
+.rank-num.top3 { background: linear-gradient(135deg, #cd7c3a, #a1623a); color: white; }
+.rank-num.normal { background: #334155; color: #94a3b8; }
+.rank-name { flex: 1; font-size: 14px; font-weight: 500; }
+.rank-val { font-size: 14px; color: #818cf8; font-weight: 600; }
+
+/* 平台占比 */
+.platform-bar { margin-bottom: 14px; }
+.platform-info { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+.platform-info .name { font-weight: 500; }
+.platform-info .pct { color: #818cf8; font-weight: 600; }
+.bar-track { height: 8px; background: #0f172a; border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+/* AI 对话 */
+.ai-chat { display: flex; flex-direction: column; height: 100%; }
+.ai-input-area { display: flex; gap: 8px; margin-bottom: 14px; }
+.ai-input-area input { flex: 1; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; outline: none; }
+.ai-input-area input:focus { border-color: #818cf8; }
+.ai-btn { background: #818cf8; color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; }
+.ai-btn:hover { background: #6366f1; }
+.ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-response { background: #0f172a; border-radius: 8px; padding: 14px; flex: 1; overflow-y: auto; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.ai-loading { color: #818cf8; font-style: italic; }
+
+/* 订单表格 */
+.order-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.order-table th { text-align: left; padding: 8px 6px; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #334155; font-size: 12px; }
+.order-table td { padding: 8px 6px; border-bottom: 1px solid #1e293b; }
+.order-table tr:hover td { background: rgba(129,140,248,0.05); }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.tag-app { background: rgba(99,102,241,0.2); color: #818cf8; }
+.tag-wx { background: rgba(34,197,94,0.2); color: #22c55e; }
+.tag-web { background: rgba(245,158,11,0.2); color: #f59e0b; }
+
+.loading-spinner { text-align: center; padding: 40px; color: #64748b; }
+.error-text { color: #ef4444; font-size: 13px; padding: 20px; text-align: center; }
+
+.section-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; color: #f1f5f9; display: flex; align-items: center; gap: 10px; }
+.section-title .icon { font-size: 22px; }
+
+.full-width { grid-column: 1 / -1; }
+
+@media (max-width: 768px) {
+    .container { grid-template-columns: 1fr; padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🛒 电商数据分析系统 - FastAPI 后端</h1>
+    <span class="badge">API v1.1</span>
+    <span class="url" id="apiUrl"></span>
+    <a href="/" style="margin-left:16px;color:#94a3b8;text-decoration:none;font-size:14px;">← 返回首页</a>
+</div>
+
+<div class="container">
+
+    <!-- 销售总览 -->
+    <div class="card full-width">
+        <div class="card-header"><h3><span class="status ok" id="s1_status"></span> 📊 销售总览</h3></div>
+        <div class="card-body"><div id="overview_content"><div class="loading-spinner">加载中...</div></div></div>
+    </div>
+
+    <!-- 热销商品 -->
+    <div class="card">
+        <div class="card-header"><h3><span class="status ok" id="s2_status"></span> 🏆 热销商品 TOP5</h3></div>
+        <div class="card-body"><div id="products_content"><div class="loading-spinner">加载中...</div></div></div>
+    </div>
+
+    <!-- 用户行为 -->
+    <div class="card">
+        <div class="card-header"><h3><span class="status ok" id="s3_status"></span> 👥 用户行为分析</h3></div>
+        <div class="card-body"><div id="behavior_content"><div class="loading-spinner">加载中...</div></div></div>
+    </div>
+
+    <!-- 平台占比 -->
+    <div class="card">
+        <div class="card-header"><h3><span class="status ok" id="s4_status"></span> 📱 平台销售占比</h3></div>
+        <div class="card-body"><div id="category_content"><div class="loading-spinner">加载中...</div></div></div>
+    </div>
+
+    <!-- 最新订单 -->
+    <div class="card">
+        <div class="card-header"><h3><span class="status ok" id="s5_status"></span> 📦 最新订单</h3></div>
+        <div class="card-body"><div id="orders_content"><div class="loading-spinner">加载中...</div></div></div>
+    </div>
+
+    <!-- AI 助手 -->
+    <div class="card full-width">
+        <div class="card-header"><h3><span class="status ok" id="s6_status"></span> 🤖 AI 智能查询助手（Text-to-SQL）</h3></div>
+        <div class="card-body">
+            <div class="ai-chat">
+                <div class="ai-input-area">
+                    <input type="text" id="ai_input" placeholder="输入自然语言问题，例如：查询最近7天的销售额、哪个平台订单最多..." value="销售额最高的3个商品编号和金额是多少？">
+                    <button class="ai-btn" id="ai_btn" onclick="askAI()">发送查询</button>
+                </div>
+                <div class="ai-response" id="ai_response">点击「发送查询」开始AI对话...</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const BASE = window.location.origin;
+
+let authToken = null;
+
+async function ensureAuth() {
+    if (authToken) return authToken;
+    try {
+        const r = await fetch(BASE + '/api/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: 'admin', password: 'admin123'})
+        });
+        if (r.ok) {
+            const d = await r.json();
+            authToken = d.access_token;
+            return authToken;
+        }
+        return null;
+    } catch(e) { return null; }
+}
+
+document.getElementById('apiUrl').textContent = BASE + '/docs';
+
+function setStatus(id, ok) {
+    const el = document.getElementById(id);
+    el.className = 'status ' + (ok ? 'ok' : 'err');
+}
+
+function formatMoney(n) {
+    return '¥' + Number(n).toLocaleString('zh-CN', {minimumFractionDigits: 2});
+}
+
+function formatNum(n) {
+    return Number(n).toLocaleString('zh-CN');
+}
+
+// ====== 1. 销售总览 ======
+async function loadOverview() {
+    try {
+        const r = await fetch(BASE + '/api/analytics/sales-overview');
+        const d = await r.json();
+        setStatus('s1_status', true);
+        document.getElementById('overview_content').innerHTML = `
+            <div class="metric-grid">
+                <div class="metric-item"><div class="metric-value">${formatMoney(d.total_sales)}</div><div class="metric-label">总销售额</div></div>
+                <div class="metric-item"><div class="metric-value">${formatNum(d.total_orders)}</div><div class="metric-label">总订单数</div></div>
+                <div class="metric-item"><div class="metric-value">${formatMoney(d.avg_order_value)}</div><div class="metric-label">平均客单价</div></div>
+                <div class="metric-item"><div class="metric-value">${formatNum(d.total_users)}</div><div class="metric-label">总用户数</div></div>
+                <div class="metric-item"><div class="metric-value">${d.refund_rate}%</div><div class="metric-label">退款率</div></div>
+                <div class="metric-item"><div class="metric-value">${formatMoney(d.total_refund_amount)}</div><div class="metric-label">退款总额</div></div>
+            </div>`;
+    } catch(e) {
+        setStatus('s1_status', false);
+        document.getElementById('overview_content').innerHTML = '<div class="error-text">加载失败: ' + e.message + '</div>';
+    }
+}
+
+// ====== 2. 热销商品 ======
+async function loadProducts() {
+    try {
+        const r = await fetch(BASE + '/api/analytics/top-products?limit=5');
+        const d = await r.json();
+        setStatus('s2_status', true);
+        let html = '<ul class="rank-list">';
+        d.forEach((p, i) => {
+            const cls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : 'normal';
+            html += `<li class="rank-item"><span class="rank-num ${cls}">${i + 1}</span><span class="rank-name">${p.product_id}</span><span class="rank-val">${formatMoney(p.total_sales)} (${p.order_count}笔)</span></li>`;
+        });
+        html += '</ul>';
+        document.getElementById('products_content').innerHTML = html;
+    } catch(e) {
+        setStatus('s2_status', false);
+        document.getElementById('products_content').innerHTML = '<div class="error-text">加载失败</div>';
+    }
+}
+
+// ====== 3. 用户行为 ======
+async function loadBehavior() {
+    try {
+        const r = await fetch(BASE + '/api/analytics/user-behavior');
+        const d = await r.json();
+        setStatus('s3_status', true);
+        document.getElementById('behavior_content').innerHTML = `
+            <div class="metric-grid">
+                <div class="metric-item"><div class="metric-value">${d.repeat_purchase_rate}%</div><div class="metric-label">复购率</div></div>
+                <div class="metric-item"><div class="metric-value">${d.avg_order_frequency}</div><div class="metric-label">人均消费频次</div></div>
+                <div class="metric-item"><div class="metric-value">${formatNum(d.active_users_7d)}</div><div class="metric-label">7日活跃用户</div></div>
+                <div class="metric-item"><div class="metric-value">${formatNum(d.active_users_30d)}</div><div class="metric-label">30日活跃用户</div></div>
+                <div class="metric-item"><div class="metric-value">${formatMoney(d.avg_customer_value)}</div><div class="metric-label">平均客单价</div></div>
+                <div class="metric-item"><div class="metric-value">${formatNum(d.total_users)}</div><div class="metric-label">总用户数</div></div>
+            </div>`;
+    } catch(e) {
+        setStatus('s3_status', false);
+        document.getElementById('behavior_content').innerHTML = '<div class="error-text">加载失败</div>';
+    }
+}
+
+// ====== 4. 平台占比 ======
+async function loadCategory() {
+    try {
+        const r = await fetch(BASE + '/api/analytics/category-analysis');
+        const d = await r.json();
+        setStatus('s4_status', true);
+        const colors = ['#818cf8', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
+        let html = '';
+        d.categories.forEach((c, i) => {
+            html += `<div class="platform-bar">
+                <div class="platform-info"><span class="name">${c.platform_type}</span><span class="pct">${c.sales_ratio}% · ${formatMoney(c.total_sales)}</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:${c.sales_ratio}%;background:${colors[i % colors.length]}"></div></div>
+            </div>`;
+        });
+        document.getElementById('category_content').innerHTML = html;
+    } catch(e) {
+        setStatus('s4_status', false);
+        document.getElementById('category_content').innerHTML = '<div class="error-text">加载失败</div>';
+    }
+}
+
+// ====== 5. 最新订单 ======
+async function loadOrders() {
+    try {
+        const r = await fetch(BASE + '/api/orders?page_size=6');
+        const d = await r.json();
+        setStatus('s5_status', true);
+        let html = '<table class="order-table"><thead><tr><th>订单号</th><th>商品</th><th>金额</th><th>平台</th><th>时间</th></tr></thead><tbody>';
+        d.items.forEach(o => {
+            const tagClass = o.platform_type === 'APP' ? 'tag-app' : o.platform_type.includes('微信') || o.platform_type.includes('公众号') ? 'tag-wx' : o.platform_type.includes('web') || o.platform_type.includes('网站') ? 'tag-web' : '';
+            html += `<tr><td>${o.order_no.substring(0, 18)}...</td><td>${o.product_id}</td><td>${formatMoney(o.payment_amount)}</td><td><span class="tag ${tagClass}">${o.platform_type}</span></td><td>${o.order_time.substring(0, 16).replace('T', ' ')}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        html += `<div style="margin-top:10px;color:#64748b;font-size:12px;">共 ${formatNum(d.total)} 条记录</div>`;
+        document.getElementById('orders_content').innerHTML = html;
+    } catch(e) {
+        setStatus('s5_status', false);
+        document.getElementById('orders_content').innerHTML = '<div class="error-text">加载失败</div>';
+    }
+}
+
+// ====== 6. AI 查询 ======
+async function askAI() {
+    const input = document.getElementById('ai_input');
+    const btn = document.getElementById('ai_btn');
+    const resp = document.getElementById('ai_response');
+    const query = input.value.trim();
+    if (!query) return;
+
+    btn.disabled = true;
+    btn.textContent = '查询中...';
+    resp.innerHTML = '<div class="ai-loading">🔐 正在认证...</div>';
+
+    try {
+        const token = await ensureAuth();
+        if (!token) {
+            setStatus('s6_status', false);
+            resp.innerHTML = '<div class="error-text">⚠️ 认证失败，请确认后端服务正常运行</div>';
+            btn.disabled = false;
+            btn.textContent = '发送查询';
+            return;
+        }
+
+        resp.innerHTML = '<div class="ai-loading">🤖 正在思考中，请稍候... (调用大模型生成SQL并执行查询)</div>';
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 120000);
+        const r = await fetch(BASE + '/api/ai/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query }),
+            signal: controller.signal
+        });
+        clearTimeout(timer);
+        const d = await r.json();
+
+        setStatus('s6_status', r.ok);
+
+        if (r.ok && d.sql) {
+            let resultHtml = '';
+            if (d.result && d.result.length > 0) {
+                const keys = Object.keys(d.result[0]);
+                resultHtml = '<table class="order-table" style="margin-top:12px"><thead><tr>' +
+                    keys.map(k => `<th>${k}</th>`).join('') + '</tr></thead><tbody>';
+                d.result.slice(0, 10).forEach(row => {
+                    resultHtml += '<tr>' + keys.map(k => `<td>${row[k]}</td>`).join('') + '</tr>';
+                });
+                resultHtml += '</tbody></table>';
+                if (d.result.length > 10) resultHtml += `<div style="color:#64748b;font-size:12px;margin-top:6px;">共 ${d.result.length} 条结果，显示前10条</div>`;
+            }
+
+            resp.innerHTML = `
+                <div style="color:#22c55e;font-weight:600;margin-bottom:8px;">✅ AI 回答：</div>
+                <div style="margin-bottom:12px;">${d.answer}</div>
+                ${resultHtml}
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155;">
+                    <div style="color:#818cf8;font-size:12px;margin-bottom:4px;">🔍 生成的SQL:</div>
+                    <code style="display:block;background:#0a0f1e;padding:10px;border-radius:6px;font-size:12px;color:#a5b4fc;overflow-x:auto;">${d.sql}</code>
+                </div>`;
+        } else {
+            resp.innerHTML = `<div style="color:#f59e0b;">⚠️ ${d.answer || JSON.stringify(d)}</div>`;
+        }
+    } catch(e) {
+        setStatus('s6_status', false);
+        resp.innerHTML = '<div class="error-text">请求失败: ' + e.message + '</div>';
+    }
+
+    btn.disabled = false;
+    btn.textContent = '发送查询';
+}
+
+// Enter键触发
+document.getElementById('ai_input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') askAI();
+});
+
+// 全部加载
+Promise.all([loadOverview(), loadProducts(), loadBehavior(), loadCategory(), loadOrders()]);
+</script>
+</body>
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商数据分析系统 - 系统监控</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; }
+
+.header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    border-bottom: 1px solid rgba(129,140,248,0.15);
+    padding: 16px 32px;
+    display: flex; align-items: center; gap: 16px;
+}
+.logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 16px rgba(245,158,11,0.3);
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header .badge {
+    font-size: 11px; font-weight: 600;
+    background: rgba(245,158,11,0.15); color: #f59e0b;
+    padding: 3px 10px; border-radius: 20px;
+    border: 1px solid rgba(245,158,11,0.25);
+}
+.header .back-link {
+    margin-left: auto;
+    color: #94a3b8; text-decoration: none; font-size: 14px;
+    display: flex; align-items: center; gap: 6px;
+    transition: color 0.2s;
+}
+.header .back-link:hover { color: #818cf8; }
+.header .refresh-info {
+    color: #64748b; font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+}
+.refresh-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #22c55e;
+    animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.container {
+    max-width: 1400px; margin: 0 auto; padding: 24px;
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    gap: 20px;
+}
+
+.card {
+    background: #111827;
+    border: 1px solid rgba(148,163,184,0.08);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+.card-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(148,163,184,0.06);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.card-head h3 {
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+}
+.card-head .icon { font-size: 18px; }
+.card-body { padding: 20px; }
+
+.col-12 { grid-column: span 12; }
+.col-8 { grid-column: span 8; }
+.col-6 { grid-column: span 6; }
+.col-4 { grid-column: span 4; }
+
+@media (max-width: 1024px) {
+    .col-8, .col-6, .col-4 { grid-column: span 12; }
+}
+
+.metric-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.metric-box {
+    flex: 1; min-width: 140px;
+    background: #0a0e1a; border-radius: 10px;
+    padding: 18px 16px; text-align: center;
+    border: 1px solid rgba(148,163,184,0.04);
+}
+.metric-box .value {
+    font-size: 28px; font-weight: 800;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.2;
+}
+.metric-box .value.green {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.metric-box .value.amber {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.metric-box .value.red {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.metric-box .label { font-size: 12px; color: #64748b; margin-top: 6px; }
+
+.health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.health-item {
+    background: #0a0e1a; border-radius: 10px;
+    padding: 16px; display: flex; align-items: center; gap: 14px;
+    border: 1px solid rgba(148,163,184,0.04);
+}
+.health-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+}
+.health-icon.ok { background: rgba(34,197,94,0.12); }
+.health-icon.err { background: rgba(239,68,68,0.12); }
+.health-info .name { font-size: 14px; font-weight: 600; }
+.health-info .detail { font-size: 12px; color: #64748b; margin-top: 2px; }
+.health-badge {
+    margin-left: auto; font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+}
+.health-badge.ok { background: rgba(34,197,94,0.12); color: #22c55e; }
+.health-badge.err { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+.endpoint-table { width: 100%; border-collapse: collapse; }
+.endpoint-table th {
+    text-align: left; padding: 10px 12px; font-size: 12px;
+    color: #64748b; font-weight: 500;
+    border-bottom: 1px solid rgba(148,163,184,0.08);
+}
+.endpoint-table td {
+    padding: 10px 12px; font-size: 13px;
+    border-bottom: 1px solid rgba(148,163,184,0.04);
+}
+.endpoint-table tr:hover td { background: rgba(129,140,248,0.03); }
+.endpoint-path {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    color: #818cf8; font-size: 12px;
+}
+.endpoint-bar {
+    height: 6px; background: #1e293b; border-radius: 3px;
+    overflow: hidden; min-width: 60px;
+}
+.endpoint-bar-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, #818cf8, #6366f1);
+    transition: width 0.6s ease;
+}
+.error-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+}
+.error-badge.zero { background: rgba(34,197,94,0.12); color: #22c55e; }
+.error-badge.some { background: rgba(245,158,11,0.12); color: #f59e0b; }
+.error-badge.many { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+.server-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.info-item {
+    display: flex; justify-content: space-between;
+    padding: 10px 14px; background: #0a0e1a; border-radius: 8px;
+    font-size: 13px;
+}
+.info-item .key { color: #64748b; }
+.info-item .val { color: #e2e8f0; font-weight: 500; font-family: 'Cascadia Code', monospace; font-size: 12px; }
+
+.overall-status {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+}
+.overall-status.healthy { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); }
+.overall-status.degraded { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.15); }
+.overall-status .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+}
+.overall-status.healthy .dot { background: #22c55e; box-shadow: 0 0 10px rgba(34,197,94,0.5); }
+.overall-status.degraded .dot { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,0.5); }
+
+.loading { text-align: center; padding: 40px; color: #475569; }
+.error-text { color: #ef4444; font-size: 13px; text-align: center; padding: 20px; }
+
+.footer {
+    text-align: center; padding: 20px;
+    color: #334155; font-size: 12px;
+    border-top: 1px solid rgba(148,163,184,0.05);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo-icon">📈</div>
+    <h1>系统监控面板</h1>
+    <span class="badge">Real-time</span>
+    <div class="refresh-info">
+        <span class="refresh-dot"></span>
+        <span id="refreshTimer">5s 自动刷新</span>
+    </div>
+    <a href="/" class="back-link">← 返回首页</a>
+</div>
+
+<div class="container" id="dashboard">
+    <div class="loading">正在加载监控数据...</div>
+</div>
+
+<div class="footer">
+    电商数据分析系统 v1.1 &nbsp;|&nbsp; 系统监控面板 &nbsp;|&nbsp; 数据每 5 秒自动刷新
+</div>
+
+<script>
+const BASE = window.location.origin;
+let maxCount = 1;
+
+function formatUptime(sec) {
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (d > 0) return `${d}天 ${h}时 ${m}分`;
+    if (h > 0) return `${h}时 ${m}分 ${s}秒`;
+    return `${m}分 ${s}秒`;
+}
+
+function formatTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleString('zh-CN');
+}
+
+function errorBadgeClass(errors, total) {
+    if (errors === 0) return 'zero';
+    if (errors / total < 0.1) return 'some';
+    return 'many';
+}
+
+async function loadDashboard() {
+    try {
+        const [metricsResp, healthResp] = await Promise.all([
+            fetch(BASE + '/api/monitor/metrics'),
+            fetch(BASE + '/api/monitor/health/detailed')
+        ]);
+        const metrics = await metricsResp.json();
+        const health = await healthResp.json();
+
+        const srv = metrics.server || {};
+        const req = metrics.requests || {};
+        const cache = metrics.cache || {};
+        const endpoints = req.top_endpoints || [];
+        if (endpoints.length > 0) maxCount = Math.max(maxCount, endpoints[0].count);
+
+        const isHealthy = health.status === 'healthy';
+        const checks = health.checks || {};
+
+        let html = '';
+
+        // Row 1: Overall Status
+        html += `<div class="card col-12">
+            <div class="card-body">
+                <div class="overall-status ${isHealthy ? 'healthy' : 'degraded'}">
+                    <span class="dot"></span>
+                    <span>系统状态：${isHealthy ? '运行正常' : '部分降级'}</span>
+                    <span style="margin-left:auto;font-size:12px;color:#64748b;font-weight:400;">检测时间：${formatTime(health.timestamp)}</span>
+                </div>
+            </div>
+        </div>`;
+
+        // Row 2: Key Metrics
+        const errorRate = req.error_rate || 0;
+        const rateClass = errorRate === 0 ? 'green' : errorRate < 5 ? 'amber' : 'red';
+        html += `<div class="card col-12">
+            <div class="card-head"><h3><span class="icon">📊</span> 核心指标</h3></div>
+            <div class="card-body">
+                <div class="metric-row">
+                    <div class="metric-box"><div class="value">${formatUptime(srv.uptime_seconds || 0)}</div><div class="label">运行时长</div></div>
+                    <div class="metric-box"><div class="value green">${req.total || 0}</div><div class="label">总请求数</div></div>
+                    <div class="metric-box"><div class="value green">${req.success || 0}</div><div class="label">成功请求</div></div>
+                    <div class="metric-box"><div class="value ${req.error > 0 ? 'red' : 'green'}">${req.error || 0}</div><div class="label">失败请求</div></div>
+                    <div class="metric-box"><div class="value ${rateClass}">${errorRate}%</div><div class="label">错误率</div></div>
+                    <div class="metric-box"><div class="value amber">${cache.keys || 0}</div><div class="label">缓存键数</div></div>
+                </div>
+            </div>
+        </div>`;
+
+        // Row 3: Health Checks + Server Info
+        html += `<div class="card col-6">
+            <div class="card-head"><h3><span class="icon">🏥</span> 组件健康状态</h3></div>
+            <div class="card-body">
+                <div class="health-grid">
+                    ${Object.entries(checks).map(([key, val]) => {
+                        const ok = val.status === 'ok';
+                        const icons = { database: '🗄️', cache: '💾' };
+                        const names = { database: '数据库连接', cache: '内存缓存' };
+                        const details = { database: ok ? '连接正常' : (val.detail || '连接异常'), cache: ok ? `${val.keys} 个键活跃` : '缓存异常' };
+                        return `<div class="health-item">
+                            <div class="health-icon ${ok ? 'ok' : 'err'}">${icons[key] || '⚙️'}</div>
+                            <div class="health-info"><div class="name">${names[key] || key}</div><div class="detail">${details[key] || val.status}</div></div>
+                            <span class="health-badge ${ok ? 'ok' : 'err'}">${ok ? '正常' : '异常'}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </div>`;
+
+        html += `<div class="card col-6">
+            <div class="card-head"><h3><span class="icon">🖥️</span> 服务器信息</h3></div>
+            <div class="card-body">
+                <div class="server-info">
+                    <div class="info-item"><span class="key">运行状态</span><span class="val" style="color:#22c55e">${srv.status || '-'}</span></div>
+                    <div class="info-item"><span class="key">Python 版本</span><span class="val">${srv.python_version || '-'}</span></div>
+                    <div class="info-item"><span class="key">进程 PID</span><span class="val">${srv.process_id || '-'}</span></div>
+                    <div class="info-item"><span class="key">启动时间</span><span class="val">${formatTime(srv.started_at)}</span></div>
+                    <div class="info-item"><span class="key">运行时长</span><span class="val">${formatUptime(srv.uptime_seconds || 0)}</span></div>
+                    <div class="info-item"><span class="key">缓存状态</span><span class="val" style="color:#f59e0b">${cache.keys || 0} keys</span></div>
+                </div>
+            </div>
+        </div>`;
+
+        // Row 4: Top Endpoints
+        if (endpoints.length > 0) {
+            html += `<div class="card col-12">
+                <div class="card-head"><h3><span class="icon">🔥</span> 热门接口 TOP${endpoints.length}</h3></div>
+                <div class="card-body" style="padding:0;">
+                    <table class="endpoint-table">
+                        <thead><tr><th>接口路径</th><th>请求次数</th><th>占比</th><th>平均耗时</th><th>错误数</th></tr></thead>
+                        <tbody>
+                        ${endpoints.map(ep => {
+                            const pct = maxCount > 0 ? Math.round(ep.count / maxCount * 100) : 0;
+                            const ebc = errorBadgeClass(ep.errors, ep.count);
+                            return `<tr>
+                                <td><span class="endpoint-path">${ep.path}</span></td>
+                                <td>${ep.count}</td>
+                                <td><div class="endpoint-bar"><div class="endpoint-bar-fill" style="width:${pct}%"></div></div></td>
+                                <td>${ep.avg_ms}ms</td>
+                                <td><span class="error-badge ${ebc}">${ep.errors}</span></td>
+                            </tr>`;
+                        }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        document.getElementById('dashboard').innerHTML = html;
+    } catch(e) {
+        document.getElementById('dashboard').innerHTML = `<div class="card col-12"><div class="card-body"><div class="error-text">加载失败: ${e.message}</div></div></div>`;
+    }
+}
+
+loadDashboard();
+setInterval(loadDashboard, 5000);
+</script>
+</body>
+</html>

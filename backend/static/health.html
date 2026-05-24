@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商数据分析系统 - 健康检查</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; }
+
+.header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    border-bottom: 1px solid rgba(34,197,94,0.15);
+    padding: 16px 32px;
+    display: flex; align-items: center; gap: 16px;
+}
+.logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header .badge {
+    font-size: 11px; font-weight: 600;
+    background: rgba(34,197,94,0.15); color: #22c55e;
+    padding: 3px 10px; border-radius: 20px;
+    border: 1px solid rgba(34,197,94,0.25);
+}
+.header .back-link {
+    margin-left: auto;
+    color: #94a3b8; text-decoration: none; font-size: 14px;
+    display: flex; align-items: center; gap: 6px;
+    transition: color 0.2s;
+}
+.header .back-link:hover { color: #818cf8; }
+.header .refresh-info {
+    color: #64748b; font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+}
+.refresh-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #22c55e;
+    animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.container {
+    max-width: 1200px; margin: 0 auto; padding: 24px;
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    gap: 20px;
+}
+
+.card {
+    background: #111827;
+    border: 1px solid rgba(148,163,184,0.08);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+.card-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(148,163,184,0.06);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.card-head h3 {
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+}
+.card-head .icon { font-size: 18px; }
+.card-body { padding: 20px; }
+
+.col-12 { grid-column: span 12; }
+.col-6 { grid-column: span 6; }
+.col-4 { grid-column: span 4; }
+
+@media (max-width: 900px) {
+    .col-6, .col-4 { grid-column: span 12; }
+}
+
+/* 总体状态横幅 */
+.status-banner {
+    display: flex; align-items: center; gap: 16px;
+    padding: 28px 32px; border-radius: 14px;
+    font-size: 18px; font-weight: 700;
+}
+.status-banner.healthy {
+    background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(22,163,74,0.04));
+    border: 1px solid rgba(34,197,94,0.2);
+}
+.status-banner.degraded {
+    background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.04));
+    border: 1px solid rgba(245,158,11,0.2);
+}
+.status-icon-big {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+}
+.status-banner.healthy .status-icon-big {
+    background: linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.08));
+    box-shadow: 0 4px 20px rgba(34,197,94,0.25);
+}
+.status-banner.degraded .status-icon-big {
+    background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.08));
+    box-shadow: 0 4px 20px rgba(245,158,11,0.25);
+}
+.status-text-main { font-size: 20px; }
+.status-sub { font-size: 13px; color: #64748b; font-weight: 400; margin-top: 4px; }
+.status-time { margin-left: auto; text-align: right; }
+.status-time .time-label { font-size: 11px; color: #475569; }
+.status-time .time-val { font-size: 13px; color: #94a3b8; font-family: 'Cascadia Code', monospace; }
+
+/* 组件卡片 */
+.check-card {
+    background: #0a0e1a; border-radius: 12px;
+    padding: 24px; display: flex; align-items: center; gap: 20px;
+    border: 1px solid rgba(148,163,184,0.05);
+    transition: border-color 0.2s;
+}
+.check-card:hover { border-color: rgba(148,163,184,0.12); }
+.check-icon-wrap {
+    width: 60px; height: 60px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; flex-shrink: 0;
+}
+.check-icon-wrap.ok-db { background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(37,99,235,0.06)); }
+.check-icon-wrap.ok-cache { background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(139,92,246,0.06)); }
+.check-icon-wrap.err { background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.06)); }
+.check-detail { flex: 1; }
+.check-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.check-desc { font-size: 13px; color: #64748b; }
+.check-status-badge {
+    font-size: 13px; font-weight: 700;
+    padding: 6px 18px; border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.check-status-badge.ok {
+    background: rgba(34,197,94,0.12); color: #22c55e;
+    border: 1px solid rgba(34,197,94,0.2);
+}
+.check-status-badge.err {
+    background: rgba(239,68,68,0.12); color: #ef4444;
+    border: 1px solid rgba(239,68,68,0.2);
+}
+
+/* 详细信息区 */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.detail-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; background: #0a0e1a; border-radius: 8px;
+    border: 1px solid rgba(148,163,184,0.04);
+}
+.detail-item .dk { font-size: 13px; color: #64748b; }
+.detail-item .dv { font-size: 14px; font-weight: 600; font-family: 'Cascadia Code', monospace; }
+.detail-item .dv.green { color: #22c55e; }
+.detail-item .dv.amber { color: #f59e0b; }
+.detail-item .dv.red { color: #ef4444; }
+
+/* 脉冲动画 */
+.pulse-ring {
+    position: relative;
+}
+.pulse-ring::after {
+    content: '';
+    position: absolute;
+    inset: -4px; border-radius: 50%;
+    border: 2px solid currentColor;
+    opacity: 0;
+    animation: pulse-ring 2s ease-out infinite;
+}
+.status-banner.healthy .pulse-ring::after { color: #22c55e; }
+.status-banner.degraded .pulse-ring::after { color: #f59e0b; }
+@keyframes pulse-ring { 0%{transform:scale(0.8);opacity:0.6;} 100%{transform:scale(1.4);opacity:0;} }
+
+/* 时间线 */
+.timeline { position: relative; padding-left: 24px; }
+.timeline::before {
+    content: ''; position: absolute; left: 7px; top: 0; bottom: 0;
+    width: 2px; background: #1e293b; border-radius: 1px;
+}
+.timeline-item {
+    position: relative; padding: 10px 0 10px 20px;
+}
+.timeline-item::before {
+    content: ''; position: absolute; left: -20px; top: 18px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #22c55e; border: 2px solid #0a0e1a;
+}
+.timeline-item.warn::before { background: #f59e0b; }
+.timeline-item.err::before { background: #ef4444; }
+.tl-time { font-size: 11px; color: #475569; font-family: 'Cascadia Code', monospace; }
+.tl-msg { font-size: 13px; color: #94a3b8; margin-top: 2px; }
+
+.loading { text-align: center; padding: 60px; color: #475569; }
+.loading-spinner {
+    width: 36px; height: 36px; border: 3px solid #1e293b;
+    border-top-color: #818cf8; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+.error-text { color: #ef4444; font-size: 13px; text-align: center; padding: 40px; }
+
+.footer {
+    text-align: center; padding: 20px;
+    color: #334155; font-size: 12px;
+    border-top: 1px solid rgba(148,163,184,0.05);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo-icon">🏥</div>
+    <h1>健康检查面板</h1>
+    <span class="badge">Live</span>
+    <div class="refresh-info">
+        <span class="refresh-dot"></span>
+        <span id="refreshTimer">5s 自动刷新</span>
+    </div>
+    <a href="/" class="back-link">← 返回首页</a>
+</div>
+
+<div class="container" id="dashboard">
+    <div class="loading">
+        <div class="loading-spinner"></div>
+        正在执行健康检查...
+    </div>
+</div>
+
+<div class="footer">
+    电商数据分析系统 v1.1 &nbsp;|&nbsp; 系统健康检查 &nbsp;|&nbsp; 数据每 5 秒自动刷新
+</div>
+
+<script>
+const BASE = window.location.origin;
+let historyLog = [];
+const MAX_LOG = 20;
+
+function formatTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleString('zh-CN');
+}
+
+function timeAgo(iso) {
+    if (!iso) return '';
+    const diff = Date.now() - new Date(iso).getTime();
+    if (diff < 5000) return '刚刚';
+    if (diff < 60000) return Math.floor(diff / 1000) + '秒前';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    return Math.floor(diff / 3600000) + '小时前';
+}
+
+async function loadHealth() {
+    try {
+        const resp = await fetch(BASE + '/api/monitor/health/detailed');
+        const data = await resp.json();
+
+        const isHealthy = data.status === 'healthy';
+        const checks = data.checks || {};
+        const timestamp = data.timestamp || '';
+
+        // 记录历史
+        historyLog.unshift({ time: timestamp, status: data.status, checks: {...checks} });
+        if (historyLog.length > MAX_LOG) historyLog.pop();
+
+        // 判断各组件状态
+        const dbOk = checks.database && checks.database.status === 'ok';
+        const cacheOk = checks.cache && checks.cache.status === 'ok';
+
+        let html = '';
+
+        // ===== 总体状态横幅 =====
+        html += `<div class="card col-12">
+            <div class="card-body" style="padding: 8px;">
+                <div class="status-banner ${isHealthy ? 'healthy' : 'degraded'}">
+                    <div class="status-icon-big pulse-ring">${isHealthy ? '✅' : '⚠️'}</div>
+                    <div>
+                        <div class="status-text-main">系统${isHealthy ? '运行正常' : '部分降级'}</div>
+                        <div class="status-sub">
+                            ${isHealthy
+                                ? '所有组件运行正常，服务可用'
+                                : '检测到部分组件异常，请关注下方详情'}
+                        </div>
+                    </div>
+                    <div class="status-time">
+                        <div class="time-label">最后检测时间</div>
+                        <div class="time-val">${formatTime(timestamp)}</div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px;">${timeAgo(timestamp)}</div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        // ===== 组件健康卡片 =====
+        html += `<div class="card col-12">
+            <div class="card-head"><h3><span class="icon">🔍</span> 组件健康检查</h3></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;">
+                    <!-- Database -->
+                    <div class="check-card">
+                        <div class="check-icon-wrap ${dbOk ? 'ok-db' : 'err'}">🗄️</div>
+                        <div class="check-detail">
+                            <div class="check-name">数据库连接</div>
+                            <div class="check-desc">${dbOk ? 'MySQL 连接正常，可正常读写' : (checks.database?.detail || '连接异常')}</div>
+                        </div>
+                        <span class="check-status-badge ${dbOk ? 'ok' : 'err'}">${dbOk ? '● 正常' : '● 异常'}</span>
+                    </div>
+                    <!-- Cache -->
+                    <div class="check-card">
+                        <div class="check-icon-wrap ${cacheOk ? 'ok-cache' : 'err'}">💾</div>
+                        <div class="check-detail">
+                            <div class="check-name">内存缓存</div>
+                            <div class="check-desc">${cacheOk ? `缓存服务正常，当前 ${checks.cache?.keys || 0} 个键活跃` : '缓存服务异常'}</div>
+                        </div>
+                        <span class="check-status-badge ${cacheOk ? 'ok' : 'err'}">${cacheOk ? '● 正常' : '● 异常'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        // ===== 详情指标 =====
+        html += `<div class="card col-6">
+            <div class="card-head"><h3><span class="icon">📋</span> 检查详情</h3></div>
+            <div class="card-body">
+                <div class="detail-grid">
+                    <div class="detail-item"><span class="dk">总体状态</span><span class="dv ${isHealthy ? 'green' : 'amber'}">${data.status.toUpperCase()}</span></div>
+                    <div class="detail-item"><span class="dk">检测时间 (UTC)</span><span class="dv">${timestamp}</span></div>
+                    <div class="detail-item"><span class="dk">数据库</span><span class="dv ${dbOk ? 'green' : 'red'}">${checks.database?.status || '-'}</span></div>
+                    <div class="detail-item"><span class="dk">缓存</span><span class="dv ${cacheOk ? 'green' : 'red'}">${checks.cache?.status || '-'}</span></div>
+                    ${checks.cache?.keys !== undefined ? `<div class="detail-item"><span class="dk">缓存活跃键数</span><span class="dv amber">${checks.cache.keys}</span></div>` : ''}
+                    <div class="detail-item"><span class="dk">组件通过率</span><span class="dv green">${Object.keys(checks).length > 0 ? Math.round(Object.values(checks).filter(c => c.status === 'ok').length / Object.keys(checks).length * 100) : 0}%</span></div>
+                </div>
+            </div>
+        </div>`;
+
+        // ===== 检测历史 =====
+        html += `<div class="card col-6">
+            <div class="card-head"><h3><span class="icon">📜</span> 检测历史</h3></div>
+            <div class="card-body">
+                <div class="timeline">
+                    ${historyLog.map((entry, i) => {
+                        const allOk = Object.values(entry.checks || {}).every(c => c.status === 'ok');
+                        const cls = allOk ? '' : (i === 0 ? 'warn' : '');
+                        return `<div class="timeline-item ${cls}">
+                            <div class="tl-time">${formatTime(entry.time)}</div>
+                            <div class="tl-msg">状态: <strong style="color:${allOk ? '#22c55e' : '#f59e0b'}">${entry.status}</strong>${!allOk ? ' — 部分组件异常' : ' — 全部正常'}</div>
+                        </div>`;
+                    }).join('')}
+                    ${historyLog.length === 0 ? '<div class="tl-msg" style="padding-left:0;">暂无记录</div>' : ''}
+                </div>
+            </div>
+        </div>`;
+
+        document.getElementById('dashboard').innerHTML = html;
+    } catch(e) {
+        document.getElementById('dashboard').innerHTML = `<div class="card col-12"><div class="card-body"><div class="error-text">❌ 健康检查请求失败: ${e.message}<br><br>可能原因：API 服务未启动或网络不通</div></div></div>`;
+    }
+}
+
+loadHealth();
+setInterval(loadHealth, 5000);
+</script>
+</body>
+</html>
