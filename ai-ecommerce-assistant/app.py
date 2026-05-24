@@ -271,16 +271,35 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                           pull=[0.02] * len(df))
 
     elif chart_type in ["bar_h", "bar"]:
-        n_items = len(df)
-        
         df_plot = df.copy()
         
+        try:
+            df_plot[y_col] = pd.to_numeric(df_plot[y_col], errors='coerce')
+        except Exception:
+            pass
+        
+        if len(df_plot) > 5:
+            df_plot = df_plot.nlargest(5, columns=y_col).reset_index(drop=True)
+        
+        n_items = len(df_plot)
         bar_colors = ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEF2F2']
+        
+        def format_y_label(val):
+            val_str = str(val).strip()
+            if val_str.isdigit():
+                hour_val = int(val_str)
+                if 0 <= hour_val <= 23:
+                    return f"{hour_val}时"
+                elif hour_val >= 1 and hour_val <= 31:
+                    return f"{hour_val}日"
+            return val_str
         
         if chart_type == "bar_h":
             fig = go.Figure()
             for i in range(n_items):
                 y_val = df_plot[y_col].iloc[i]
+                x_raw = df_plot[x_col].iloc[i]
+                x_label = format_y_label(x_raw)
                 try:
                     y_num = float(y_val)
                     y_text = f'{y_num:,.0f}'
@@ -290,9 +309,9 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                 
                 fig.add_trace(go.Bar(
                     x=[y_num],
-                    y=[df_plot[x_col].iloc[i]],
+                    y=[x_label],
                     orientation='h',
-                    name=df_plot[x_col].iloc[i],
+                    name=x_label,
                     marker=dict(
                         color=bar_colors[i % len(bar_colors)],
                         line=dict(width=0.5, color='rgba(255,255,255,0.3)'),
@@ -300,7 +319,7 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                     text=y_text,
                     textposition='outside',
                     textfont=dict(size=12, color='#E4E4E7', family='monospace'),
-                    hovertemplate=f'<b>{df_plot[x_col].iloc[i]}</b><br>%{{x:,.0f}}<extra></extra>',
+                    hovertemplate=f'<b>{x_label}</b><br>%{{x:,.0f}}<extra></extra>',
                 ))
             
             dynamic_height = 300 + max(n_items * 35, 100)
@@ -311,6 +330,8 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
             fig = go.Figure()
             for i in range(n_items):
                 y_val = df_sorted[y_col].iloc[i]
+                x_raw = df_sorted[x_col].iloc[i]
+                x_label = format_y_label(x_raw)
                 try:
                     y_num = float(y_val)
                     y_text = f'{y_num:,.0f}'
@@ -320,9 +341,9 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                 
                 fig.add_trace(go.Bar(
                     x=[y_num],
-                    y=[df_sorted[x_col].iloc[i]],
+                    y=[x_label],
                     orientation='h',
-                    name=df_sorted[x_col].iloc[i],
+                    name=x_label,
                     marker=dict(
                         color=bar_colors[(n_items - 1 - i) % len(bar_colors)],
                         line=dict(width=0.5, color='rgba(255,255,255,0.3)'),
@@ -330,7 +351,7 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                     text=y_text,
                     textposition='outside',
                     textfont=dict(size=12, color='#E4E4E7', family='monospace'),
-                    hovertemplate=f'<b>{df_sorted[x_col].iloc[i]}</b><br>%{{x:,.0f}}<extra></extra>',
+                    hovertemplate=f'<b>{x_label}</b><br>%{{x:,.0f}}<extra></extra>',
                 ))
             
             dynamic_height = 300 + max(n_items * 35, 100)

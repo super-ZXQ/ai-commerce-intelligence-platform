@@ -1,0 +1,33 @@
+# 环境变量（包含API Key，绝对不能提交）
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Streamlit
+.streamlit/
+
+# 日志
+*.log
+
+# 临时文件
+tmp/
+temp/
