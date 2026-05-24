@@ -11,31 +11,31 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+if not os.path.exists(os.path.join(_REPO_ROOT, 'data')):
+    _REPO_ROOT = os.path.dirname(_REPO_ROOT)
+
+@st.cache_data(show_spinner="正在加载数据，请稍候...")
+def load_data():
+    base = os.path.join(_REPO_ROOT, 'data')
+    for ext in ('.parquet', '.csv'):
+        f = os.path.join(base, 'cleaned_orders' + ext)
+        if os.path.exists(f):
+            if ext == '.parquet':
+                return pd.read_parquet(f)
+            return pd.read_csv(f, parse_dates=['下单时间', '付款时间'])
+    raise FileNotFoundError("未找到数据文件 data/cleaned_orders.parquet 或 .csv")
+
+with st.spinner("⏳ 正在加载数据..."):
+    try:
+        df = load_data()
+        st.success(f"✅ 成功加载 {len(df):,} 条订单数据")
+    except Exception as e:
+        st.error(f"❌ 数据加载失败：{e}")
+        st.stop()
+
 st.title("🛒 电商订单数据分析看板")
 st.markdown("---")
-
-def _find_repo_root():
-    p = os.path.dirname(os.path.abspath(__file__))
-    while p != os.path.dirname(p):
-        if os.path.exists(os.path.join(p, 'data', 'cleaned_orders.csv')):
-            return p
-        p = os.path.dirname(p)
-    return os.path.dirname(os.path.abspath(__file__))
-
-_REPO_ROOT = _find_repo_root()
-
-@st.cache_data
-def load_data():
-    data_path = os.path.join(_REPO_ROOT, 'data', 'cleaned_orders.csv')
-    df = pd.read_csv(data_path, parse_dates=['下单时间', '付款时间'])
-    return df
-
-try:
-    df = load_data()
-    st.success(f"✅ 成功加载 {len(df):,} 条订单数据")
-except Exception as e:
-    st.error(f"❌ 数据加载失败：{e}")
-    st.stop()
 
 st.sidebar.header("🔍 筛选条件")
 
@@ -100,4 +100,4 @@ fig_user.update_traces(texttemplate='%{x:.0f}', textposition='outside')
 st.plotly_chart(fig_user, use_container_width=True)
 
 st.markdown("---")
-st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders.csv | 电商数据分析系统 v1.1")
+st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders | 电商数据分析系统 v1.1")
