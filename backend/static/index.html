@@ -228,10 +228,10 @@ body {
         </a>
 
         <!-- AI 分析助手 -->
-        <a href="#" onclick="alert('请本地运行: streamlit run ai-ecommerce-assistant/app.py'); return false;" class="card card-ai">
+        <a href="http://localhost:8502" target="_blank" class="card card-ai">
             <div class="card-header">
                 <div class="card-icon icon-ai">🤖</div>
-                <span class="card-status status-manual">需本地启动</span>
+                <span class="card-status status-ready" id="aiStatus">检测中</span>
             </div>
             <h3>🤖 AI 分析助手</h3>
             <p>自然语言查数，自动生成 SQL 并执行。智能图表渲染、异常预警、敏感过滤、CSV 导出。</p>
@@ -344,6 +344,7 @@ async function init() {
         checkService(BASE + '/monitor', 'monitorStatus'),
         checkService(BASE + '/health-panel', 'healthStatus'),
         checkService(BASE + '/health', null),
+        checkService('http://localhost:8502', 'aiStatus'),
     ]);
 
     const apiEl = document.getElementById('apiStatus');

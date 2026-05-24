@@ -16,7 +16,7 @@ from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseTool
 load_dotenv()
 
 API_KEY = os.getenv("LLM_API_KEY")
-BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 MODEL_NAME = os.getenv("LLM_MODEL", "qwen-plus")
 
 DB_USER = os.getenv("DB_USER")
