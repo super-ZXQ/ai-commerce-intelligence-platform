@@ -24,3 +24,6 @@ Thumbs.db
 # 虚拟环境
 venv/
 .venv/
+
+# 软著申请材料（敏感文件，不上传）
+copyright_materials/
