@@ -182,9 +182,11 @@ function renderDistChart(containerId,labelA,arrAData,labelB,arrBData){
 }
 
 function renderABResult(d){
-  const exp=d.experiment,desc=d.descriptive,conv=d.conversion,tt=d.t_test,mw=d.mann_whitney,chi=d.chi_square;
-  const eff=d.effect_size,ci=d.confidence_interval,power=d.power_analysis,con=d.conclusion;
-  const sq=d.sample_quality,assumptions=d.assumptions;
+  if(!d || d.error){alert(d?.error||'数据返回异常');return;}
+  if(!d.conclusion){alert('实验结果数据不完整，请重试');return;}
+  const exp=d.experiment||{},desc=d.descriptive||{},conv=d.conversion||{},tt=d.t_test||{},mw=d.mann_whitney||{},chi=d.chi_square||{};
+  const eff=d.effect_size||{},ci=d.confidence_interval||{},power=d.power_analysis||{},con=d.conclusion||{};
+  const sq=d.sample_quality||{},assumptions=d.assumptions||{};
   let html='',maxMean=Math.max(desc.group_a.mean,desc.group_b.mean),maxRate=Math.max(conv.group_a.rate,conv.group_b.rate);
 
   html+=`<div class="result-section"><h3><span class="icon">📋</span> 实验概况</h3><div class="stats-grid">`;
