@@ -84,7 +84,7 @@ async def run_ab_test(
 
     normality_a = _shapiro_test(arr_a)
     normality_b = _shapiro_test(arr_b)
-    is_normal = normality_a["p_value"] >= alpha and normality_b["p_value"] >= alpha
+    is_normal = bool(normality_a["p_value"] >= alpha and normality_b["p_value"] >= alpha)
 
     levene_result = _levene_test(arr_a, arr_b)
 
@@ -102,7 +102,7 @@ async def run_ab_test(
 
     power_result = _statistical_power(t_result["t_statistic"], t_result["df"], alpha)
 
-    recommended_test = _recommend_test(is_normal, levene_result["p_value"] >= alpha, sample_check["ratio"])
+    recommended_test = _recommend_test(is_normal, bool(levene_result["p_value"] >= alpha), sample_check["ratio"])
 
     metric_label = METRIC_MAP.get(metric, metric)
     dim_label = {"platform_type": "平台", "is_refunded": "退款状态", "weekday": "星期"}.get(dimension, dimension)
@@ -115,8 +115,8 @@ async def run_ab_test(
         label_a = "已退款" if group_a_value == "是" else "未退款"
         label_b = "已退款" if group_b_value == "是" else "未退款"
 
-    t_significant = t_result["p_value"] < alpha
-    chi_significant = chi_result["p_value"] < alpha
+    t_significant = bool(t_result["p_value"] < alpha)
+    chi_significant = bool(chi_result["p_value"] < alpha)
 
     return {
         "experiment": {
@@ -212,7 +212,7 @@ async def run_multi_group(
         "anova": {
             "f_statistic": round(float(f_stat), 4),
             "p_value": round(float(p_value), 6),
-            "significant": float(p_value) < alpha,
+            "significant": bool(float(p_value) < alpha),
         },
         "assumptions": {
             "variance_homogeneity": levene_multi,
@@ -281,7 +281,7 @@ def _shapiro_test(arr: np.ndarray) -> dict:
     return {
         "statistic": round(float(stat), 6),
         "p_value": round(float(p_value), 6),
-        "normal": p_value >= 0.05,
+        "normal": bool(p_value >= 0.05),
         "note": f"样本量={len(sample)}（原数据{len(arr)}条，超过5000时抽样）" if len(arr) > 5000 else "",
     }
 
@@ -291,7 +291,7 @@ def _levene_test(arr_a: np.ndarray, arr_b: np.ndarray) -> dict:
     return {
         "statistic": round(float(stat), 4),
         "p_value": round(float(p_value), 6),
-        "equal_var": p_value >= 0.05,
+        "equal_var": bool(p_value >= 0.05),
         "test_type": "Levene 检验 (中位数)",
     }
 
@@ -301,7 +301,7 @@ def _levene_test_multi(*arrays) -> dict:
     return {
         "statistic": round(float(stat), 4),
         "p_value": round(float(p_value), 6),
-        "equal_var": p_value >= 0.05,
+        "equal_var": bool(p_value >= 0.05),
         "test_type": "Levene 检验 (中位数)",
     }
 
@@ -408,9 +408,9 @@ def _statistical_power(t_stat: float, df: float, alpha: float) -> dict:
         nc = abs(t_stat)
         if df <= 0 or not np.isfinite(nc):
             return {"power": 0.5, "beta": 0.5, "adequate": False, "interpretation": "无法计算统计功效"}
-        power = sp_stats.nct.sf(sp_stats.t.ppf(1 - alpha/2, df), df, nc)
-        beta = 1 - power
-        adequate = power >= 0.8
+        power = float(sp_stats.nct.sf(sp_stats.t.ppf(1 - alpha/2, df), df, nc))
+        beta = float(1 - power)
+        adequate = bool(power >= 0.8)
         if power >= 0.9:
             quality = "优秀"
         elif power >= 0.8:
@@ -475,7 +475,7 @@ def _tukey_hsd(labels: list, arrays: list, alpha: float, dimension: str) -> dict
                 "group_a": l_a, "group_b": l_b,
                 "mean_diff": round(float(np.mean(arrays[i]) - np.mean(arrays[j])), 4),
                 "p_value": round(float(p_val), 6),
-                "reject": p_val < alpha, "significant": p_val < alpha,
+                "reject": bool(p_val < alpha), "significant": bool(p_val < alpha),
             })
         return {"method": "Welch's t-test 两两对比 (Tukey备用)", "pairs": fallback_pairs, "note": "Tukey HSD计算失败，使用Welch's t-test替代"}
 
@@ -550,7 +550,7 @@ def _build_conclusion(
         "summary": " | ".join(parts),
         "t_test_significant": t_sig,
         "chi_square_significant": chi_sig,
-        "power_adequate": power.get("adequate", False),
+        "power_adequate": bool(power.get("adequate", False)),
         "recommended_test": recommended["primary"],
         "recommendation": parts[-1],
     }
