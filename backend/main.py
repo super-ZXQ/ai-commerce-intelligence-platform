@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from backend.config import get_settings
 from backend.database import engine, Base, check_db_connection
 from backend.models.database_models import Order  # noqa: F401 - 注册 ORM 模型
-from backend.routes import orders, products, analytics, ai, export, auth, monitor
+from backend.routes import orders, products, analytics, ai, export, auth, monitor, abtest
 from backend.routes.monitor import record_request
 from backend.utils.rate_limiter import check_rate_limit
 
@@ -77,7 +77,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_SKIP_RATE_LIMIT_PATHS = ("/docs", "/redoc", "/health", "/health-panel", "/", "/demo", "/openapi.json", "/monitor")
+_SKIP_RATE_LIMIT_PATHS = ("/docs", "/redoc", "/health", "/health-panel", "/", "/demo", "/openapi.json", "/monitor", "/abtest")
 
 
 @app.middleware("http")
@@ -136,6 +136,7 @@ app.include_router(analytics.router)
 app.include_router(ai.router)
 app.include_router(export.router)
 app.include_router(monitor.router)
+app.include_router(abtest.router)
 
 
 _DEMO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -166,3 +167,8 @@ async def monitor_page() -> FileResponse:
 @app.get("/health-panel", tags=["监控"])
 async def health_panel_page() -> FileResponse:
     return FileResponse(os.path.join(_STATIC_DIR, "health.html"))
+
+
+@app.get("/abtest", tags=["A/B实验"])
+async def abtest_page() -> FileResponse:
+    return FileResponse(os.path.join(_STATIC_DIR, "abtest.html"))

@@ -15,7 +15,8 @@
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手** | LangChain + Qwen + MySQL | 自然语言提问，自动生成 SQL 并绘图 |
-| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 23 个 RESTful API，含 JWT 认证/限流/缓存/监控 |
+| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 26 个 RESTful API，含 JWT 认证/限流/缓存/监控/A-B实验 |
+| **A/B 实验分析** | scipy + numpy + FastAPI | t-test / 卡方检验 / ANOVA / 效应量 / 置信区间 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 
 ## 在线演示
@@ -28,6 +29,7 @@
 | **API 体验页面** | 本地 `http://localhost:8000/demo` | 可视化数据大屏 + AI 查询 |
 | **系统监控面板** | 本地 `http://localhost:8000/monitor` | 可视化监控仪表盘 |
 | **健康检查面板** | 本地 `http://localhost:8000/health-panel` | 组件健康状态与指标看板 |
+| **A/B 实验分析** | 本地 `http://localhost:8000/abtest` | 统计检验可视化面板（t-test/ANOVA/效应量） |
 
 ---
 
@@ -35,31 +37,33 @@
 
 为项目提供完整的 RESTful API 服务，支持外部系统（小程序、移动端、前端）实时调用数据。
 
-### 核心功能（22 个接口）
+### 核心功能（26 个接口）
 
 | 模块 | 接口数 | 说明 | 认证 |
 |------|--------|------|------|
 | **认证系统** | 3 | 登录 / 刷新Token / 当前用户 | 公开 |
-| **系统接口** | 6 | 首页 / 健康检查 / 体验页 / 监控面板 / 健康面板 / API文档 | 公开 |
+| **系统接口** | 7 | 首页 / 健康检查 / 体验页 / 监控面板 / 健康面板 / A-B实验面板 / API文档 | 公开 |
 | **订单查询** | 3 | 列表（分页+排序）、详情、多条件筛选 | 公开 |
 | **商品与用户** | 2 | 商品销售排名、用户消费排名 | 公开 |
 | **数据分析** | 5 | 销售总览(缓存)、趋势、热销商品、用户行为(缓存)、平台分析 | 公开 |
 | **AI 助手** | 1 | 自然语言 -> 自动 SQL -> 返回结果 | 需 JWT |
 | **数据导出** | 2 | CSV / Excel 格式导出（分批查询防 OOM） | 公开 |
 | **监控** | 2 | 实时指标统计、详细健康检查 | 公开 |
+| **A/B 实验** | 3 | 分组查询 / A-B对比(t-test+卡方+效应量) / ANOVA方差分析 | 公开 |
 
 ### 技术架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│              FastAPI Application (v1.1)              │
-├──────────┬──────────┬──────────┬──────────┬────────┤
-│  auth/   │ orders/  │products  │analytics │   ai/  │
-│  routes  │  routes  │  routes  │  routes  │export/ │
-│          │          │          │          │monitor/│
-├──────────┴──────────┴──────────┴──────────┴────────┤
+│              FastAPI Application (v1.2)              │
+├──────────┬──────────┬──────────┬──────────┬────────┬────────┐
+│  auth/   │ orders/  │products  │analytics │   ai/  │ abtest/│
+│  routes  │  routes  │  routes  │  routes  │export/ │        │
+│          │          │          │          │monitor/ │        │
+├──────────┴──────────┴──────────┴──────────┴────────┴────────┤
 │              Services Layer                         │
 │  order_service │ analytics_service │ ai_service     │
+│  abtest_service (scipy统计检验引擎)                  │
 ├─────────────────────────────────────────────────────┤
 │         SQLAlchemy Async (aiomysql)                 │
 │              MySQL Connection Pool (10+20)           │
@@ -93,6 +97,16 @@ curl http://localhost:8000/api/analytics/sales-overview
 curl http://localhost:8000/api/analytics/top-products?limit=5
 curl "http://localhost:8000/api/orders/filter?platform_type=APP&page_size=10"
 curl -o report.xlsx "http://localhost:8000/api/export/analytics?export_format=excel"
+
+# 4. A/B 实验分析（无需 Token）
+# 获取可用分组
+curl "http://localhost:8000/api/abtest/groups?dimension=platform_type"
+
+# APP vs 微信公众号 对比实验
+curl "http://localhost:8000/api/abtest/compare?dimension=platform_type&group_a=APP&group_b=微信公众号&metric=payment_amount&alpha=0.05"
+
+# 多平台 ANOVA 方差分析
+curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=payment_amount"
 ```
 
 ### 安全特性
@@ -143,6 +157,47 @@ curl -o report.xlsx "http://localhost:8000/api/export/analytics?export_format=ex
 
 ---
 
+## A/B 实验分析
+
+基于 scipy 统计引擎，提供完整的 A/B 实验分析能力：
+
+```
+实验问题：APP端 vs 微信公众号端，哪个客单价更高？
+
+ A组（APP）：n=51,313, 均值=¥1,014.52, 标准差=¥452.30
+ B组（微信）：n=42,041, 均值=¥1,028.96, 标准差=¥318.50
+ → t=-31.98, p<0.0001 (显著)  Cohen's d=-0.21 (小效应)
+ → 结论：微信客单价显著高于APP，建议优化APP策略
+```
+
+| 功能 | 说明 |
+|------|------|
+| **Welch's t-test** | 双样本独立t检验，自动Welch校正不等方差 |
+| **卡方检验** | 转化率差异显著性检验 |
+| **Mann-Whitney U** | 非参数检验，数据非正态时使用 |
+| **Cohen's d 效应量** | 衡量差异的实际意义大小（小/中/大） |
+| **Cramer's V 关联强度** | 分类变量关联程度量化 |
+| **95% 置信区间** | 均值差的可信范围估计 |
+| **ANOVA 方差分析** | 多组同时比较，F检验+事后结论 |
+
+### 支持的分组维度
+
+| 维度 | 字段 | 分组数 | 典型场景 |
+|------|------|--------|---------|
+| 平台类型 | `platform_type` | 6 组 | APP vs 微信 vs Web vs 淘宝 |
+| 退款状态 | `is_refunded` | 2 组 | 已退款 vs 未退款对比 |
+| 星期 | `weekday` | 7 组 | 工作日 vs 周末效应分析 |
+
+### 支持的分析指标
+
+| 指标 | 字段 | 适用场景 |
+|------|------|---------|
+| 付款金额 | `payment_amount` | 客单价/营收对比 |
+| 订单金额 | `order_amount` | 下单金额差异 |
+| 优惠金额 | `discount_amount` | 促销敏感度分析 |
+
+---
+
 ## 技术栈
 
 | 类别 | 技术 | 说明 |
@@ -156,6 +211,7 @@ curl -o report.xlsx "http://localhost:8000/api/export/analytics?export_format=ex
 | 可视化 | matplotlib, plotly | 静态图 + 交互式图表 |
 | BI 看板 | Streamlit | 交互式数据大屏 |
 | AI 框架 | LangChain, LangChain-OpenAI | SQL Agent + LLM 调用 |
+| 统计分析 | scipy + numpy | t-test / 卡方 / ANOVA / 效应量 |
 | 测试框架 | pytest + pytest-asyncio + httpx | 异步单元测试 |
 | 开发环境 | Jupyter Notebook, VS Code | 模块化 Notebook 开发 |
 | 版本控制 | Git, GitHub | 规范 commit 信息 |
@@ -172,7 +228,7 @@ curl -o report.xlsx "http://localhost:8000/api/export/analytics?export_format=ex
 | 时间跨度 | 2025.01-2026.01 | 全年销售数据 |
 | 总销售额 | 101,776,848.74 元 | 实际付款金额 |
 | 复购率 | 25.39% | 消费 >=2 次的用户占比 |
-| API 接口 | 23 个 | 含认证/限流/监控 |
+| API 接口 | 26 个 | 含认证/限流/监控/A-B实验 |
 | 默认账号 | admin/admin123 | JWT 认证账号 |
 | 测试用例 | 27 个 | 异步单元测试 |
 | 支持平台 | 6 个 | APP/微信公众号/Web网站/淘宝/微信小商店/wap网站 |
@@ -202,17 +258,20 @@ ecommerce_analysis/
 │   │   ├── analytics.py            # 数据分析路由（5 个接口）
 │   │   ├── ai.py                   # AI 助手路由（需 JWT 认证）
 │   │   ├── export.py               # 导出路由（CSV/Excel 分批查询）
-│   │   └── monitor.py              # 监控路由（metrics/detailed health）
+│   │   ├── monitor.py              # 监控路由（metrics/detailed health）
+│   │   └── abtest.py               # A/B实验路由（分组/对比/ANOVA）
 │   │
 │   ├── services/
 │   │   ├── order_service.py        # 订单逻辑（SQL注入防护/分页优化）
 │   │   ├── analytics_service.py    # 分析逻辑（缓存装饰器/查询优化）
-│   │   └── ai_service.py           # AI 查询逻辑（敏感过滤/重试/解析）
+│   │   ├── ai_service.py           # AI 查询逻辑（敏感过滤/重试/解析）
+│   │   └── abtest_service.py       # A/B实验统计引擎（t-test/卡方/ANOVA）
 │   │
 │   ├── static/
 │   │   ├── index.html              # 统一入口导航页面
 │   │   ├── monitor.html            # 系统监控可视化面板
-│   │   └── health.html             # 健康检查可视化面板
+│   │   ├── health.html             # 健康检查可视化面板
+│   │   └── abtest.html             # A/B实验分析面板
 │   │
 │   ├── utils/
 │   │   ├── auth.py                 # JWT 工具（生成/验证/密码哈希）
@@ -260,6 +319,7 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 # 体验页面:    http://localhost:8000/demo
 # 监控面板:    http://localhost:8000/monitor
 # 健康面板:    http://localhost:8000/health-panel
+# A/B实验:     http://localhost:8000/abtest
 ```
 
 ### 完整部署
@@ -358,6 +418,8 @@ python-jose[cryptography]>=3.3.0
 httpx>=0.25.0
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
+scipy>=1.11.0
+numpy>=1.24.0
 ```
 
 ---
@@ -366,4 +428,5 @@ pytest-asyncio>=0.21.0
 
 - **v1.0**：17 个基础 API + Swagger 文档 + AI 查询 + 数据导出
 - **v1.1**：JWT 认证 + API 限流 + 响应缓存 + 监控指标 + 27 个测试用例 + Postman Collection + 数据库索引优化 + 可视化监控面板 + 健康检查面板 + 统一入口导航
+- **v1.2**：A/B 实验分析模块（scipy统计引擎）+ t-test/卡方/Mann-Whitney/Cohen's d/ANOVA + 可视化实验面板 + 26 个接口
 - **规划中**：接入 Redis 生产级缓存、Airflow 定时调度、Docker 容器化部署
