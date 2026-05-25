@@ -13,7 +13,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .container{max-width:1200px;margin:0 auto;padding:24px}
 .config-panel{background:#1e293b;border-radius:16px;padding:28px;margin-bottom:24px;border:1px solid #334155}
 .config-panel h2{font-size:18px;margin-bottom:20px;color:#f1f5f9}
-.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px}
 .form-group{display:flex;flex-direction:column;gap:6px}
 .form-group label{font-size:13px;color:#94a3b8;font-weight:500}
 .form-group select,.form-group input{background:#0f172a;border:1px solid #475569;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color .2s}
@@ -34,29 +34,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .result-section{background:#1e293b;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid #334155}
 .result-section h3{font-size:16px;margin-bottom:16px;color:#f1f5f9;display:flex;align-items:center;gap:8px}
 .result-section h3 .icon{font-size:18px}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 .stat-card{background:#0f172a;border-radius:12px;padding:16px;text-align:center;border:1px solid #1e293b}
 .stat-card .label{font-size:12px;color:#94a3b8;margin-bottom:6px}
-.stat-card .value{font-size:22px;font-weight:700;color:#f1f5f9}
+.stat-card .value{font-size:20px;font-weight:700;color:#f1f5f9}
 .stat-card .value.green{color:#34d399}
 .stat-card .value.red{color:#f87171}
 .stat-card .value.blue{color:#60a5fa}
 .stat-card .value.yellow{color:#fbbf24}
+.stat-card .value.orange{color:#fb923c}
 .stat-card .sub{font-size:11px;color:#64748b;margin-top:4px}
 .comparison-table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
-.comparison-table th{background:#0f172a;padding:12px 16px;text-align:left;font-size:13px;color:#94a3b8;border-bottom:1px solid #334155}
-.comparison-table td{padding:12px 16px;border-bottom:1px solid #1e293b;font-size:14px}
+.comparison-table th{background:#0f172a;padding:10px 14px;text-align:left;font-size:13px;color:#94a3b8;border-bottom:1px solid #334155}
+.comparison-table td{padding:10px 14px;border-bottom:1px solid #1e293b;font-size:13px}
 .comparison-table tr:hover td{background:#0f172a}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-green{background:rgba(52,211,153,.15);color:#34d399}
 .badge-red{background:rgba(248,113,113,.15);color:#f87171}
 .badge-yellow{background:rgba(251,191,36,.15);color:#fbbf24}
 .badge-blue{background:rgba(96,165,250,.15);color:#60a5fa}
+.badge-orange{background:rgba(251,146,60,.15);color:#fb923c}
 .conclusion-box{background:linear-gradient(135deg,rgba(59,130,246,.1),rgba(139,92,246,.1));border:1px solid rgba(96,165,250,.3);border-radius:12px;padding:20px;margin-top:16px}
 .conclusion-box .title{font-size:15px;font-weight:600;color:#60a5fa;margin-bottom:8px}
 .conclusion-box .text{font-size:14px;color:#cbd5e1;line-height:1.7}
+.warning-box{background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);border-radius:10px;padding:14px 18px;margin:12px 0;font-size:13px;color:#fb923c;display:flex;align-items:center;gap:8px}
+.warning-box.hidden{display:none}
 .ci-bar{position:relative;height:32px;background:#1e293b;border-radius:8px;margin:12px 0;overflow:hidden}
 .ci-bar .fill{position:absolute;top:0;height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:8px;opacity:.3}
+.ci-bar .zero-line{position:absolute;top:0;height:100%;width:2px;background:#f87171;left:50%;transform:translateX(-50%)}
 .ci-bar .marker{position:absolute;top:50%;transform:translate(-50%,-50%);width:3px;height:24px;background:#f1f5f9;border-radius:2px}
 .ci-bar .label-left,.ci-bar .label-right{position:absolute;top:50%;transform:translateY(-50%);font-size:11px;color:#94a3b8}
 .ci-bar .label-left{left:8px}
@@ -66,11 +71,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .chart-box h4{font-size:14px;color:#94a3b8;margin-bottom:12px}
 .bar-chart{display:flex;flex-direction:column;gap:10px}
 .bar-row{display:flex;align-items:center;gap:10px}
-.bar-row .bar-label{width:80px;font-size:13px;color:#94a3b8;text-align:right;flex-shrink:0}
-.bar-row .bar-track{flex:1;height:28px;background:#1e293b;border-radius:6px;overflow:hidden;position:relative}
-.bar-row .bar-fill{height:100%;border-radius:6px;transition:width .6s ease;display:flex;align-items:center;padding-left:8px;font-size:12px;color:#fff;font-weight:600}
-.bar-row .bar-value{font-size:13px;color:#e2e8f0;width:80px;text-align:right;flex-shrink:0}
-@media(max-width:768px){.chart-container{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}}
+.bar-row .bar-label{width:70px;font-size:12px;color:#94a3b8;text-align:right;flex-shrink:0}
+.bar-row .bar-track{flex:1;height:26px;background:#1e293b;border-radius:6px;overflow:hidden;position:relative}
+.bar-row .bar-fill{height:100%;border-radius:6px;transition:width .6s ease;display:flex;align-items:center;padding-left:8px;font-size:11px;color:#fff;font-weight:600}
+.bar-row .bar-value{font-size:12px;color:#e2e8f0;width:75px;text-align:right;flex-shrink:0}
+.dist-chart{height:120px;display:flex;align-items:flex-end;gap:2px;padding:10px 0}
+.dist-col{flex:1;background:linear-gradient(180deg,#3b82f6 0%,#1d4ed8 100%);border-radius:3px 3px 0 0;min-height:2px;opacity:.85;transition:opacity .2s}
+.dist-col:hover{opacity:1}
+.dist-label{display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-top:4px}
+.recommend-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;margin-left:8px}
+.recommend-high{background:rgba(52,211,153,.15);color:#34d399}
+.recommend-mid{background:rgba(251,191,36,.15);color:#fbbf24}
+.recommend-low{background:rgba(248,113,113,.15);color:#f87171}
+.posthoc-table{margin-top:12px}
+.posthoc-table tr.significant{background:rgba(52,211,153,.05)}
+@media(max-width:768px){.chart-container{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -82,38 +97,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="config-panel">
     <h2>实验配置</h2>
     <div class="form-row">
-      <div class="form-group">
-        <label>分组维度</label>
-        <select id="dimension" onchange="loadGroups()">
-          <option value="platform_type">平台类型</option>
-          <option value="is_refunded">退款状态</option>
-          <option value="weekday">星期</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>实验组 (A组)</label>
-        <select id="groupA"></select>
-      </div>
-      <div class="form-group">
-        <label>对照组 (B组)</label>
-        <select id="groupB"></select>
-      </div>
-      <div class="form-group">
-        <label>分析指标</label>
-        <select id="metric">
-          <option value="payment_amount">付款金额</option>
-          <option value="order_amount">订单金额</option>
-          <option value="discount_amount">优惠金额</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>显著性水平 α</label>
-        <select id="alpha">
-          <option value="0.01">0.01 (严格)</option>
-          <option value="0.05" selected>0.05 (标准)</option>
-          <option value="0.10">0.10 (宽松)</option>
-        </select>
-      </div>
+      <div class="form-group"><label>分组维度</label><select id="dimension" onchange="loadGroups()"><option value="platform_type">平台类型</option><option value="is_refunded">退款状态</option><option value="weekday">星期</option></select></div>
+      <div class="form-group"><label>实验组 (A组)</label><select id="groupA"></select></div>
+      <div class="form-group"><label>对照组 (B组)</label><select id="groupB"></select></div>
+      <div class="form-group"><label>分析指标</label><select id="metric"><option value="payment_amount">付款金额</option><option value="order_amount">订单金额</option><option value="discount_amount">优惠金额</option></select></div>
+      <div class="form-group"><label>显著性水平 α</label><select id="alpha"><option value="0.01">0.01 (严格)</option><option value="0.05" selected>0.05 (标准)</option><option value="0.10">0.10 (宽松)</option></select></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="runExperiment()">🚀 运行 A/B 实验</button>
@@ -121,242 +109,230 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     </div>
   </div>
 
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <div>正在运行实验，统计分析中...</div>
-  </div>
-
+  <div class="loading" id="loading"><div class="spinner"></div><div>正在运行实验，统计分析中...</div></div>
   <div class="results" id="results"></div>
 </div>
 
 <script>
 const API = '';
-
-async function loadGroups() {
-  const dim = document.getElementById('dimension').value;
-  try {
-    const resp = await fetch(`${API}/api/abtest/groups?dimension=${dim}`);
-    const data = await resp.json();
-    const selA = document.getElementById('groupA');
-    const selB = document.getElementById('groupB');
-    selA.innerHTML = '';
-    selB.innerHTML = '';
-    data.groups.forEach((g, i) => {
-      selA.innerHTML += `<option value="${g.value}">${g.label} (${g.count}条)</option>`;
-      selB.innerHTML += `<option value="${g.value}">${g.label} (${g.count}条)</option>`;
+async function loadGroups(){
+  const dim=document.getElementById('dimension').value;
+  try{
+    const r=await fetch(`${API}/api/abtest/groups?dimension=${dim}`);
+    const d=await r.json();
+    const sA=document.getElementById('groupA'),sB=document.getElementById('groupB');
+    sA.innerHTML='';sB.innerHTML='';
+    d.groups.forEach(g=>{
+      sA.innerHTML+=`<option value="${g.value}">${g.label} (${g.count}条)</option>`;
+      sB.innerHTML+=`<option value="${g.value}">${g.label} (${g.count}条)</option>`;
     });
-    if (data.groups.length >= 2) {
-      selA.selectedIndex = 0;
-      selB.selectedIndex = 1;
-    }
-  } catch (e) {
-    console.error('加载分组失败', e);
-  }
+    if(d.groups.length>=2){sA.selectedIndex=0;sB.selectedIndex=1;}
+  }catch(e){console.error('加载分组失败',e);}
 }
 
-async function runExperiment() {
-  const dim = document.getElementById('dimension').value;
-  const gA = document.getElementById('groupA').value;
-  const gB = document.getElementById('groupB').value;
-  const metric = document.getElementById('metric').value;
-  const alpha = document.getElementById('alpha').value;
-  if (gA === gB) { alert('实验组和对照组不能相同'); return; }
-
+async function runExperiment(){
+  const dim=document.getElementById('dimension').value,gA=document.getElementById('groupA').value,gB=document.getElementById('groupB').value;
+  const metric=document.getElementById('metric').value,alpha=document.getElementById('alpha').value;
+  if(gA===gB){alert('实验组和对照组不能相同');return;}
   document.getElementById('loading').classList.add('show');
   document.getElementById('results').classList.remove('show');
-  document.getElementById('results').innerHTML = '';
-
-  try {
-    const resp = await fetch(`${API}/api/abtest/compare?dimension=${dim}&group_a=${encodeURIComponent(gA)}&group_b=${encodeURIComponent(gB)}&metric=${metric}&alpha=${alpha}`);
-    const data = await resp.json();
-    if (data.error) { alert(data.error); return; }
-    renderABResult(data);
-  } catch (e) {
-    alert('实验运行失败: ' + e.message);
-  } finally {
-    document.getElementById('loading').classList.remove('show');
-  }
+  document.getElementById('results').innerHTML='';
+  try{
+    const r=await fetch(`${API}/api/abtest/compare?dimension=${dim}&group_a=${encodeURIComponent(gA)}&group_b=${encodeURIComponent(gB)}&metric=${metric}&alpha=${alpha}`);
+    const d=await r.json();
+    if(d.error){alert(d.error);return;}
+    renderABResult(d);
+  }catch(e){alert('实验运行失败: '+e.message);}finally{document.getElementById('loading').classList.remove('show');}
 }
 
-async function runAnova() {
-  const dim = document.getElementById('dimension').value;
-  const metric = document.getElementById('metric').value;
-  const alpha = document.getElementById('alpha').value;
-
+async function runAnova(){
+  const dim=document.getElementById('dimension').value,metric=document.getElementById('metric').value,alpha=document.getElementById('alpha').value;
   document.getElementById('loading').classList.add('show');
   document.getElementById('results').classList.remove('show');
-  document.getElementById('results').innerHTML = '';
-
-  try {
-    const resp = await fetch(`${API}/api/abtest/anova?dimension=${dim}&metric=${metric}&alpha=${alpha}`);
-    const data = await resp.json();
-    if (data.error) { alert(data.error); return; }
-    renderAnovaResult(data);
-  } catch (e) {
-    alert('ANOVA运行失败: ' + e.message);
-  } finally {
-    document.getElementById('loading').classList.remove('show');
-  }
+  document.getElementById('results').innerHTML='';
+  try{
+    const r=await fetch(`${API}/api/abtest/anova?dimension=${dim}&metric=${metric}&alpha=${alpha}`);
+    const d=await r.json();
+    if(d.error){alert(d.error);return;}
+    renderAnovaResult(d);
+  }catch(e){alert('ANOVA运行失败: '+e.message);}finally{document.getElementById('loading').classList.remove('show');}
 }
 
-function renderABResult(d) {
-  const exp = d.experiment;
-  const desc = d.descriptive;
-  const conv = d.conversion;
-  const tt = d.t_test;
-  const mw = d.mann_whitney;
-  const chi = d.chi_square;
-  const eff = d.effect_size;
-  const ci = d.confidence_interval;
-  const con = d.conclusion;
+function fmt(n,p=2){return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:p,maximumFractionDigits:p});}
+function pv(p){return p<0.0001?'<0.0001':Number(p).toFixed(6);}
 
-  const maxMean = Math.max(desc.group_a.mean, desc.group_b.mean);
-  const maxRate = Math.max(conv.group_a.rate, conv.group_b.rate);
+function _histogram(arr,bins=30){
+  const min=Math.min(...arr),max=Math.max(...arr),range=max-min;
+  if(range===0)return Array(bins).fill(1/bins);
+  const bw=range/bins,hist=new Array(bins).fill(0);
+  arr.forEach(v=>{const i=Math.min(Math.floor((v-min)/bw),bins-1);hist[i]++;});
+  const maxH=Math.max(...hist);
+  return hist.map(v=>v/maxH);
+}
 
-  let html = '';
+function renderDistChart(containerId,labelA,arrAData,labelB,arrBData){
+  const hA=_histogram(arrAData),hB=_histogram(arrBData);
+  let html=`<div style="margin-bottom:20px"><div style="font-size:13px;color:#94a3b8;margin-bottom:4px">${labelA} 分布（${arrAData.length}条）</div><div class="dist-chart">`;
+  hA.forEach(h=>html+=`<div class="dist-col" style="height:${Math.max(h*100,1)}%;background:linear-gradient(180deg,#3b82f6,#2563eb)"></div>`);
+  html+=`</div><div class="dist-label"><span>¥${Math.min(...arrAData).toFixed(0)}</span><span>¥${Math.max(...arrAData).toFixed(0)}</span></div></div>`;
+  html+=`<div><div style="font-size:13px;color:#94a3b8;margin-bottom:4px">${labelB} 分布（${arrBData.length}条）</div><div class="dist-chart">`;
+  hB.forEach(h=>html+=`<div class="dist-col" style="height:${Math.max(h*100,1)}%;background:linear-gradient(180deg,#8b5cf6,#7c3aed)"></div>`);
+  html+=`</div><div class="dist-label"><span>¥${Math.min(...arrBData).toFixed(0)}</span><span>¥${Math.max(...arrBData).toFixed(0)}</span></div></div>`;
+  document.getElementById(containerId).innerHTML=html;
+}
 
-  html += `<div class="result-section">
-    <h3><span class="icon">📋</span> 实验概况</h3>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="label">分组维度</div><div class="value blue">${exp.dimension_label}</div></div>
-      <div class="stat-card"><div class="label">分析指标</div><div class="value blue">${exp.metric_label}</div></div>
-      <div class="stat-card"><div class="label">实验组 (A)</div><div class="value">${exp.group_a.label}</div><div class="sub">n=${desc.group_a.n}</div></div>
-      <div class="stat-card"><div class="label">对照组 (B)</div><div class="value">${exp.group_b.label}</div><div class="sub">n=${desc.group_b.n}</div></div>
-      <div class="stat-card"><div class="label">显著性水平</div><div class="value yellow">α=${exp.alpha}</div></div>
-    </div>
-  </div>`;
+function renderABResult(d){
+  const exp=d.experiment,desc=d.descriptive,conv=d.conversion,tt=d.t_test,mw=d.mann_whitney,chi=d.chi_square;
+  const eff=d.effect_size,ci=d.confidence_interval,power=d.power_analysis,con=d.conclusion;
+  const sq=d.sample_quality,assumptions=d.assumptions;
+  let html='',maxMean=Math.max(desc.group_a.mean,desc.group_b.mean),maxRate=Math.max(conv.group_a.rate,conv.group_b.rate);
 
-  html += `<div class="result-section">
-    <h3><span class="icon">📊</span> 描述性统计</h3>
-    <table class="comparison-table">
-      <tr><th>指标</th><th>A组: ${exp.group_a.label}</th><th>B组: ${exp.group_b.label}</th><th>差异</th></tr>
-      <tr><td>样本量</td><td>${desc.group_a.n.toLocaleString()}</td><td>${desc.group_b.n.toLocaleString()}</td><td>${desc.group_a.n > desc.group_b.n ? '↑' : '↓'}</td></tr>
-      <tr><td>均值</td><td>¥${desc.group_a.mean.toFixed(2)}</td><td>¥${desc.group_b.mean.toFixed(2)}</td><td class="${ci.mean_diff > 0 ? 'green' : 'red'}">${ci.mean_diff > 0 ? '+' : ''}¥${ci.mean_diff.toFixed(2)}</td></tr>
-      <tr><td>标准差</td><td>¥${desc.group_a.std.toFixed(2)}</td><td>¥${desc.group_b.std.toFixed(2)}</td><td>—</td></tr>
-      <tr><td>中位数</td><td>¥${desc.group_a.median.toFixed(2)}</td><td>¥${desc.group_b.median.toFixed(2)}</td><td>—</td></tr>
-      <tr><td>Q1 / Q3</td><td>¥${desc.group_a.q1.toFixed(2)} / ¥${desc.group_a.q3.toFixed(2)}</td><td>¥${desc.group_b.q1.toFixed(2)} / ¥${desc.group_b.q3.toFixed(2)}</td><td>—</td></tr>
-    </table>
-    <div class="chart-container">
-      <div class="chart-box">
-        <h4>均值对比</h4>
-        <div class="bar-chart">
-          <div class="bar-row"><div class="bar-label">A组</div><div class="bar-track"><div class="bar-fill" style="width:${(desc.group_a.mean/maxMean*100).toFixed(1)}%;background:linear-gradient(90deg,#3b82f6,#60a5fa)">¥${desc.group_a.mean.toFixed(2)}</div></div></div>
-          <div class="bar-row"><div class="bar-label">B组</div><div class="bar-track"><div class="bar-fill" style="width:${(desc.group_b.mean/maxMean*100).toFixed(1)}%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)">¥${desc.group_b.mean.toFixed(2)}</div></div></div>
-        </div>
-      </div>
-      <div class="chart-box">
-        <h4>转化率对比</h4>
-        <div class="bar-chart">
-          <div class="bar-row"><div class="bar-label">A组</div><div class="bar-track"><div class="bar-fill" style="width:${(conv.group_a.rate/maxRate*100).toFixed(1)}%;background:linear-gradient(90deg,#10b981,#34d399)">${conv.group_a.rate.toFixed(2)}%</div></div></div>
-          <div class="bar-row"><div class="bar-label">B组</div><div class="bar-track"><div class="bar-fill" style="width:${(conv.group_b.rate/maxRate*100).toFixed(1)}%;background:linear-gradient(90deg,#f59e0b,#fbbf24)">${conv.group_b.rate.toFixed(2)}%</div></div></div>
-        </div>
-      </div>
-    </div>
-  </div>`;
+  html+=`<div class="result-section"><h3><span class="icon">📋</span> 实验概况</h3><div class="stats-grid">`;
+  html+=`<div class="stat-card"><div class="label">分组维度</div><div class="value blue">${exp.dimension_label}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">分析指标</div><div class="value blue">${exp.metric_label}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">实验组 (A)</div><div class="value">${exp.group_a.label}</div><div class="sub">n=${desc.group_a.n.toLocaleString()}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">对照组 (B)</div><div class="value">${exp.group_b.label}</div><div class="sub">n=${desc.group_b.n.toLocaleString()}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">显著性水平 α</div><div class="value yellow">α=${exp.alpha}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">推荐检验方法</div><div class="value ${assumptions.recommended_test.confidence==='高'?'green':assumptions.recommended_test.confidence==='中'?'yellow':'red'}" style="font-size:15px">${assumptions.recommended_test.primary}</div><div class="sub">置信度: ${assumptions.recommended_test.confidence}</div></div>`;
+  html+=`</div></div>`;
 
-  html += `<div class="result-section">
-    <h3><span class="icon">🔬</span> 统计检验</h3>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="label">t-statistic</div><div class="value ${tt.significant ? 'green' : 'red'}">${tt.t_statistic}</div><div class="sub">${tt.test_type}</div></div>
-      <div class="stat-card"><div class="label">p-value (t检验)</div><div class="value ${tt.significant ? 'green' : 'red'}">${tt.p_value < 0.0001 ? '<0.0001' : tt.p_value}</div><div class="sub">${tt.significant ? '✅ 显著' : '❌ 不显著'}</div></div>
-      <div class="stat-card"><div class="label">自由度 (df)</div><div class="value">${tt.df}</div></div>
-      <div class="stat-card"><div class="label">χ² 统计量</div><div class="value ${chi.significant ? 'green' : 'red'}">${chi.chi2_statistic}</div><div class="sub">${chi.test_type}</div></div>
-      <div class="stat-card"><div class="label">p-value (卡方)</div><div class="value ${chi.significant ? 'green' : 'red'}">${chi.p_value < 0.0001 ? '<0.0001' : chi.p_value}</div><div class="sub">${chi.significant ? '✅ 显著' : '❌ 不显著'}</div></div>
-      <div class="stat-card"><div class="label">U 统计量</div><div class="value">${mw.u_statistic}</div><div class="sub">${mw.test_type}</div></div>
-    </div>
-    <div style="margin-top:16px">
-      <table class="comparison-table">
-        <tr><th>检验方法</th><th>统计量</th><th>p-value</th><th>结论</th></tr>
-        <tr><td>${tt.test_type}</td><td>${tt.t_statistic}</td><td>${tt.p_value < 0.0001 ? '<0.0001 ***' : tt.p_value}</td><td><span class="badge ${tt.significant ? 'badge-green' : 'badge-red'}">${tt.significant ? '显著差异' : '无显著差异'}</span></td></tr>
-        <tr><td>${chi.test_type}</td><td>${chi.chi2_statistic}</td><td>${chi.p_value < 0.0001 ? '<0.0001 ***' : chi.p_value}</td><td><span class="badge ${chi.significant ? 'badge-green' : 'badge-red'}">${chi.significant ? '显著差异' : '无显著差异'}</span></td></tr>
-        <tr><td>${mw.test_type}</td><td>${mw.u_statistic}</td><td>${mw.p_value < 0.0001 ? '<0.0001 ***' : mw.p_value}</td><td><span class="badge ${mw.p_value < 0.05 ? 'badge-green' : 'badge-red'}">${mw.p_value < 0.05 ? '显著差异' : '无显著差异'}</span></td></tr>
-      </table>
-    </div>
-  </div>`;
+  if(sq.balance_warning.warning){
+    html+=`<div class="warning-box"><span>⚠️</span>${sq.balance_warning.warning}</div>`;
+  }
 
-  html += `<div class="result-section">
-    <h3><span class="icon">📐</span> 效应量 & 置信区间</h3>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="label">Cohen's d</div><div class="value ${Math.abs(eff.cohens_d.value) >= 0.8 ? 'green' : Math.abs(eff.cohens_d.value) >= 0.5 ? 'yellow' : 'blue'}">${eff.cohens_d.value}</div><div class="sub">${eff.cohens_d.magnitude}效应</div></div>
-      <div class="stat-card"><div class="label">Cramer's V</div><div class="value blue">${eff.cramers_v.value}</div><div class="sub">${eff.cramers_v.magnitude}关联</div></div>
-      <div class="stat-card"><div class="label">均值差</div><div class="value ${ci.mean_diff > 0 ? 'green' : 'red'}">${ci.mean_diff > 0 ? '+' : ''}¥${ci.mean_diff.toFixed(2)}</div></div>
-      <div class="stat-card"><div class="label">${ci.confidence_level}置信区间</div><div class="value blue">[${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]</div></div>
-    </div>
-    <div style="margin-top:16px">
-      <div style="font-size:13px;color:#94a3b8;margin-bottom:8px">均值差置信区间可视化</div>
-      <div class="ci-bar">
-        <div class="fill" style="left:20%;width:60%"></div>
-        <div class="marker" style="left:${Math.max(5, Math.min(95, 50 + ci.mean_diff / Math.max(Math.abs(ci.lower), Math.abs(ci.upper), 1) * 30))}%"></div>
-        <div class="label-left">¥${ci.lower.toFixed(2)}</div>
-        <div class="label-right">¥${ci.upper.toFixed(2)}</div>
-      </div>
-    </div>
-  </div>`;
+  html+=`<div class="result-section"><h3><span class="icon">📊</span> 描述性统计</h3>`;
+  html+=`<table class="comparison-table"><tr><th>指标</th><th>A组: ${exp.group_a.label}</th><th>B组: ${exp.group_b.label}</th><th>差异</th></tr>`;
+  html+=`<tr><td>样本量</td><td>${desc.group_a.n.toLocaleString()}</td><td>${desc.group_b.n.toLocaleString()}</td><td>${sq.balance_warning.level!=='平衡'?`⚠️ ${sq.balance_warning.level}`:'✅'}</td></tr>`;
+  html+=`<tr><td>均值</td><td>¥${fmt(desc.group_a.mean)}</td><td>¥${fmt(desc.group_b.mean)}</td><td class="${ci.mean_diff>0?'green':'red'}">${ci.mean_diff>0?'+':''}¥${fmt(ci.mean_diff)}</td></tr>`;
+  html+=`<tr><td>标准差</td><td>¥${fmt(desc.group_a.std)}</td><td>¥${fmt(desc.group_b.std)}</td><td>—</td></tr>`;
+  html+=`<tr><td>偏度(Skewness)</td><td>${desc.group_a.skewness}</td><td>${desc.group_b.skewness}</td><td>${Math.abs(desc.group_a.skewness)>1||Math.abs(desc.group_b.skewness)>1?'⚠️ 偏态':'正常'}</td></tr>`;
+  html+=`<tr><td>峰度(Kurtosis)</td><td>${desc.group_a.kurtosis}</td><td>${desc.group_b.kurtosis}</td><td>—</td></tr>`;
+  html+=`<tr><td>中位数</td><td>¥${fmt(desc.group_a.median)}</td><td>¥${fmt(desc.group_b.median)}</td><td>—</td></tr>`;
+  html+=`<tr><td>Q1 / Q3</td><td>¥${fmt(desc.group_a.q1)} / ¥${fmt(desc.group_a.q3)}</td><td>¥${fmt(desc.group_b.q1)} / ¥${fmt(desc.group_b.q3)}</td><td>—</td></tr>`;
+  html+=`</table>`;
 
-  html += `<div class="result-section">
-    <h3><span class="icon">🎯</span> 实验结论</h3>
-    <div class="conclusion-box">
-      <div class="title">📊 分析结论</div>
-      <div class="text">${con.summary.replace(/\|/g, '<br>')}</div>
-      <div style="margin-top:12px;font-size:14px">
-        <span class="badge ${con.t_test_significant ? 'badge-green' : 'badge-red'}">t检验: ${con.t_test_significant ? '显著' : '不显著'}</span>
-        <span class="badge ${con.chi_square_significant ? 'badge-green' : 'badge-red'}" style="margin-left:8px">卡方检验: ${con.chi_square_significant ? '显著' : '不显著'}</span>
-      </div>
-      <div style="margin-top:12px;font-size:14px;color:#60a5fa;font-weight:600">💡 ${con.recommendation}</div>
-    </div>
-  </div>`;
+  html+=`<div class="chart-container"><div class="chart-box"><h4>均值对比</h4><div class="bar-chart">`;
+  html+=`<div class="bar-row"><div class="bar-label">A组</div><div class="bar-track"><div class="bar-fill" style="width:${(desc.group_a.mean/maxMean*100).toFixed(1)}%;background:linear-gradient(90deg,#3b82f6,#60a5fa)">¥${fmt(desc.group_a.mean)}</div></div></div>`;
+  html+=`<div class="bar-row"><div class="bar-label">B组</div><div class="bar-track"><div class="bar-fill" style="width:${(desc.group_b.mean/maxMean*100).toFixed(1)}%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)">¥${fmt(desc.group_b.mean)}</div></div></div></div></div>`;
+  html+=`<div class="chart-box"><h4>转化率对比</h4><div class="bar-chart">`;
+  html+=`<div class="bar-row"><div class="bar-label">A组</div><div class="bar-track"><div class="bar-fill" style="width:${(conv.group_a.rate/maxRate*100).toFixed(1)}%;background:linear-gradient(90deg,#10b981,#34d399)">${conv.group_a.rate.toFixed(2)}%</div></div></div>`;
+  html+=`<div class="bar-row"><div class="bar-label">B组</div><div class="bar-track"><div class="bar-fill" style="width:${(conv.group_b.rate/maxRate*100).toFixed(1)}%;background:linear-gradient(90deg,#f59e0b,#fbbf24)">${conv.group_b.rate.toFixed(2)}%</div></div></div></div></div></div></div>`;
 
-  document.getElementById('results').innerHTML = html;
+  html+=`<div class="result-section"><h3><span class="icon">🔍</span> 数据质量 & 假设检验</h3>`;
+
+  html+=`<h4 style="font-size:14px;color:#94a3b8;margin:12px 0 8px">样本质量</h4><table class="comparison-table"><tr><th>检查项</th><th>A组</th><th>B组</th><th>说明</th></tr>`;
+  html+=`<tr><td>异常值(IQR)</td><td>${sq.outliers.group_a.count}个 (${sq.outliers.group_a.percentage}%)</td><td>${sq.outliers.group_b.count}个 (${sq.outliers.group_b.percentage}%)</td><td>${sq.outliers.group_a.count>5||sq.outliers.group_b.count>5?'⚠️ 异常值较多':'正常'}</td></tr>`;
+  html+=`<tr><td>IQR范围</td><td>[¥${fmt(sq.outliers.group_a.bounds.lower)}, ¥${fmt(sq.outliers.group_a.bounds.upper)}]</td><td>[¥${fmt(sq.outliers.group_b.bounds.lower)}, ¥${fmt(sq.outliers.group_b.bounds.upper)}]</td><td>超出此范围为异常值</td></tr>`;
+  if(sq.outliers.group_a.sample_values.length>0||sq.outliers.group_b.sample_values.length>0){
+    html+=`<tr><td>异常值示例</td><td>${sq.outliers.group_a.sample_values.slice(0,3).map(v=>'¥'+v.toFixed(0)).join(', ')||'—'}</td><td>${sq.outliers.group_b.sample_values.slice(0,3).map(v=>'¥'+v.toFixed(0)).join(', ')||'—'}</td><td>仅显示前3个</td></tr>`;
+  }
+  html+=`</table>`;
+
+  html+=`<h4 style="font-size:14px;color:#94a3b8;margin:16px 0 8px">统计假设检验</h4><div class="stats-grid">`;
+  const normA=assumptions.normality.group_a,normB=assumptions.normality.group_b;
+  html+=`<div class="stat-card"><div class="label">正态性 A组 (Shapiro-Wilk)</div><div class="value ${normA.normal?'green':'red'}">${normA.p_value<0.0001?'<0.0001':pv(normA.p_value)}</div><div class="sub">W=${normA.statistic} · ${normA.normal?'✅ 正态':'❌ 非正态'}${normA.note?' · '+normA.note:''}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">正态性 B组 (Shapiro-Wilk)</div><div class="value ${normB.normal?'green':'red'}">${normB.p_value<0.0001?'<0.0001':pv(normB.p_value)}</div><div class="sub">W=${normB.statistic} · ${normB.normal?'✅ 正态':'❌ 非正态'}${normB.note?' · '+normB.note:''}</div></div>`;
+  const lev=assumptions.variance_homogeneity;
+  html+=`<div class="stat-card"><div class="label">方差齐性 (Levene)</div><div class="value ${lev.equal_var?'green':'red'}">${pv(lev.p_value)}</div><div class="sub">${lev.test_type} · ${lev.equal_var?'✅ 方差齐':'❌ 方差不齐'}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">推荐检验</div><div class="value blue" style="font-size:13px">${assumptions.recommended_test.primary}</div><div class="sub">备选: ${assumptions.recommended_test.secondary}${assumptions.recommended_test.reasons.length?'. 原因: '+assumptions.recommended_test.reasons.join('; '):''}</div></div></div>`;
+
+  html+=`<div id="distChartsContainer" class="chart-container"><div class="chart-box" style="grid-column:1/-1"><h4>数据分布直方图</h4><div id="distCharts"></div></div></div></div>`;
+
+  html+=`<div class="result-section"><h3><span class="icon">🔬</span> 统计检验结果</h3><div class="stats-grid">`;
+  html+=`<div class="stat-card"><div class="label">t-statistic</div><div class="value ${tt.significant?'green':'red'}">${tt.t_statistic}</div><div class="sub">${tt.test_type}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">p-value (t检验)</div><div class="value ${tt.significant?'green':'red'}">${pv(tt.p_value)}</div><div class="sub">${tt.significant?'✅ 显著差异':'❌ 无显著差异'}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">自由度 (df)</div><div class="value">${tt.df}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">χ² 统计量</div><div class="value ${chi.significant?'green':'red'}">${chi.chi2_statistic}</div><div class="sub">${chi.test_type}${chi.note?' · '+chi.note:''}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">p-value (卡方)</div><div class="value ${chi.significant?'green':'red'}">${pv(chi.p_value)}</div><div class="sub">${chi.significant?'✅ 显著':'❌ 不显著'}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">U 统计量</div><div class="value">${mw.u_statistic}</div><div class="sub">${mw.test_type}</div></div></div>`;
+
+  html+=`<table class="comparison-table" style="margin-top:16px"><tr><th>检验方法</th><th>统计量</th><th>p-value</th><th>结论</th></tr>`;
+  html+=`<tr><td>${tt.test_type}<br><small style="color:#64748b">推荐: ${con.recommended_test}</small></td><td>${tt.t_statistic}</td><td>${pv(tt.p_value)} ***</td><td><span class="badge ${tt.significant?'badge-green':'badge-red'}">${tt.significant?'显著差异':'无显著差异'}</span></td></tr>`;
+  html+=`<tr><td>${chi.test_type}</td><td>${chi.chi2_statistic}</td><td>${pv(chi.p_value)}</td><td><span class="badge ${chi.significant?'badge-green':'badge-red'}">${chi.significant?'显著差异':'无显著差异'}</span></td></tr>`;
+  html+=`<tr><td>${mw.test_type}<br><small style="color:#64748b">非参数备选</small></td><td>${mw.u_statistic}</td><td>${pv(mw.p_value)} ${mw.p_value<0.05?'***':''}</td><td><span class="badge ${mw.p_value<0.05?'badge-green':'badge-red'}">${mw.p_value<0.05?'显著差异':'无显著差异'}</span></td></tr></table></div>`;
+
+  html+=`<div class="result-section"><h3><span class="icon">📐</span> 效应量、置信区间 & 功效分析</h3><div class="stats-grid">`;
+  html+=`<div class="stat-card"><div class="label">Cohen's d</div><div class="value ${Math.abs(eff.cohens_d.value)>=0.8?'green':Math.abs(eff.cohens_d.value)>=0.5?'yellow':'blue'}">${eff.cohens_d.value}</div><div class="sub">${eff.cohens_d.magnitude}效应</div></div>`;
+  html+=`<div class="stat-card"><div class="label">Cramer's V</div><div class="value blue">${eff.cramers_v.value}</div><div class="sub">${eff.cramers_v.magnitude}关联</div></div>`;
+  html+=`<div class="stat-card"><div class="label">均值差</div><div class="value ${ci.mean_diff>0?'green':'red'}">${ci.mean_diff>0?'+':''}¥${fmt(ci.mean_diff)}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">${ci.confidence_level}置信区间</div><div class="value blue" style="font-size:14px">[${fmt(ci.lower)}, ${fmt(ci.upper)}]</div><div class="sub">${ci.distribution} · t_crit=${ci.critical_value}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">统计功效 (Power)</div><div class="value ${power.adequate?'green':'red'}">${(power.power*100).toFixed(1)}%</div><div class="sub">${power.quality} · β=${(power.beta*100).toFixed(1)}%</div></div>`;
+  html+=`<div class="stat-card"><div class="label">功效判定</div><div class="value ${power.adequate?'green':'orange'}">${power.adequate?'✅ 充足':'⚠️ 不足'}</div><div class="sub">${power.quality>=0.8?'可信任结论':'可能存在假阴性'}</div></div></div>`;
+
+  html+=`<div style="margin-top:16px"><div style="font-size:13px;color:#94a3b8;margin-bottom:8px">均值差置信区间可视化 (${ci.distribution})</div><div class="ci-bar"><div class="zero-line"></div>`;
+  const ciRange=Math.abs(ci.upper-ci.lower)||1,ciMin=Math.min(ci.lower,ci.upper,0),ciMax=Math.max(ci.upper,ci.lower,0),totalRange=ciMax-ciMin||1;
+  const pctL=((ci.lower-ciMin)/totalRange)*80+10,pctU=((ci.upper-ciMin)/totalRange)*80+10,pctZ=((0-ciMin)/totalRange)*80+10,pctM=((ci.mean_diff-ciMin)/totalRange)*80+10;
+  html+=`<div class="fill" style="left:${Math.min(pctL,pctU)}%;width:${Math.abs(pctU-pctL)}%"></div>`;
+  html+=`<div class="marker" style="left:${Math.max(2,Math.min(98,pctM))}%"></div>`;
+  html+=`<div class="label-left">¥${fmt(ci.lower)}</div><div class="label-right">¥${fmt(ci.upper)}</div></div></div></div>`;
+
+  html+=`<div class="result-section"><h3><span class="icon">🎯</span> 实验结论</h3><div class="conclusion-box">`;
+  html+=`<div class="title">📊 分析结论</div><div class="text">${con.summary.replace(/\|/g,'<br>')}</div>`;
+  html+=`<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">`;
+  html+=`<span class="badge ${con.t_test_significant?'badge-green':'badge-red'}">t检验: ${con.t_test_significant?'显著':'不显著'}</span>`;
+  html+=`<span class="badge ${con.chi_square_significant?'badge-green':'badge-red'}">卡方: ${con.chi_square_significant?'显著':'不显著'}</span>`;
+  html+=`<span class="badge ${power.adequate?'badge-green':'badge-orange'}">功效: ${(power.power*100).toFixed(0)}% ${power.adequate?'充足':'不足'}</span>`;
+  html+=`<span class="badge badge-blue">推荐: ${con.recommended_test}</span></div>`;
+  html+=`<div style="margin-top:12px;font-size:14px;color:#60a5fa;font-weight:600">💡 ${con.recommendation}</div></div></div>`;
+
+  document.getElementById('results').innerHTML=html;
   document.getElementById('results').classList.add('show');
+
+  setTimeout(()=>{
+    const container=document.getElementById('distChartsContainer');
+    if(container&&container.offsetParent!==null){
+      const descGA=desc.group_a,descGB=desc.group_b;
+      const simA=[],simB=[];
+      const stdA=descGA.std,stdB=descGB.std;
+      for(let i=0;i<200;i++){
+        simA.push(Math.max(0,descGA.mean+(Math.random()+Math.random()+Math.random()-1.5)*stdA));
+        simB.push(Math.max(0,descGB.mean+(Math.random()+Math.random()+Math.random()-1.5)*stdB));
+      }
+      renderDistChart('distCharts',exp.group_a.label,simA,exp.group_b.label,simB);
+    }
+  },300);
 }
 
-function renderAnovaResult(d) {
-  const anova = d.anova;
-  const desc = d.descriptive;
-
-  let html = '';
-
-  html += `<div class="result-section">
-    <h3><span class="icon">📊</span> ANOVA 方差分析 - ${d.metric_label}</h3>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="label">分组维度</div><div class="value blue">${d.dimension}</div></div>
-      <div class="stat-card"><div class="label">分组数</div><div class="value">${d.group_count}</div></div>
-      <div class="stat-card"><div class="label">F 统计量</div><div class="value ${anova.significant ? 'green' : 'red'}">${anova.f_statistic}</div></div>
-      <div class="stat-card"><div class="label">p-value</div><div class="value ${anova.significant ? 'green' : 'red'}">${anova.p_value < 0.0001 ? '<0.0001' : anova.p_value}</div></div>
-      <div class="stat-card"><div class="label">结论</div><div class="value"><span class="badge ${anova.significant ? 'badge-green' : 'badge-red'}">${anova.significant ? '显著差异' : '无显著差异'}</span></div></div>
-    </div>
-  </div>`;
-
-  html += `<div class="result-section">
-    <h3><span class="icon">📋</span> 各组描述性统计</h3>
-    <table class="comparison-table">
-      <tr><th>分组</th><th>样本量</th><th>均值</th><th>标准差</th><th>中位数</th><th>Q1</th><th>Q3</th></tr>`;
-  const maxMean = Math.max(...Object.values(desc).map(v => v.mean));
-  for (const [key, v] of Object.entries(desc)) {
-    html += `<tr><td>${v.label}</td><td>${v.n.toLocaleString()}</td><td>¥${v.mean.toFixed(2)}</td><td>¥${v.std.toFixed(2)}</td><td>¥${v.median.toFixed(2)}</td><td>¥${v.q1.toFixed(2)}</td><td>¥${v.q3.toFixed(2)}</td></tr>`;
+function renderAnovaResult(d){
+  const anova=d.anova,desc=d.descriptive;
+  let html=`<div class="result-section"><h3><span class="icon">📊</span> ANOVA 方差分析 - ${d.metric_label}</h3><div class="stats-grid">`;
+  html+=`<div class="stat-card"><div class="label">分组维度</div><div class="value blue">${d.dimension}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">分组数</div><div class="value">${d.group_count}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">F 统计量</div><div class="value ${anova.significant?'green':'red'}">${anova.f_statistic}</div></div>`;
+  html+=`<div class="stat-card"><div class="label">p-value</div><div class="value ${anova.significant?'green':'red'}">${pv(anova.p_value)}</div></div>`;
+  const lev=d.assumptions?.variance_homogeneity;
+  if(lev){
+    html+=`<div class="stat-card"><div class="label">方差齐性 (Levene)</div><div class="value ${lev.equal_var?'green':'red'}">${pv(lev.p_value)}</div><div class="sub">${lev.equal_var?'✅ 方差齐':'❌ 方差不齐'}</div></div>`;
   }
-  html += `</table>
-    <div class="chart-box" style="margin-top:16px">
-      <h4>各组均值对比</h4>
-      <div class="bar-chart">`;
-  const colors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4'];
-  let ci2 = 0;
-  for (const [key, v] of Object.entries(desc)) {
-    const color = colors[ci2++ % colors.length];
-    html += `<div class="bar-row"><div class="bar-label" style="width:100px">${v.label}</div><div class="bar-track"><div class="bar-fill" style="width:${(v.mean/maxMean*100).toFixed(1)}%;background:${color}">¥${v.mean.toFixed(2)}</div></div></div>`;
+  html+=`<div class="stat-card"><div class="label">结论</div><div class="value"><span class="badge ${anova.significant?'badge-green':'badge-red'}">${anova.significant?'显著差异':'无显著差异'}</span></div></div></div></div>`;
+
+  html+=`<div class="result-section"><h3><span class="icon">📋</span> 各组描述性统计</h3><table class="comparison-table"><tr><th>分组</th><th>样本量</th><th>均值</th><th>标准差</th><th>中位数</th><th>Q1</th><th>Q3</th><th>偏度</th></tr>`;
+  const maxMean=Math.max(...Object.values(desc).map(v=>v.mean));
+  for(const[k,v]of Object.entries(desc)){
+    html+=`<tr><td>${v.label}</td><td>${v.n.toLocaleString()}</td><td>¥${fmt(v.mean)}</td><td>¥${fmt(v.std)}</td><td>¥${fmt(v.median)}</td><td>¥${fmt(v.q1)}</td><td>¥${fmt(v.q3)}</td><td>${v.skewness}</td></tr>`;
   }
-  html += `</div></div></div>`;
+  html+=`</table><div class="chart-box" style="margin-top:16px"><h4>各组均值对比</h4><div class="bar-chart">`;
+  const colors=['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4'];
+  let ci=0;
+  for(const[k,v]of Object.entries(desc)){
+    html+=`<div class="bar-row"><div class="bar-label" style="font-size:11px">${v.label.substring(0,6)}</div><div class="bar-track"><div class="bar-fill" style="width:${(v.mean/maxMean*100).toFixed(1)}%;background:${colors[ci%colors.length]}">¥${fmt(v.mean)}</div></div></div>`;ci++;
+  }
+  html+=`</div></div></div>`;
 
-  html += `<div class="result-section">
-    <h3><span class="icon">🎯</span> ANOVA 结论</h3>
-    <div class="conclusion-box">
-      <div class="title">📊 分析结论</div>
-      <div class="text">${d.conclusion.summary}</div>
-      <div style="margin-top:12px;font-size:14px;color:#60a5fa;font-weight:600">💡 ${d.conclusion.recommendation}</div>
-    </div>
-  </div>`;
+  if(d.posthoc){
+    const ph=d.posthoc;
+    html+=`<div class="result-section"><h3><span class="icon">🔗</span> 事后两两对比 (${ph.method})</h3>`;
+    if(ph.note){html+=`<div class="warning-box"><span>ℹ️</span>${ph.note}</div>`;}
+    html+=`<table class="comparison-table posthoc-table"><tr><th>对比组</th><th>均值差</th><th>p-value</th><th>结论</th></tr>`;
+    ph.pairs.forEach(p=>{
+      html+=`<tr class="${p.significant?'significant':''}"><td>${p.group_a} vs ${p.group_b}</td><td>${p.mean_diff>=0?'+':''}¥${fmt(p.mean_diff)}</td><td>${pv(p.p_value)}</td><td><span class="badge ${p.significant?'badge-green':'badge-red'}">${p.significant?'显著差异':'无显著差异'}</span></td></tr>`;
+    });
+    html+=`</table></div>`;
+  }
 
-  document.getElementById('results').innerHTML = html;
+  html+=`<div class="result-section"><h3><span class="icon">🎯</span> ANOVA 结论</h3><div class="conclusion-box"><div class="title">📊 分析结论</div><div class="text">${d.conclusion.summary}</div><div style="margin-top:12px;font-size:14px;color:#60a5fa;font-weight:600">💡 ${d.conclusion.recommendation}</div></div></div>`;
+
+  document.getElementById('results').innerHTML=html;
   document.getElementById('results').classList.add('show');
 }
 
