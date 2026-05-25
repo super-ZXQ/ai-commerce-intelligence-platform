@@ -1,29 +1,13 @@
-# 原始数据（体积大，不上传）
-data/datas.xlsx
-*.xlsx
-
-# 环境变量（含 API 密钥）
-.env
-
-# 数据库文件（体积大）
-*.db
-
-# Python 运行缓存
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
 .ipynb_checkpoints/
-
-# 系统隐藏文件
+*.egg-info/
+dist/
+build/
+.env
+*.log
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-
-# 虚拟环境
-venv/
-.venv/
-
-# 软著申请材料（敏感文件，不上传）
-copyright_materials/

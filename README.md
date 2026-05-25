@@ -289,11 +289,9 @@ ecommerce_analysis/
 │
 ├── ai-ecommerce-assistant/          # AI Streamlit 助手（LangChain + Qwen）
 ├── streamlit_app.py                 # Streamlit BI 看板主程序
-├── app/bi_dashboard.py             # Streamlit Cloud 部署入口
 ├── data/cleaned_orders.csv         # 清洗后数据
 ├── notebook/                       # 5 个分析 Notebook
 ├── sql/                            # 建表/导入/高级分析 SQL
-├── output/                         # 可视化输出
 └── README.md
 ```
 
@@ -335,7 +333,7 @@ pip install -r ai-ecommerce-assistant/requirements.txt
 pip install -r backend/requirements.txt
 
 # 启动三个服务（可同时运行）
-streamlit run app/bi_dashboard.py                          # BI 看板 :8501
+streamlit run streamlit_app.py                              # BI 看板 :8501
 streamlit run ai-ecommerce-assistant/app.py                # AI 助手 :8502
 python -m uvicorn backend.main:app --port 8000              # API 服务 :8000
 ```
