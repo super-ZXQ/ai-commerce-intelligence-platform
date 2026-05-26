@@ -1,22 +1,24 @@
 # 电商数据分析系统
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-v1.1-green?logo=fastapi)
+![FastAPI](https://img.shields.io/badge/FastAPI-v1.2-green?logo=fastapi)
 ![Streamlit](https://img.shields.io/badge/Streamlit-BI看板-red?logo=streamlit)
 ![LangChain](https://img.shields.io/badge/LangChain-AI助手-orange?logo=langchain)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-orange?logo=mysql)
+![Redis](https://img.shields.io/badge/Redis-7-red?logo=redis)
+![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 项目简介
 
-基于 **10万+ 条电商真实订单数据**，完成从数据清洗、特征工程到多维分析与可视化的完整链路。系统采用前后端分离架构，提供交互式 BI 看板、AI 智能查询、RESTful API 服务和实时监控四大核心能力。
+基于 **10万+ 条电商真实订单数据**，完成从数据清洗、特征工程到多维分析与可视化的完整链路。系统采用前后端分离架构，提供交互式 BI 看板、AI 智能查询、RESTful API 服务、RFM 用户画像和实时监控五大核心能力。
 
 | 模块 | 技术栈 | 功能 |
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手** | LangChain + Qwen + MySQL | 自然语言提问，自动生成 SQL 并绘图 |
-| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 26 个 RESTful API，含 JWT 认证/限流/缓存/监控/A-B实验 |
-| **A/B 实验分析** | scipy + numpy + FastAPI | t-test / 卡方检验 / ANOVA / 效应量 / 置信区间 |
+| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 30 个 RESTful API，含 JWT 认证/限流/缓存/监控/RFM |
+| **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 
 ## 在线演示
@@ -29,7 +31,44 @@
 | **API 体验页面** | 本地 `http://localhost:8000/demo` | 可视化数据大屏 + AI 查询 |
 | **系统监控面板** | 本地 `http://localhost:8000/monitor` | 可视化监控仪表盘 |
 | **健康检查面板** | 本地 `http://localhost:8000/health-panel` | 组件健康状态与指标看板 |
-| **A/B 实验分析** | 本地 `http://localhost:8000/abtest` | 统计检验可视化面板（t-test/ANOVA/效应量） |
+
+---
+
+## Docker Compose 一键部署
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/2681107509-dev/ecommerce-analysis-system.git
+cd ecommerce_analysis
+
+# 2. 配置环境变量
+cp deploy/.env.example .env
+# 编辑 .env 填入 MySQL 密码、JWT Secret、LLM API Key
+
+# 3. 一键启动全部服务
+docker-compose up -d
+
+# 4. 查看服务状态
+docker-compose ps
+```
+
+**服务架构：**
+
+```
+docker-compose up -d
+├── ea-mysql        → MySQL 8.0 (3306) + 自动建表+导入
+├── ea-redis        → Redis 7 Alpine (6379) + AOF持久化 + LRU淘汰
+├── ea-backend      → FastAPI (8000) → 依赖 mysql + redis
+├── ea-streamlit    → BI 看板 (8501) → 依赖 mysql
+└── ea-ai-assistant → AI 助手 (8502) → 依赖 mysql
+```
+
+| 特性 | 说明 |
+|------|------|
+| 健康检查链路 | MySQL → Redis → Backend → Streamlit/AI，全部 `healthcheck` + `depends_on` |
+| 数据持久化 | MySQL `mysql_data` + Redis `redis_data` Docker Volume |
+| Redis 配置 | AOF + RDB 双持久化、256MB 上限、allkeys-lru 淘汰 |
+| 优雅依赖 | 后端等待 MySQL 就绪后才启动，Streamlit 等待后端 |
 
 ---
 
@@ -37,38 +76,40 @@
 
 为项目提供完整的 RESTful API 服务，支持外部系统（小程序、移动端、前端）实时调用数据。
 
-### 核心功能（26 个接口）
+### 核心功能（30 个接口）
 
 | 模块 | 接口数 | 说明 | 认证 |
 |------|--------|------|------|
 | **认证系统** | 3 | 登录 / 刷新Token / 当前用户 | 公开 |
-| **系统接口** | 7 | 首页 / 健康检查 / 体验页 / 监控面板 / 健康面板 / A-B实验面板 / API文档 | 公开 |
+| **系统接口** | 7 | 首页 / 健康检查 / 体验页 / 监控面板 / 健康面板 / API文档 | 公开 |
 | **订单查询** | 3 | 列表（分页+排序）、详情、多条件筛选 | 公开 |
 | **商品与用户** | 2 | 商品销售排名、用户消费排名 | 公开 |
 | **数据分析** | 5 | 销售总览(缓存)、趋势、热销商品、用户行为(缓存)、平台分析 | 公开 |
 | **AI 助手** | 1 | 自然语言 -> 自动 SQL -> 返回结果 | 需 JWT |
 | **数据导出** | 2 | CSV / Excel 格式导出（分批查询防 OOM） | 公开 |
-| **监控** | 2 | 实时指标统计、详细健康检查 | 公开 |
-| **A/B 实验** | 3 | 分组查询 / A-B对比(t-test+卡方+效应量) / ANOVA方差分析 | 公开 |
+| **监控** | 2 | 实时指标统计、详细健康检查（含 Redis 状态） | 公开 |
+| **RFM 用户画像** | 4 | 总览 / 分群 / 分群用户详情 / TOP 用户 | 公开 |
 
 ### 技术架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │              FastAPI Application (v1.2)              │
-├──────────┬──────────┬──────────┬──────────┬────────┬────────┐
-│  auth/   │ orders/  │products  │analytics │   ai/  │ abtest/│
-│  routes  │  routes  │  routes  │  routes  │export/ │        │
-│          │          │          │          │monitor/ │        │
-├──────────┴──────────┴──────────┴──────────┴────────┴────────┤
-│              Services Layer                         │
-│  order_service │ analytics_service │ ai_service     │
-│  abtest_service (scipy统计检验引擎)                  │
-├─────────────────────────────────────────────────────┤
+├──────────┬──────────┬──────────┬──────────┬──────────┤
+│  auth/   │ orders/  │products  │analytics │   ai/    │
+│  routes  │  routes  │  routes  │  routes  │ export/  │
+│          │          │          │          │ monitor/ │
+│          │          │          │          │   rfm/   │
+├──────────┴──────────┴──────────┴──────────┴──────────┤
+│              Services Layer                           │
+│  order_service │ analytics_service │ ai_service       │
+│  rfm_service (RFM量化分群引擎)                        │
+├───────────────────────────────────────────────────────┤
 │         SQLAlchemy Async (aiomysql)                 │
 │              MySQL Connection Pool (10+20)           │
 ├─────────────────────────────────────────────────────┤
-│  JWT Auth  │ Rate Limit │ Cache │ Monitor           │
+│  JWT Auth  │ Rate Limit │ Redis Cache │ Monitor     │
+│  (bcrypt)  │ (TTL清理)  │ (双层降级)  │             │
 └─────────────────────────────────────────────────────┘
                     ↕
             ┌───────────────┐
@@ -98,28 +139,26 @@ curl http://localhost:8000/api/analytics/top-products?limit=5
 curl "http://localhost:8000/api/orders/filter?platform_type=APP&page_size=10"
 curl -o report.xlsx "http://localhost:8000/api/export/analytics?export_format=excel"
 
-# 4. A/B 实验分析（无需 Token）
-# 获取可用分组
-curl "http://localhost:8000/api/abtest/groups?dimension=platform_type"
-
-# APP vs 微信公众号 对比实验
-curl "http://localhost:8000/api/abtest/compare?dimension=platform_type&group_a=APP&group_b=微信公众号&metric=payment_amount&alpha=0.05"
-
-# 多平台 ANOVA 方差分析
-curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=payment_amount"
+# 4. RFM 用户画像
+curl http://localhost:8000/api/rfm/overview
+curl http://localhost:8000/api/rfm/segments
+curl "http://localhost:8000/api/rfm/segments/重要价值客户?page=1&page_size=20"
+curl http://localhost:8000/api/rfm/top-users?limit=10
 ```
 
 ### 安全特性
 
 | 特性 | 说明 | 配置位置 |
 |------|------|---------|
-| JWT Bearer Token 认证 | SHA256 密码哈希 + HS256 签名，24h 有效期 | `utils/auth.py` |
-| API 请求频率限制 | 按路径差异化限流：登录 5次/min、AI 10次/min、导出 3次/2min | `utils/rate_limiter.py` |
+| JWT Bearer Token 认证 | bcrypt 密码哈希(rounds=12) + HS256 签名，24h 有效期 | `utils/auth.py` |
+| JWT Secret 强制校验 | 生产环境未设置 JWT_SECRET 拒绝启动，开发模式降级告警 | `config.py` |
+| API 请求频率限制 | 按路径差异化限流 + TTL 自动清理 + 线程安全 Lock | `utils/rate_limiter.py` |
 | SQL 注入防护 | LIKE 查询自动转义 `%` `_` 特殊字符 | `services/order_service.py` |
 | 敏感数据过滤 | AI 查询自动拦截隐私问题（手机号/身份证/密码） | `services/ai_service.py` |
-| 响应缓存 | 销售总览 2min / 用户行为 3min，减少 DB 压力 | `utils/cache.py` |
-| CORS 跨域控制 | 支持配置允许的来源列表 | `config.py` |
+| Redis 双层缓存 | Redis 优先 → 失败自动降级内存缓存，TTL 过期双保障 | `utils/cache.py` |
+| CORS 跨域控制 | 白名单模式，仅允许本地端口访问 | `config.py` |
 | 统一错误处理 | 全局异常捕获，生产环境隐藏堆栈 | `main.py` |
+| 密钥保护 | `.env` 加入 `.gitignore`，防止密钥泄露 | `.gitignore` |
 
 ### 性能优化
 
@@ -127,11 +166,63 @@ curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=paym
 |--------|------|
 | 异步全链路 | async/await 从路由到数据库（asyncio + aiomysql） |
 | 连接池 | 10 核心连接 + 20 溢出连接，3600s 自动回收 |
+| Redis 缓存 | 热门查询 Redis 缓存，AOF 持久化，LRU 淘汰，内存降级 |
 | 分批导出 | 每批 5000 条，防止大数据量 OOM |
 | 用户行为优化 | 5 次 SQL 合并为 2 次 |
-| 缓存加速 | 热门查询结果内存缓存，TTL 可配 |
+| 缓存加速 | 销售总览 2min / 用户行为 3min / RFM 10min，TTL 可配 |
 | 数据库索引 | 7 个关键索引（见 `sql/optimize_indexes.sql`） |
+| 限流器优化 | 后台线程 300s 清理过期 key，线程安全 Lock，上限 10000 条 |
 | 请求日志 | 自动记录方法/路径/状态码/耗时/限流信息 |
+
+---
+
+## RFM 用户画像
+
+基于 RFM 模型（Recency 最近消费 / Frequency 消费频次 / Monetary 消费金额），对 78,060 名用户进行五分位量化评分和自动分群。
+
+### 分群模型
+
+```
+R≥4 F≥4 M≥4 → 重要价值客户    R≥4 F<4 M≥4 → 重要保持客户
+R≥4 F≥4 M<4 → 重要发展客户    R≥4 F<4 M<4 → 重要挽留客户
+R<4 F≥4 M≥4 → 一般价值客户    R<4 F<4 M≥4 → 一般保持客户
+R<4 F≥4 M<4 → 一般发展客户    R<4 F<4 M<4 → 一般挽留客户
+```
+
+### 数据概览
+
+| 指标 | 数值 |
+|------|------|
+| 分析用户数 | 78,060 名 |
+| 平均消费间隔 | 147.5 天 |
+| 平均消费频次 | 1.31 次 |
+| 平均消费金额 | ¥1,303.83 |
+| 高价值客户 | 31,227 人（40%），贡献 ¥4,482 万 |
+
+### API 接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/rfm/overview` | GET | RFM 总览：高价值/流失预警 + 分群分布 + 消费分布 |
+| `/api/rfm/segments` | GET | 全量分群结果（支持自定义参考日期和分位数） |
+| `/api/rfm/segments/{segment}` | GET | 指定分群用户详情（分页） |
+| `/api/rfm/top-users` | GET | RFM 评分 TOP 用户 |
+
+---
+
+## Redis 缓存架构
+
+采用 **Redis 优先 + 内存降级** 的双层缓存策略，确保服务高可用：
+
+| 特性 | 实现 |
+|------|------|
+| **双层架构** | Redis 优先 → 连接失败自动降级内存缓存 |
+| **TTL 过期** | Redis `SETEX` + 内存 `expires_at` 双重保障 |
+| **持久化** | AOF（everysec）+ RDB（900s/300s/60s 三级快照） |
+| **淘汰策略** | `maxmemory 256mb` + `allkeys-lru` |
+| **模式失效** | `invalidate_pattern()` 同时清理 Redis + 内存 |
+| **健康检查** | `/api/monitor/health/detailed` 含 Redis 连接状态 |
+| **优雅降级** | Redis 不可用时自动切内存，日志告警 |
 
 ---
 
@@ -157,77 +248,6 @@ curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=paym
 
 ---
 
-## A/B 实验分析
-
-基于 scipy 统计引擎，提供完整的 A/B 实验分析能力，包含**数据质量检查、统计假设检验、效应量分析**三大核心能力：
-
-```
-实验问题：APP端 vs 微信公众号端，哪个客单价更高？
-
- A组（APP）：n=51,313, 均值=¥1,014.52, 标准差=¥452.30
- B组（微信）：n=42,041, 均值=¥1,028.96, 标准差=¥318.50
- → t=-31.98, p<0.0001 (显著)  Cohen's d=-0.21 (小效应)
- → 统计功效: 100% (优秀) · 正态性: ❌非正态 · 方差齐性: ❌不齐
- → 推荐检验: Mann-Whitney U (数据不满足正态假设)
- → 结论：微信客单价显著高于APP，建议优化APP策略
-```
-
-### 核心统计功能
-
-| 类别 | 功能 | 说明 |
-|------|------|------|
-| **描述统计** | 均值/标准差/中位数/Q1-Q3/偏度/峰度 | 完整的数据分布特征 |
-| **样本质量** | 异常值检测(IQR) + 样本量平衡检查 | 自动识别异常数据和样本失衡 |
-| **正态性检验** | Shapiro-Wilk 检验 | 判断数据是否满足正态分布假设 |
-| **方差齐性检验** | Levene 检验(中位数) | 判断两组方差是否相等 |
-| **Welch's t-test** | 双样本独立t检验 | 自动Welch校正不等方差 |
-| **Mann-Whitney U** | 非参数检验 | 数据非正态时的备选方案 |
-| **卡方检验** | 转化率差异显著性 | 分类变量关联检验 |
-| **Cohen's d 效应量** | 差异实际意义量化 | 小(<0.2)/中(<0.5)/大(≥0.8) |
-| **Cramer's V 关联强度** | 分类变量关联程度 | 弱(<0.1)/中(<0.3)/强(≥0.3) |
-| **95% 置信区间(T分布)** | 均值差可信范围 | 使用T分布更精确(小样本) |
-| **统计功效分析** | Power = 1-β | 判断检验效力是否充足(≥80%) |
-| **ANOVA 方差分析** | 多组同时比较 | F检验 + Tukey HSD事后两两对比 |
-| **智能推荐** | 自动推荐最佳检验方法 | 基于正态性/方差齐性/样本平衡 |
-
-### 可视化展示
-
-| 图表 | 说明 |
-|------|------|
-| 均值对比柱状图 | 直观展示两组均值差异 |
-| 转化率对比柱状图 | 付款转化比例可视化 |
-| 数据分布直方图 | 两组数据的频率分布形态 |
-| 置信区间可视化条 | 均值差的置信区间与零点位置关系 |
-| 事后检验结果表 | ANOVA多组两两对比显著性标记 |
-
-### 支持的分组维度
-
-| 维度 | 字段 | 分组数 | 典型场景 |
-|------|------|--------|---------|
-| 平台类型 | `platform_type` | 6 组 | APP vs 微信 vs Web vs 淘宝 |
-| 退款状态 | `is_refunded` | 2 组 | 已退款 vs 未退款对比 |
-| 星期 | `weekday` | 7 组 | 工作日 vs 周末效应分析 |
-
-### 支持的分析指标
-
-| 指标 | 字段 | 适用场景 |
-|------|------|---------|
-| 付款金额 | `payment_amount` | 客单价/营收对比 |
-| 订单金额 | `order_amount` | 下单金额差异 |
-| 优惠金额 | `discount_amount` | 促销敏感度分析 |
-
-### 统计假设检验流程
-
-```
-1️⃣ 数据收集 → 2️⃣ 样本质量检查 → 3️⃣ 正态性检验
-    ↓                              ↓
-8️⃣ 业务建议 ← 7️⃣ 效应量+功效评估 ← 6️⃣ 选择合适检验方法
-    ↑                              ↓
-    └─────── 5️⃣ 置信区间估计 ←─── 4️⃣ 执行统计检验(t-test/MWU/卡方)
-```
-
----
-
 ## 技术栈
 
 | 类别 | 技术 | 说明 |
@@ -236,12 +256,14 @@ curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=paym
 | 后端框架 | FastAPI + Uvicorn | 异步高性能 RESTful API |
 | ORM | SQLAlchemy (async) + aiomysql | 异步 ORM + 异步 MySQL 驱动 |
 | 数据验证 | Pydantic v2 | 请求/响应模型校验 |
-| JWT 认证 | python-jose | HS256 签名 + SHA256 密码哈希 |
+| JWT 认证 | python-jose + bcrypt | HS256 签名 + bcrypt 密码哈希(rounds=12) |
+| 缓存 | Redis 7 + 内存降级 | 双层缓存 + AOF 持久化 + LRU 淘汰 |
+| 容器化 | Docker Compose | MySQL + Redis + FastAPI + Streamlit 一键部署 |
 | 数据处理 | pandas, numpy | pandas 2.0+ |
 | 可视化 | matplotlib, plotly | 静态图 + 交互式图表 |
 | BI 看板 | Streamlit | 交互式数据大屏 |
 | AI 框架 | LangChain, LangChain-OpenAI | SQL Agent + LLM 调用 |
-| 统计分析 | scipy + numpy | t-test / 卡方 / ANOVA / 效应量 |
+| 用户画像 | RFM 模型 | 五分位量化评分 + 8 类自动分群 |
 | 测试框架 | pytest + pytest-asyncio + httpx | 异步单元测试 |
 | 开发环境 | Jupyter Notebook, VS Code | 模块化 Notebook 开发 |
 | 版本控制 | Git, GitHub | 规范 commit 信息 |
@@ -258,8 +280,8 @@ curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=paym
 | 时间跨度 | 2025.01-2026.01 | 全年销售数据 |
 | 总销售额 | 101,776,848.74 元 | 实际付款金额 |
 | 复购率 | 25.39% | 消费 >=2 次的用户占比 |
-| API 接口 | 26 个 | 含认证/限流/监控/A-B实验 |
-| 默认账号 | admin/admin123 | JWT 认证账号 |
+| API 接口 | 30 个 | 含认证/限流/监控/RFM |
+| 默认账号 | admin/admin123 | JWT 认证账号（bcrypt 哈希） |
 | 测试用例 | 27 个 | 异步单元测试 |
 | 支持平台 | 6 个 | APP/微信公众号/Web网站/淘宝/微信小商店/wap网站 |
 
@@ -270,8 +292,8 @@ curl "http://localhost:8000/api/abtest/anova?dimension=platform_type&metric=paym
 ```
 ecommerce_analysis/
 ├── backend/                        # FastAPI 后端服务
-│   ├── main.py                     # 应用入口（CORS/中间件/路由注册/限流/日志）
-│   ├── config.py                   # 配置管理（Pydantic Settings + JWT Secret）
+│   ├── main.py                     # 应用入口（CORS/中间件/路由注册/限流/日志/Redis初始化）
+│   ├── config.py                   # 配置管理（Pydantic Settings + JWT/Redis/LLM）
 │   ├── database.py                 # 异步连接池 + 健康检查
 │   ├── demo.html                   # 可视化体验页面（含自动登录）
 │   ├── requirements.txt            # Python 依赖
@@ -288,25 +310,24 @@ ecommerce_analysis/
 │   │   ├── analytics.py            # 数据分析路由（5 个接口）
 │   │   ├── ai.py                   # AI 助手路由（需 JWT 认证）
 │   │   ├── export.py               # 导出路由（CSV/Excel 分批查询）
-│   │   ├── monitor.py              # 监控路由（metrics/detailed health）
-│   │   └── abtest.py               # A/B实验路由（分组/对比/ANOVA）
+│   │   ├── monitor.py              # 监控路由（metrics/detailed health + Redis）
+│   │   └── rfm.py                  # RFM 用户画像路由（4 个接口）
 │   │
 │   ├── services/
 │   │   ├── order_service.py        # 订单逻辑（SQL注入防护/分页优化）
 │   │   ├── analytics_service.py    # 分析逻辑（缓存装饰器/查询优化）
 │   │   ├── ai_service.py           # AI 查询逻辑（敏感过滤/重试/解析）
-│   │   └── abtest_service.py       # A/B实验统计引擎（t-test/卡方/ANOVA）
+│   │   └── rfm_service.py          # RFM 量化分群引擎（五分位评分/8类分群/流失预警）
 │   │
 │   ├── static/
 │   │   ├── index.html              # 统一入口导航页面
 │   │   ├── monitor.html            # 系统监控可视化面板
-│   │   ├── health.html             # 健康检查可视化面板
-│   │   └── abtest.html             # A/B实验分析面板
+│   │   └── health.html             # 健康检查可视化面板
 │   │
 │   ├── utils/
-│   │   ├── auth.py                 # JWT 工具（生成/验证/密码哈希）
-│   │   ├── rate_limiter.py         # 限流中间件（按路径差异化）
-│   │   └── cache.py                # 内存缓存（@cached 装饰器/TTL）
+│   │   ├── auth.py                 # JWT 工具（bcrypt 密码哈希/生成/验证）
+│   │   ├── rate_limiter.py         # 限流中间件（TTL清理/Lock/上限淘汰）
+│   │   └── cache.py                # 双层缓存（Redis优先 + 内存降级）
 │   │
 │   ├── tests/
 │   │   └── test_api.py             # 27 个异步单元测试
@@ -317,8 +338,15 @@ ecommerce_analysis/
 │   └── sql/
 │       └── optimize_indexes.sql    # 数据库索引优化脚本（7个索引）
 │
+├── deploy/                          # 部署配置
+│   ├── redis.conf                   # Redis 生产配置（AOF/RDB/LRU/持久化）
+│   └── .env.example                 # 环境变量模板
+│
 ├── ai-ecommerce-assistant/          # AI Streamlit 助手（LangChain + Qwen）
 ├── streamlit_app.py                 # Streamlit BI 看板主程序
+├── docker-compose.yml               # Docker Compose 一键部署编排
+├── Dockerfile                       # FastAPI 后端镜像
+├── Dockerfile.streamlit             # BI 看板镜像
 ├── data/cleaned_orders.csv         # 清洗后数据
 ├── notebook/                       # 5 个分析 Notebook
 ├── sql/                            # 建表/导入/高级分析 SQL
@@ -329,28 +357,27 @@ ecommerce_analysis/
 
 ## 运行方式
 
-### 快速启动
+### 方式一：Docker Compose 一键部署（推荐）
 
 ```bash
-# 1. 安装依赖
-pip install -r backend/requirements.txt
+git clone https://github.com/2681107509-dev/ecommerce-analysis-system.git
+cd ecommerce_analysis
 
-# 2. 配置 .env（已预置默认值，仅需确认 MySQL 密码）
-# backend/.env 中修改 DB_PASSWORD 即可
+# 配置环境变量
+cp deploy/.env.example .env
+# 编辑 .env 填入 MySQL 密码、JWT Secret、LLM API Key
 
-# 3. 启动服务
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# 一键启动
+docker-compose up -d
 
 # 访问：
 # 统一入口:    http://localhost:8000/
 # Swagger 文档: http://localhost:8000/docs
-# 体验页面:    http://localhost:8000/demo
-# 监控面板:    http://localhost:8000/monitor
-# 健康面板:    http://localhost:8000/health-panel
-# A/B实验:     http://localhost:8000/abtest
+# BI 看板:     http://localhost:8501
+# AI 助手:     http://localhost:8502
 ```
 
-### 完整部署
+### 方式二：本地开发
 
 ```bash
 git clone https://github.com/2681107509-dev/ecommerce-analysis-system.git
@@ -380,13 +407,23 @@ DB_USER=root
 DB_PASSWORD=你的MySQL密码
 DB_NAME=ecommerce_analysis
 
-# JWT 认证
+# Redis 缓存（可选，不启用则使用内存缓存）
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+REDIS_ENABLED=false
+
+# JWT 认证（生产环境必须设置强随机密钥）
 JWT_SECRET=your-secret-key-change-in-production
 
 # AI 助手（可选）
 LLM_API_KEY=sk-你的阿里云Key
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL=qwen-plus
+
+# 应用配置
+DEBUG=false
 ```
 
 **`ai-ecommerce-assistant/.env`（AI 分析助手）**：
@@ -409,6 +446,8 @@ LLM_MODEL=qwen-plus
 |--------|------|------|
 | `admin` | `admin123` | 管理员 |
 | `analyst` | `analyst123` | 分析师 |
+
+> 密码使用 bcrypt(rounds=12) 哈希存储，非明文
 
 ### 运行测试
 
@@ -443,11 +482,13 @@ langchain>=0.2.0
 langchain-community>=0.2.0
 langchain-openai>=0.1.0
 python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.0
 httpx>=0.25.0
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 scipy>=1.11.0
 numpy>=1.24.0
+redis>=5.0.0
 ```
 
 ---
@@ -456,6 +497,5 @@ numpy>=1.24.0
 
 - **v1.0**：17 个基础 API + Swagger 文档 + AI 查询 + 数据导出
 - **v1.1**：JWT 认证 + API 限流 + 响应缓存 + 监控指标 + 27 个测试用例 + Postman Collection + 数据库索引优化 + 可视化监控面板 + 健康检查面板 + 统一入口导航
-- **v1.2**：A/B 实验分析模块（scipy统计引擎）+ t-test/卡方/Mann-Whitney/Cohen's d/ANOVA + 可视化实验面板 + 26 个接口
-- **v1.2.1**：A/B实验优化 - 正态性检验(Shapiro-Wilk) + 方差齐性(Levene) + 统计功效分析 + T分布置信区间 + Tukey HSD事后检验 + 异常值检测(IQR) + 样本量平衡检查 + 数据分布直方图 + 智能检验方法推荐
-- **规划中**：接入 Redis 生产级缓存、Airflow 定时调度、Docker 容器化部署
+- **v1.2**：安全加固（bcrypt 密码哈希 + JWT Secret 强制校验 + CORS 白名单 + 限流器 TTL 清理 + .gitignore 密钥保护）+ Redis 双层缓存（AOF 持久化 + LRU 淘汰 + 内存降级）+ RFM 用户画像（五分位评分 + 8 类分群 + 流失预警 + 4 个 API）+ Docker Compose 一键部署（MySQL + Redis + FastAPI + Streamlit + AI 助手）
+- **规划中**：漏斗分析、购物篮关联分析（Apriori）、销量预测（Prophet）、RBAC 权限系统

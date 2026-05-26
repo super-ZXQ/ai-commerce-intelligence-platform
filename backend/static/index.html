@@ -228,7 +228,7 @@ body {
         </a>
 
         <!-- AI 分析助手 -->
-        <a href="http://localhost:8502" target="_blank" class="card card-ai">
+        <a href="http://localhost:8505" target="_blank" class="card card-ai">
             <div class="card-header">
                 <div class="card-icon icon-ai">🤖</div>
                 <span class="card-status status-ready" id="aiStatus">检测中</span>
@@ -307,22 +307,6 @@ body {
             <span class="card-arrow">→</span>
         </a>
 
-        <!-- A/B 实验分析 -->
-        <a href="/abtest" target="_blank" class="card" style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-color:#6366f1">
-            <div class="card-header">
-                <div class="card-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">🔬</div>
-                <span class="card-status status-ready" id="abtestStatus">检测中</span>
-            </div>
-            <h3>🔬 A/B 实验分析</h3>
-            <p>实验组 vs 对照组统计检验：t-test、卡方检验、Mann-Whitney U、Cohen's d 效应量、置信区间、ANOVA 方差分析。</p>
-            <div class="card-tags">
-                <span class="tag tag-tech">scipy</span>
-                <span class="tag tag-tech">统计检验</span>
-                <span class="tag">显著性分析</span>
-            </div>
-            <span class="card-arrow">→</span>
-        </a>
-
     </div>
 </div>
 
@@ -360,7 +344,7 @@ async function init() {
         checkService(BASE + '/monitor', 'monitorStatus'),
         checkService(BASE + '/health-panel', 'healthStatus'),
         checkService(BASE + '/health', null),
-        checkService('http://localhost:8502', 'aiStatus'),
+        checkService('http://localhost:8505', 'aiStatus'),
     ]);
 
     const apiEl = document.getElementById('apiStatus');

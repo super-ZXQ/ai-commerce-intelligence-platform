@@ -7,8 +7,44 @@ from functools import wraps
 
 logger = logging.getLogger(__name__)
 
-_cache: dict[str, dict] = {}
 DEFAULT_TTL = 300
+
+_memory_cache: dict[str, dict] = {}
+
+_redis_client = None
+_redis_available = False
+
+
+def init_redis(redis_url: str) -> bool:
+    global _redis_client, _redis_available
+    try:
+        import redis
+        _redis_client = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=3, socket_timeout=3)
+        _redis_client.ping()
+        _redis_available = True
+        logger.info("✅ Redis 缓存已连接")
+        return True
+    except Exception as e:
+        _redis_available = False
+        _redis_client = None
+        logger.warning(f"⚠️ Redis 连接失败，降级为内存缓存: {e}")
+        return False
+
+
+def check_redis_health() -> dict:
+    if not _redis_available or _redis_client is None:
+        return {"status": "disabled", "backend": "memory"}
+    try:
+        _redis_client.ping()
+        info = _redis_client.info("memory")
+        return {
+            "status": "ok",
+            "backend": "redis",
+            "used_memory_human": info.get("used_memory_human", "N/A"),
+            "keys": _redis_client.dbsize(),
+        }
+    except Exception as e:
+        return {"status": "error", "detail": str(e), "backend": "redis_fallback_memory"}
 
 
 def _make_key(*args, **kwargs) -> str:
@@ -17,29 +53,61 @@ def _make_key(*args, **kwargs) -> str:
 
 
 def get(key: str) -> Optional[Any]:
-    entry = _cache.get(key)
+    if _redis_available and _redis_client:
+        try:
+            raw = _redis_client.get(key)
+            if raw is not None:
+                return json.loads(raw)
+            return None
+        except Exception as e:
+            logger.warning(f"Redis GET 失败，降级内存: {e}")
+    entry = _memory_cache.get(key)
     if entry is None:
         return None
     if entry["expires_at"] < time.time():
-        del _cache[key]
+        del _memory_cache[key]
         return None
     return entry["data"]
 
 
 def set(key: str, value: Any, ttl: int = DEFAULT_TTL) -> None:
-    _cache[key] = {"data": value, "expires_at": time.time() + ttl}
+    if _redis_available and _redis_client:
+        try:
+            _redis_client.setex(key, ttl, json.dumps(value, default=str))
+            return
+        except Exception as e:
+            logger.warning(f"Redis SET 失败，降级内存: {e}")
+    _memory_cache[key] = {"data": value, "expires_at": time.time() + ttl}
 
 
 def delete(key: str) -> None:
-    _cache.pop(key, None)
+    if _redis_available and _redis_client:
+        try:
+            _redis_client.delete(key)
+        except Exception:
+            pass
+    _memory_cache.pop(key, None)
 
 
 def clear() -> None:
-    _cache.clear()
+    if _redis_available and _redis_client:
+        try:
+            _redis_client.flushdb()
+        except Exception:
+            pass
+    _memory_cache.clear()
 
 
 def stats() -> dict:
-    return {"keys": len(_cache), "memory_estimate_mb": len(json.dumps(_cache, default=str)) / (1024 * 1024)}
+    result = {"backend": "redis" if _redis_available else "memory", "memory_keys": len(_memory_cache)}
+    if _redis_available and _redis_client:
+        try:
+            result["redis_keys"] = _redis_client.dbsize()
+            info = _redis_client.info("memory")
+            result["redis_memory"] = info.get("used_memory_human", "N/A")
+        except Exception:
+            result["redis_keys"] = "error"
+    return result
 
 
 def cached(ttl: int = DEFAULT_TTL):
@@ -60,7 +128,24 @@ def cached(ttl: int = DEFAULT_TTL):
 
 
 def invalidate_pattern(pattern: str) -> int:
-    keys_to_delete = [k for k in _cache if pattern in k]
+    count = 0
+    if _redis_available and _redis_client:
+        try:
+            keys = _redis_client.keys(f"*{pattern}*")
+            if keys:
+                count = _redis_client.delete(*keys)
+        except Exception:
+            pass
+    keys_to_delete = [k for k in _memory_cache if pattern in k]
     for k in keys_to_delete:
-        delete(k)
-    return len(keys_to_delete)
+        del _memory_cache[k]
+        count += 1
+    return count
+
+
+def cleanup_memory_cache() -> int:
+    now = time.time()
+    expired = [k for k, v in _memory_cache.items() if v["expires_at"] < now]
+    for k in expired:
+        del _memory_cache[k]
+    return len(expired)

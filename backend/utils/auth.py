@@ -1,8 +1,8 @@
-import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
@@ -10,8 +10,8 @@ from backend.config import get_settings
 
 settings = get_settings()
 
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+ALGORITHM = settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes
 
 
 class TokenData(BaseModel):
@@ -31,11 +31,15 @@ class TokenResponse(BaseModel):
 
 
 def _hash_password(password: str) -> str:
-    return hashlib.sha256(f"{settings.jwt_secret}:{password}".encode()).hexdigest()
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return _hash_password(plain_password) == hashed_password
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(username: str, expires_delta: Optional[timedelta] = None) -> str:
@@ -59,7 +63,7 @@ def decode_token(token: str) -> Optional[TokenData]:
         return None
 
 
-DEFAULT_USERS = {
+DEFAULT_USERS: dict[str, str] = {
     "admin": _hash_password("admin123"),
     "analyst": _hash_password("analyst123"),
 }

@@ -7,7 +7,23 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-.env
 *.log
 .DS_Store
 Thumbs.db
+
+# 环境变量与密钥文件（禁止提交）
+.env
+.env.local
+.env.production
+backend/.env
+ai-ecommerce-assistant/.env
+
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 临时文件
+query/
+*.tmp

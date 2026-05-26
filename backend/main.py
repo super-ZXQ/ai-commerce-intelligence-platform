@@ -11,9 +11,10 @@ from fastapi.responses import JSONResponse, FileResponse
 from backend.config import get_settings
 from backend.database import engine, Base, check_db_connection
 from backend.models.database_models import Order  # noqa: F401 - 注册 ORM 模型
-from backend.routes import orders, products, analytics, ai, export, auth, monitor, abtest
+from backend.routes import orders, products, analytics, ai, export, auth, monitor, rfm
 from backend.routes.monitor import record_request
 from backend.utils.rate_limiter import check_rate_limit
+from backend.utils.cache import init_redis, check_redis_health
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +35,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ 数据库连接失败: {e}")
         logger.warning("API将以无数据库模式启动，数据相关接口将返回错误")
+
+    if settings.redis_enabled:
+        redis_ok = init_redis(settings.redis_url)
+        if redis_ok:
+            logger.info("✅ Redis 缓存已启用")
+        else:
+            logger.warning("⚠️ Redis 连接失败，使用内存缓存降级模式")
+    else:
+        logger.info("ℹ️ Redis 未启用，使用内存缓存")
+
     yield
     await engine.dispose()
     logger.info("👋 数据库连接池已关闭")
@@ -55,6 +66,7 @@ app = FastAPI(
 - **AI助手**：自然语言查询（Text-to-SQL）
 - **数据导出**：CSV/Excel格式导出
 - **监控**：实时指标、详细健康检查
+- **RFM用户画像**：RFM模型分群、用户价值评估、流失预警
 
 ### 安全特性
 - JWT Bearer Token 认证
@@ -77,7 +89,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_SKIP_RATE_LIMIT_PATHS = ("/docs", "/redoc", "/health", "/health-panel", "/", "/demo", "/openapi.json", "/monitor", "/abtest")
+_SKIP_RATE_LIMIT_PATHS = ("/docs", "/redoc", "/health", "/health-panel", "/", "/demo", "/openapi.json", "/monitor")
 
 
 @app.middleware("http")
@@ -136,7 +148,7 @@ app.include_router(analytics.router)
 app.include_router(ai.router)
 app.include_router(export.router)
 app.include_router(monitor.router)
-app.include_router(abtest.router)
+app.include_router(rfm.router)
 
 
 _DEMO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -167,8 +179,3 @@ async def monitor_page() -> FileResponse:
 @app.get("/health-panel", tags=["监控"])
 async def health_panel_page() -> FileResponse:
     return FileResponse(os.path.join(_STATIC_DIR, "health.html"))
-
-
-@app.get("/abtest", tags=["A/B实验"])
-async def abtest_page() -> FileResponse:
-    return FileResponse(os.path.join(_STATIC_DIR, "abtest.html"))
