@@ -17,7 +17,7 @@
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手** | LangChain + Qwen + MySQL | 自然语言提问，自动生成 SQL 并绘图 |
-| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 30 个 RESTful API，含 JWT 认证/限流/缓存/监控/RFM |
+| **FastAPI 后端接口** | FastAPI + SQLAlchemy + LangChain | 31 个 RESTful API，含 JWT 认证/限流/缓存/监控/RFM |
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 
@@ -26,7 +26,7 @@
 | 应用 | 链接 | 说明 |
 |------|------|------|
 | **BI 数据看板** | [点击体验](https://ecommerce-analysis-system-cqd8tpywoxneg8n3wqexfm.streamlit.app) | Streamlit Cloud 在线部署 |
-| **AI 分析助手** | 本地 `http://localhost:8502` | 自然语言查数，自动 SQL + 图表 |
+| **AI 分析助手** | 本地 `http://localhost:8505` | 自然语言查数，自动 SQL + 图表 |
 | **API 文档** | 本地 `http://localhost:8000/docs` | Swagger UI 交互式文档 |
 | **API 体验页面** | 本地 `http://localhost:8000/demo` | 可视化数据大屏 + AI 查询 |
 | **系统监控面板** | 本地 `http://localhost:8000/monitor` | 可视化监控仪表盘 |
@@ -60,7 +60,7 @@ docker-compose up -d
 ├── ea-redis        → Redis 7 Alpine (6379) + AOF持久化 + LRU淘汰
 ├── ea-backend      → FastAPI (8000) → 依赖 mysql + redis
 ├── ea-streamlit    → BI 看板 (8501) → 依赖 mysql
-└── ea-ai-assistant → AI 助手 (8502) → 依赖 mysql
+└── ea-ai-assistant → AI 助手 (8505) → 依赖 mysql
 ```
 
 | 特性 | 说明 |
@@ -76,7 +76,7 @@ docker-compose up -d
 
 为项目提供完整的 RESTful API 服务，支持外部系统（小程序、移动端、前端）实时调用数据。
 
-### 核心功能（30 个接口）
+### 核心功能（31 个接口）
 
 | 模块 | 接口数 | 说明 | 认证 |
 |------|--------|------|------|
@@ -87,7 +87,7 @@ docker-compose up -d
 | **数据分析** | 5 | 销售总览(缓存)、趋势、热销商品、用户行为(缓存)、平台分析 | 公开 |
 | **AI 助手** | 1 | 自然语言 -> 自动 SQL -> 返回结果 | 需 JWT |
 | **数据导出** | 2 | CSV / Excel 格式导出（分批查询防 OOM） | 公开 |
-| **监控** | 2 | 实时指标统计、详细健康检查（含 Redis 状态） | 公开 |
+| **监控** | 3 | 实时指标统计、详细健康检查（含 Redis 状态）、外部服务状态 | 公开 |
 | **RFM 用户画像** | 4 | 总览 / 分群 / 分群用户详情 / TOP 用户 | 公开 |
 
 ### 技术架构
@@ -144,6 +144,9 @@ curl http://localhost:8000/api/rfm/overview
 curl http://localhost:8000/api/rfm/segments
 curl "http://localhost:8000/api/rfm/segments/重要价值客户?page=1&page_size=20"
 curl http://localhost:8000/api/rfm/top-users?limit=10
+
+# 5. 外部服务状态检测
+curl http://localhost:8000/api/monitor/services-status
 ```
 
 ### 安全特性
@@ -280,7 +283,7 @@ R<4 F≥4 M<4 → 一般发展客户    R<4 F<4 M<4 → 一般挽留客户
 | 时间跨度 | 2025.01-2026.01 | 全年销售数据 |
 | 总销售额 | 101,776,848.74 元 | 实际付款金额 |
 | 复购率 | 25.39% | 消费 >=2 次的用户占比 |
-| API 接口 | 30 个 | 含认证/限流/监控/RFM |
+| API 接口 | 31 个 | 含认证/限流/监控/RFM |
 | 默认账号 | admin/admin123 | JWT 认证账号（bcrypt 哈希） |
 | 测试用例 | 27 个 | 异步单元测试 |
 | 支持平台 | 6 个 | APP/微信公众号/Web网站/淘宝/微信小商店/wap网站 |
@@ -374,7 +377,7 @@ docker-compose up -d
 # 统一入口:    http://localhost:8000/
 # Swagger 文档: http://localhost:8000/docs
 # BI 看板:     http://localhost:8501
-# AI 助手:     http://localhost:8502
+# AI 助手:     http://localhost:8505
 ```
 
 ### 方式二：本地开发
@@ -391,7 +394,7 @@ pip install -r backend/requirements.txt
 
 # 启动三个服务（可同时运行）
 streamlit run streamlit_app.py                              # BI 看板 :8501
-streamlit run ai-ecommerce-assistant/app.py                # AI 助手 :8502
+streamlit run ai-ecommerce-assistant/app.py                # AI 助手 :8505
 python -m uvicorn backend.main:app --port 8000              # API 服务 :8000
 ```
 
@@ -497,5 +500,5 @@ redis>=5.0.0
 
 - **v1.0**：17 个基础 API + Swagger 文档 + AI 查询 + 数据导出
 - **v1.1**：JWT 认证 + API 限流 + 响应缓存 + 监控指标 + 27 个测试用例 + Postman Collection + 数据库索引优化 + 可视化监控面板 + 健康检查面板 + 统一入口导航
-- **v1.2**：安全加固（bcrypt 密码哈希 + JWT Secret 强制校验 + CORS 白名单 + 限流器 TTL 清理 + .gitignore 密钥保护）+ Redis 双层缓存（AOF 持久化 + LRU 淘汰 + 内存降级）+ RFM 用户画像（五分位评分 + 8 类分群 + 流失预警 + 4 个 API）+ Docker Compose 一键部署（MySQL + Redis + FastAPI + Streamlit + AI 助手）
+- **v1.2**：安全加固（bcrypt 密码哈希 + JWT Secret 强制校验 + CORS 白名单 + 限流器 TTL 清理 + .gitignore 密钥保护）+ Redis 双层缓存（AOF 持久化 + LRU 淘汰 + 内存降级）+ RFM 用户画像（五分位评分 + 8 类分群 + 流失预警 + 4 个 API）+ Docker Compose 一键部署（MySQL + Redis + FastAPI + Streamlit + AI 助手）+ 外部服务状态检测接口 + 导航页跨域代理检测 + AI 服务单例缓存优化
 - **规划中**：漏斗分析、购物篮关联分析（Apriori）、销量预测（Prophet）、RBAC 权限系统

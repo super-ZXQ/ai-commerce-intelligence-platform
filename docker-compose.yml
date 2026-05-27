@@ -108,7 +108,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-123456}
       DB_NAME: ${DB_NAME:-ecommerce_analysis}
     ports:
-      - "${AI_PORT:-8502}:8502"
+      - "${AI_PORT:-8505}:8502"
     depends_on:
       mysql:
         condition: service_healthy

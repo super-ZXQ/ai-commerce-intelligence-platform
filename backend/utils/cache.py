@@ -99,15 +99,19 @@ def clear() -> None:
 
 
 def stats() -> dict:
-    result = {"backend": "redis" if _redis_available else "memory", "memory_keys": len(_memory_cache)}
     if _redis_available and _redis_client:
         try:
-            result["redis_keys"] = _redis_client.dbsize()
+            _redis_client.ping()
             info = _redis_client.info("memory")
-            result["redis_memory"] = info.get("used_memory_human", "N/A")
+            return {
+                "status": "ok",
+                "backend": "redis",
+                "keys": _redis_client.dbsize(),
+                "memory_human": info.get("used_memory_human", "N/A"),
+            }
         except Exception:
-            result["redis_keys"] = "error"
-    return result
+            return {"status": "error", "backend": "redis_fallback_memory", "keys": len(_memory_cache)}
+    return {"status": "ok", "backend": "memory", "keys": len(_memory_cache)}
 
 
 def cached(ttl: int = DEFAULT_TTL):

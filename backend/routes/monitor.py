@@ -1,6 +1,7 @@
 import logging
 import time
 import os
+import httpx
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
@@ -96,3 +97,22 @@ async def detailed_health():
         "checks": checks,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+_EXTERNAL_SERVICES = {
+    "bi_dashboard": "http://localhost:8501/_stcore/health",
+    "ai_assistant": "http://localhost:8505/_stcore/health",
+}
+
+
+@router.get("/services-status", summary="外部服务状态")
+async def get_services_status():
+    results = {}
+    for name, url in _EXTERNAL_SERVICES.items():
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(url)
+                results[name] = {"status": "ok" if r.status_code == 200 else "error", "code": r.status_code}
+        except Exception as e:
+            results[name] = {"status": "error", "detail": str(e)}
+    return results

@@ -212,10 +212,10 @@ body {
     <div class="cards-grid">
 
         <!-- BI 数据看板 -->
-        <a href="https://ecommerce-analysis-system-cqd8tpywoxneg8n3wqexfm.streamlit.app" target="_blank" class="card card-bi">
+        <a href="http://localhost:8501" target="_blank" class="card card-bi">
             <div class="card-header">
                 <div class="card-icon icon-bi">📊</div>
-                <span class="card-status status-external">在线服务</span>
+                <span class="card-status status-ready" id="biStatus">检测中</span>
             </div>
             <h3>📊 BI 数据看板</h3>
             <p>交互式数据大屏，多维度交叉筛选。销售总览、趋势分析、平台占比、RFM 用户分层。</p>
@@ -323,14 +323,12 @@ async function checkService(url, elementId) {
     const el = document.getElementById(elementId);
     if (!el) return;
     try {
-        const r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(3000) });
-        if (r.ok) {
-            el.textContent = '✅ 运行中';
-            el.className = 'card-status status-ready';
-        } else {
-            el.textContent = r.status === 401 ? '需认证' : `⚠️ ${r.status}`;
-            el.className = 'card-status status-manual';
-        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const r = await fetch(url, { method: 'GET', signal: controller.signal });
+        clearTimeout(timer);
+        el.textContent = '✅ 运行中';
+        el.className = 'card-status status-ready';
     } catch(e) {
         el.textContent = '❌ 未启动';
         el.className = 'card-status status-manual';
@@ -344,8 +342,29 @@ async function init() {
         checkService(BASE + '/monitor', 'monitorStatus'),
         checkService(BASE + '/health-panel', 'healthStatus'),
         checkService(BASE + '/health', null),
-        checkService('http://localhost:8505', 'aiStatus'),
     ]);
+
+    try {
+        const ext = await fetch(BASE + '/api/monitor/services-status', { signal: AbortSignal.timeout(8000) });
+        const data = await ext.json();
+        const biEl = document.getElementById('biStatus');
+        const aiEl = document.getElementById('aiStatus');
+        if (biEl) {
+            const s = data.bi_dashboard || {};
+            biEl.textContent = s.status === 'ok' ? '✅ 运行中' : '❌ 未启动';
+            biEl.className = 'card-status ' + (s.status === 'ok' ? 'status-ready' : 'status-manual');
+        }
+        if (aiEl) {
+            const s = data.ai_assistant || {};
+            aiEl.textContent = s.status === 'ok' ? '✅ 运行中' : '❌ 未启动';
+            aiEl.className = 'card-status ' + (s.status === 'ok' ? 'status-ready' : 'status-manual');
+        }
+    } catch(e) {
+        ['biStatus', 'aiStatus'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = '❌ 未启动'; el.className = 'card-status status-manual'; }
+        });
+    }
 
     const apiEl = document.getElementById('apiStatus');
     if (apiEl) {
