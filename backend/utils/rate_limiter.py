@@ -4,7 +4,6 @@ import threading
 from collections import defaultdict
 
 from fastapi import Request, HTTPException
-from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -93,26 +92,3 @@ def check_rate_limit(request: Request) -> dict:
             "remaining": remaining,
             "reset": int(_rate_store[key][0] + window) if _rate_store[key] else int(now + window),
         }
-
-
-async def rate_limit_middleware(request: Request, call_next):
-    if request.url.path in ("/docs", "/redoc", "/health", "/", "/demo", "/openapi.json", "/monitor", "/health-panel") or request.url.path.startswith("/static"):
-        response = await call_next(request)
-        return response
-
-    try:
-        info = check_rate_limit(request)
-        response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(info["limit"])
-        response.headers["X-RateLimit-Remaining"] = str(info["remaining"])
-        response.headers["X-RateLimit-Reset"] = str(info["reset"])
-        return response
-    except HTTPException as exc:
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={
-                "error_code": "RATE_LIMITED",
-                "message": exc.detail,
-            },
-            headers={k: v for k, v in (exc.headers or {}).items()},
-        )

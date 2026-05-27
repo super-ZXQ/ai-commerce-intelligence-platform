@@ -1,7 +1,9 @@
 import logging
 import re
 import json
+import asyncio
 from typing import Optional
+from functools import lru_cache
 
 from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_openai import ChatOpenAI
@@ -117,12 +119,50 @@ def _build_visualization(columns: list[str], rows: list) -> Optional[dict]:
     }
 
 
+@lru_cache(maxsize=1)
 def _get_sync_db() -> SQLDatabase:
     db_url = (
         f"mysql+pymysql://{settings.db_user}:{settings.db_password}"
         f"@{settings.db_host}:{settings.db_port}/{settings.db_name}?charset=utf8mb4"
     )
     return SQLDatabase.from_uri(db_url)
+
+
+@lru_cache(maxsize=1)
+def _get_agent():
+    if not settings.llm_api_key:
+        return None
+    db = _get_sync_db()
+    llm = ChatOpenAI(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+        temperature=0.1,
+        timeout=120,
+        max_retries=2,
+    )
+    toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+
+    prefix = f"""你是一个专业的电商数据分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
+
+{BUSINESS_CONTEXT}
+
+当用户提问时，你需要：
+1. 理解用户意图
+2. 生成正确的 SQL 查询
+3. 执行查询获取数据
+4. 用中文总结结论
+
+请始终用中文回答。"""
+
+    return create_sql_agent(
+        llm=llm,
+        toolkit=toolkit,
+        prefix=prefix,
+        verbose=False,
+        agent_type="zero-shot-react-description",
+        handle_parsing_errors=True,
+    )
 
 
 async def process_natural_language_query(query: str) -> AIQueryResponse:
@@ -144,40 +184,17 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
         )
 
     try:
-        db = _get_sync_db()
-        llm = ChatOpenAI(
-            api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url,
-            model=settings.llm_model,
-            temperature=0.1,
-            timeout=120,
-            max_retries=2,
-        )
-        toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-
-        prefix = f"""你是一个专业的电商数据分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
-
-{BUSINESS_CONTEXT}
-
-当用户提问时，你需要：
-1. 理解用户意图
-2. 生成正确的 SQL 查询
-3. 执行查询获取数据
-4. 用中文总结结论
-
-请始终用中文回答。"""
-
-        agent = create_sql_agent(
-            llm=llm,
-            toolkit=toolkit,
-            prefix=prefix,
-            verbose=False,
-            agent_type="zero-shot-react-description",
-            handle_parsing_errors=True,
-        )
+        agent = _get_agent()
+        if agent is None:
+            return AIQueryResponse(
+                sql=None,
+                result=[],
+                answer="⚠️ AI功能未配置，请在 .env 中设置 LLM_API_KEY。",
+                visualization=None,
+            )
 
         try:
-            response = agent.invoke({"input": query})
+            response = await asyncio.to_thread(agent.invoke, {"input": query})
         except Exception as invoke_err:
             err_msg = str(invoke_err)
             if "output parsing error" in err_msg.lower() or "Could not parse" in err_msg:
@@ -213,7 +230,8 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
 
         if extracted_sql:
             try:
-                raw_result = db.run(extracted_sql)
+                db = _get_sync_db()
+                raw_result = await asyncio.to_thread(db.run, extracted_sql)
                 if isinstance(raw_result, str):
                     try:
                         parsed = json.loads(raw_result)

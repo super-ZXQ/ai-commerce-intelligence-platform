@@ -50,6 +50,7 @@ async def get_sales_overview(db: AsyncSession) -> SalesOverviewResponse:
     )
 
 
+@cached(ttl=120)
 async def get_sales_trend(
     db: AsyncSession,
     granularity: str = "day",
@@ -96,6 +97,7 @@ async def get_sales_trend(
     )
 
 
+@cached(ttl=120)
 async def get_top_products(
     db: AsyncSession,
     limit: int = 10,
@@ -182,6 +184,7 @@ async def get_user_behavior(db: AsyncSession) -> UserBehaviorResponse:
     )
 
 
+@cached(ttl=180)
 async def get_category_analysis(db: AsyncSession) -> CategoryAnalysisResponse:
     """品类/平台分析"""
     total_sales_subq = select(func.sum(Order.payment_amount)).scalar_subquery()

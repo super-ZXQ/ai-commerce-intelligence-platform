@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Callable, Awaitable
 
@@ -14,7 +15,7 @@ from backend.models.database_models import Order  # noqa: F401 - 注册 ORM 模�
 from backend.routes import orders, products, analytics, ai, export, auth, monitor, rfm
 from backend.routes.monitor import record_request
 from backend.utils.rate_limiter import check_rate_limit
-from backend.utils.cache import init_redis, check_redis_health
+from backend.utils.cache import init_redis, check_redis_health, cleanup_memory_cache
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +24,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+
+_CACHE_CLEANUP_INTERVAL = 300
+
+
+async def _cache_cleanup_task():
+    while True:
+        await asyncio.sleep(_CACHE_CLEANUP_INTERVAL)
+        try:
+            removed = cleanup_memory_cache()
+            if removed > 0:
+                logger.info(f"🧹 内存缓存清理: 移除 {removed} 个过期键")
+        except Exception as e:
+            logger.warning(f"缓存清理异常: {e}")
 
 
 @asynccontextmanager
@@ -45,7 +60,11 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("ℹ️ Redis 未启用，使用内存缓存")
 
+    cleanup_task = asyncio.create_task(_cache_cleanup_task())
+
     yield
+
+    cleanup_task.cancel()
     await engine.dispose()
     logger.info("👋 数据库连接池已关闭")
 
