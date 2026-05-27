@@ -100,4 +100,4 @@ fig_user.update_traces(texttemplate='%{x:.0f}', textposition='outside')
 st.plotly_chart(fig_user, use_container_width=True)
 
 st.markdown("---")
-st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders | 电商数据分析系统 v1.1")
+st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders | 电商数据分析系统 v1.2")

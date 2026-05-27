@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from backend.database import check_db_connection
-from backend.utils.cache import _memory_cache, check_redis_health
+from backend.utils.cache import check_redis_health, stats as cache_stats
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ async def get_metrics():
                 for path, stats in top_endpoints
             ],
         },
-        "cache": {"keys": len(_memory_cache)} if _memory_cache is not None else {"keys": 0},
+        "cache": cache_stats(),
     }
 
 
@@ -81,7 +81,7 @@ async def detailed_health():
         checks["database"] = {"status": "error", "detail": str(e)}
 
     try:
-        checks["cache"] = {"status": "ok", "keys": len(_memory_cache)}
+        checks["cache"] = cache_stats()
     except Exception:
         checks["cache"] = {"status": "error"}
 

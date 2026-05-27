@@ -54,7 +54,7 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="""
-## 电商数据分析系统 API v1.1
+## 电商数据分析系统 API v1.2
 
 基于10万+电商订单数据，提供数据查询、分析、AI智能查询和数据导出功能。
 

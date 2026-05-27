@@ -1,11 +1,11 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.services.rfm_service import compute_rfm, get_rfm_segment_detail, get_rfm_overview
+from backend.services.rfm_service import compute_rfm, get_rfm_segment_detail, get_rfm_overview, VALID_SEGMENTS
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ async def rfm_overview(
 ):
     result = await get_rfm_overview(db)
     if "error" in result:
-        return {"error_code": "RFM_ERROR", "message": result["error"]}
+        raise HTTPException(status_code=500, detail=result["error"])
     return result
 
 
@@ -30,7 +30,7 @@ async def rfm_segments(
 ):
     result = await compute_rfm(db, reference_date=reference_date, n_bins=n_bins)
     if "error" in result:
-        return {"error_code": "RFM_ERROR", "message": result["error"]}
+        raise HTTPException(status_code=500, detail=result["error"])
     return {
         "reference_date": result["reference_date"],
         "total_users": result["total_users"],
@@ -47,20 +47,15 @@ async def rfm_segment_users(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    valid_segments = [
-        "重要价值客户", "重要发展客户", "重要保持客户", "重要挽留客户",
-        "一般价值客户", "一般发展客户", "一般保持客户", "一般挽留客户",
-    ]
-    if segment not in valid_segments:
-        return {
-            "error_code": "INVALID_SEGMENT",
-            "message": f"无效分群名称: {segment}",
-            "valid_segments": valid_segments,
-        }
+    if segment not in VALID_SEGMENTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效分群名称: {segment}，可选值: {VALID_SEGMENTS}",
+        )
 
     result = await get_rfm_segment_detail(db, segment=segment, page=page, page_size=page_size)
     if "error" in result:
-        return {"error_code": "RFM_ERROR", "message": result["error"]}
+        raise HTTPException(status_code=500, detail=result["error"])
     return result
 
 
@@ -71,9 +66,10 @@ async def rfm_top_users(
 ):
     result = await compute_rfm(db)
     if "error" in result:
-        return {"error_code": "RFM_ERROR", "message": result["error"]}
+        raise HTTPException(status_code=500, detail=result["error"])
+    all_users = result.get("all_users", result.get("top_users", []))
     return {
         "reference_date": result["reference_date"],
         "total_users": result["total_users"],
-        "top_users": result["top_users"][:limit],
+        "top_users": all_users[:limit],
     }

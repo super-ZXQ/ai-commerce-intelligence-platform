@@ -11,6 +11,7 @@ import pandas as pd
 from backend.database import get_db
 from backend.models.database_models import Order
 from backend.services import analytics_service
+from backend.routes.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ async def export_orders(
     end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
     platform_type: Optional[str] = Query(None, description="平台类型"),
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     导出订单数据，支持CSV和Excel格式。
@@ -104,6 +106,7 @@ async def export_orders(
 async def export_analytics(
     export_format: str = Query("csv", description="导出格式: csv/excel"),
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     导出分析报告，包含销售总览、趋势、热销商品、用户行为等数据。

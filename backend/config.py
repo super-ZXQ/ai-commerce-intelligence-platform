@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     app_name: str = "电商数据分析API"
-    app_version: str = "1.1.0"
+    app_version: str = "1.2.0"
     debug: bool = False
 
     db_host: str = "localhost"

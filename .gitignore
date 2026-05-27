@@ -27,3 +27,6 @@ ai-ecommerce-assistant/.env
 # 临时文件
 query/
 *.tmp
+
+# 内部文档（不推送到 GitHub）
+PROJECT_INTRODUCTION.md
