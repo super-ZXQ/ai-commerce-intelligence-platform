@@ -276,6 +276,7 @@ python -m pytest tests/test_api.py -v
 
 ## 更新日志
 
+- **v1.5** — 代码质量全面审查：修复12项问题（连接池优化、Agent缓存重建、RFM分页查询、导出OOM防护、Redis SCAN替代KEYS、Plotly颜色格式修复等）
 - **v1.4** — GSAP 动画增强 + RFM 评分算法修复 + 缓存机制优化
 - **v1.3** — DeepSeek V4 Flash + RFM 可视化大屏 + 图表美化
 - **v1.2** — 安全加固 + Redis 双层缓存 + RFM 用户画像 + Docker 部署

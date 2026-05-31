@@ -1,3 +1,4 @@
+# 企业级RFM分层页面 v3.0 | 符合CDP数据产品规范
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -6,12 +7,39 @@ from datetime import datetime
 import os
 import numpy as np
 
+# ══════════════════════════════════════════════════════════════
+# 全局样式
+# ══════════════════════════════════════════════════════════════
 _PLOTLY_LAYOUT_DEFAULTS = dict(
     template="plotly_white",
     font=dict(family="Microsoft YaHei, PingFang SC, sans-serif", size=13),
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
 )
+
+# 企业标准色
+ENTERPRISE_COLORS = {
+    "重要保持客户": "#1E88E5",
+    "重要挽留客户": "#FF5722",
+    "一般保持客户": "#43A047",
+    "一般挽留客户": "#7E57C2",
+    "其他": "#BDBDBD",
+}
+ENTERPRISE_COLORS_FULL = {
+    "重要价值客户": "#1565C0",
+    "重要发展客户": "#1E88E5",
+    "重要保持客户": "#1E88E5",
+    "重要挽留客户": "#FF5722",
+    "一般价值客户": "#43A047",
+    "一般发展客户": "#43A047",
+    "一般保持客户": "#43A047",
+    "一般挽留客户": "#7E57C2",
+}
+
+def _hex_to_rgba(hex_color: str, alpha: float = 0.8) -> str:
+    h = hex_color.lstrip('#')
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
 
 st.set_page_config(
     page_title="电商数据 BI 看板",
@@ -20,6 +48,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ══════════════════════════════════════════════════════════════
+# 数据加载
+# ══════════════════════════════════════════════════════════════
 _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 if not os.path.exists(os.path.join(_REPO_ROOT, 'data')):
     _REPO_ROOT = os.path.dirname(_REPO_ROOT)
@@ -45,17 +76,17 @@ with st.spinner("⏳ 正在加载数据..."):
 
 page = st.sidebar.selectbox("📋 选择看板页面", ["📊 销售总览", "👥 RFM 客户分层"])
 
+# ══════════════════════════════════════════════════════════════
+# 销售总览
+# ══════════════════════════════════════════════════════════════
 if page == "📊 销售总览":
     st.title("🛒 电商订单数据分析看板")
     st.markdown("---")
 
     st.sidebar.header("🔍 筛选条件")
-
     platforms = st.sidebar.multiselect("选择平台", options=df['平台类型'].unique(), default=df['平台类型'].unique())
-
     min_date = df['下单时间'].min().date()
     max_date = df['下单时间'].max().date()
-
     date_range = st.sidebar.date_input("选择日期范围", value=(min_date, max_date), min_value=min_date, max_value=max_date)
 
     if len(date_range) == 2:
@@ -67,7 +98,6 @@ if page == "📊 销售总览":
 
     st.subheader("📊 核心指标")
     col1, col2, col3, col4 = st.columns(4)
-
     total_sales = filtered_df['付款金额'].sum()
     total_orders = filtered_df['订单号'].nunique()
     total_users = filtered_df['用户名'].nunique()
@@ -79,7 +109,6 @@ if page == "📊 销售总览":
     col4.metric(label="💵 客单价", value=f"¥{avg_order_value:.2f}", delta="较总体" + ("↑" if avg_order_value > df['付款金额'].mean() else "↓"))
 
     st.markdown("---")
-
     st.subheader("📈 每日销售趋势")
     col_chart1, col_chart2 = st.columns([2, 1])
 
@@ -113,31 +142,31 @@ if page == "📊 销售总览":
     st.plotly_chart(fig_user, width='stretch')
 
     st.markdown("---")
-    st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders | 电商数据分析系统 v1.2")
+    st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders | 电商数据分析系统 v1.4")
 
+# ══════════════════════════════════════════════════════════════
+# 企业级RFM分层分析
+# ══════════════════════════════════════════════════════════════
 elif page == "👥 RFM 客户分层":
-    st.title("👥 RFM 客户分层分析")
-    st.markdown("基于 **Recency（最近消费时间）**、**Frequency（消费频率）**、**Monetary（消费金额）** 三个维度，对客户进行价值分层，精准识别高价值客户与流失风险客户。")
-    st.markdown("---")
 
+    # ── 侧边栏参数 ──
     st.sidebar.header("⚙️ RFM 参数设置")
-
-    n_bins = st.sidebar.slider("分位数分组数", min_value=3, max_value=10, value=5, step=1, help="将R/F/M各维度分为N个分位组，值越细分层越精细")
-
+    n_bins = st.sidebar.slider("分位数分组数", min_value=3, max_value=10, value=5, step=1)
     ref_date_input = st.sidebar.date_input(
         "参考日期",
         value=df['下单时间'].max().date(),
         min_value=df['下单时间'].min().date(),
         max_value=df['下单时间'].max().date(),
-        help="以该日期为基准计算Recency（距今天数）"
     )
+    r_threshold = st.sidebar.slider("R 评分阈值（≤此值为高）", min_value=2, max_value=n_bins, value=4, step=1,
+                                    help="R评分 ≤ 此值视为近期活跃")
+    f_threshold = st.sidebar.slider("F 评分阈值（≥此值为高）", min_value=2, max_value=n_bins, value=4, step=1,
+                                    help="F评分 ≥ 此值视为高频消费")
+    m_threshold = st.sidebar.slider("M 评分阈值（≥此值为高）", min_value=2, max_value=n_bins, value=4, step=1,
+                                    help="M评分 ≥ 此值视为高消费金额")
 
-    r_threshold = st.sidebar.slider("R评分阈值（≥此值为高）", min_value=2, max_value=n_bins, value=4, step=1, help="Recency评分≥此值视为'最近消费'")
-    f_threshold = st.sidebar.slider("F评分阈值（≥此值为高）", min_value=2, max_value=n_bins, value=4, step=1, help="Frequency评分≥此值视为'高频消费'")
-    m_threshold = st.sidebar.slider("M评分阈值（≥此值为高）", min_value=2, max_value=n_bins, value=4, step=1, help="Monetary评分≥此值视为'高消费金额'")
-
+    # ── RFM计算 ──
     paid_df = df[df['付款金额'] > 0].copy()
-
     if len(paid_df) == 0:
         st.warning("⚠️ 当前筛选条件下无有效付款数据，无法进行 RFM 分析。")
         st.stop()
@@ -149,7 +178,6 @@ elif page == "👥 RFM 客户分层":
             frequency=('订单号', 'nunique'),
             monetary=('付款金额', 'sum')
         ).reset_index()
-
         rfm['recency_days'] = (pd.Timestamp(ref_date) - rfm['last_order_date']).dt.days
 
         actual_r_bins = min(rfm['recency_days'].nunique(), n_bins_val)
@@ -184,10 +212,8 @@ elif page == "👥 RFM 客户分层":
                 rfm['m_score'] = pd.qcut(monetary_for_cut, q=n_bins_val, labels=False, duplicates='drop') + 1
             if actual_m_bins < n_bins_val:
                 rfm['m_score'] = np.ceil(rfm['m_score'] * n_bins_val / actual_m_bins).astype(int).clip(1, n_bins_val)
-
         return rfm
 
-    # 缓存键包含用户名、订单数、总金额的哈希，确保订单变更时缓存失效
     _user_stats = paid_df.groupby('用户名').agg(
         order_count=('订单号', 'nunique'),
         total_amount=('付款金额', 'sum')
@@ -199,8 +225,15 @@ elif page == "👥 RFM 客户分层":
     ))
     rfm = compute_rfm_data(_cache_key, ref_date_input, n_bins)
 
+    if '平台类型' in paid_df.columns:
+        user_platform = paid_df.groupby('用户名')['平台类型'].agg(
+            lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]
+        ).reset_index().rename(columns={'平台类型': '平台'})
+        rfm = rfm.merge(user_platform, on='用户名', how='left')
+
+    # ── 分层逻辑（R≤阈值=高，F/M≥阈值=高）──
     def assign_segment(row, r_th, f_th, m_th):
-        r_high = row['r_score'] >= r_th
+        r_high = row['r_score'] <= r_th
         f_high = row['f_score'] >= f_th
         m_high = row['m_score'] >= m_th
         if r_high and f_high and m_high:
@@ -221,312 +254,486 @@ elif page == "👥 RFM 客户分层":
 
     rfm['客户分层'] = rfm.apply(lambda row: assign_segment(row, r_threshold, f_threshold, m_threshold), axis=1)
 
-    SEGMENT_COLORS = {
-        "重要价值客户": "#E74C3C",
-        "重要发展客户": "#E67E22",
-        "重要保持客户": "#F1C40F",
-        "重要挽留客户": "#3498DB",
-        "一般价值客户": "#2ECC71",
-        "一般发展客户": "#1ABC9C",
-        "一般保持客户": "#9B59B6",
-        "一般挽留客户": "#95A5A6",
-    }
-
-    SEGMENT_ICONS = {
-        "重要价值客户": "💎",
-        "重要发展客户": "📈",
-        "重要保持客户": "🔄",
-        "重要挽留客户": "⚠️",
-        "一般价值客户": "🌟",
-        "一般发展客户": "🌱",
-        "一般保持客户": "🔵",
-        "一般挽留客户": "⚪",
-    }
-
-    st.subheader("📊 RFM 核心指标概览")
-    total_rfm_users = len(rfm)
-    avg_recency = rfm['recency_days'].mean()
-    avg_frequency = rfm['frequency'].mean()
-    avg_monetary = rfm['monetary'].mean()
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric(label="👥 分析用户数", value=f"{total_rfm_users:,}")
-    col2.metric(label="📅 平均最近消费天数", value=f"{avg_recency:.1f} 天")
-    col3.metric(label="🔄 平均消费频次", value=f"{avg_frequency:.2f} 次")
-    col4.metric(label="💰 平均消费金额", value=f"¥{avg_monetary:,.2f}")
-
-    high_value = rfm[rfm['客户分层'].str.contains('重要')]
-    at_risk = rfm[rfm['客户分层'].str.contains('挽留')]
-
-    col5, col6, col7 = st.columns(3)
-    col5.metric(
-        label="💎 重要客户数",
-        value=f"{len(high_value):,}",
-        delta=f"占比 {len(high_value)/total_rfm_users*100:.1f}%"
-    )
-    col6.metric(
-        label="⚠️ 流失风险客户数",
-        value=f"{len(at_risk):,}",
-        delta=f"占比 {len(at_risk)/total_rfm_users*100:.1f}%"
-    )
-    col7.metric(
-        label="💎 重要客户贡献金额",
-        value=f"¥{high_value['monetary'].sum():,.0f}",
-        delta=f"占比 {high_value['monetary'].sum()/rfm['monetary'].sum()*100:.1f}%" if rfm['monetary'].sum() > 0 else "占比 0%"
-    )
-
-    st.markdown("---")
-
-    st.subheader("🎯 客户分层分布")
-    seg_counts = rfm['客户分层'].value_counts().reset_index()
-    seg_counts.columns = ['客户分层', '人数']
     seg_order = ["重要价值客户", "重要发展客户", "重要保持客户", "重要挽留客户",
                  "一般价值客户", "一般发展客户", "一般保持客户", "一般挽留客户"]
-    _sort_map = {name: i for i, name in enumerate(seg_order)}
-    seg_counts['_sort_key'] = seg_counts['客户分层'].map(_sort_map)
-    seg_counts = seg_counts.sort_values('_sort_key').drop(columns=['_sort_key'])
-    seg_counts['颜色'] = seg_counts['客户分层'].astype(str).map(SEGMENT_COLORS)
-    seg_counts['图标'] = seg_counts['客户分层'].astype(str).map(SEGMENT_ICONS)
-    seg_counts['标签'] = seg_counts['图标'] + ' ' + seg_counts['客户分层'].astype(str)
 
-    col_pie, col_bar = st.columns([1, 1])
+    # 四大核心分层（高管视角聚焦）
+    core_segments = ["重要保持客户", "重要挽留客户", "一般保持客户", "一般挽留客户"]
 
-    with col_pie:
-        fig_pie = px.pie(
-            seg_counts, values='人数', names='标签',
-            title="客户分层占比",
-            hole=0.45,
-            color='标签',
-            color_discrete_map={row['标签']: row['颜色'] for _, row in seg_counts.iterrows()}
-        )
-        fig_pie.update_traces(
-            textposition='inside',
-            textinfo='percent+label',
-            textfont=dict(size=12),
-            hovertemplate='<b>%{label}</b><br>人数: %{value:,}<br>占比: %{percent}<extra></extra>'
-        )
-        fig_pie.update_layout(
-            **_PLOTLY_LAYOUT_DEFAULTS,
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=11)),
-            margin=dict(t=50, b=80, l=20, r=20)
-        )
-        st.plotly_chart(fig_pie, width='stretch')
+    total_users = len(rfm)
+    total_gmv = rfm['monetary'].sum() if total_users > 0 else 0
 
-    with col_bar:
-        fig_bar = px.bar(
-            seg_counts, x='客户分层', y='人数',
-            title="各分层客户人数",
-            color='客户分层',
-            color_discrete_map=SEGMENT_COLORS,
-        )
-        fig_bar.update_traces(
-            texttemplate='%{y:,}',
-            textposition='outside',
-            hovertemplate='<b>%{x}</b><br>人数: %{y:,}<extra></extra>'
-        )
-        fig_bar.update_layout(
-            **_PLOTLY_LAYOUT_DEFAULTS,
-            xaxis_title="客户分层",
-            yaxis_title="人数",
-            showlegend=False,
-            xaxis=dict(tickangle=30, tickfont=dict(size=11)),
-            margin=dict(t=50, b=100, l=50, r=20)
-        )
-        st.plotly_chart(fig_bar, width='stretch')
-
+    # ── 页面标题 ──
+    st.title("👥 RFM 客户分层分析")
+    st.caption(f"数据截止：{ref_date_input} | 分组数：{n_bins} | R阈值≤{r_threshold} F/M阈值≥{f_threshold} | 共 {total_users:,} 位客户 | 总GMV ¥{total_gmv:,.0f}")
     st.markdown("---")
 
-    st.subheader("🔥 RFM 评分热力图")
-    st.markdown("展示 R、F、M 各评分组合下的客户数量分布，颜色越深代表该组合的客户越多。")
+    # ══════════════════════════════════════════════════════
+    # 三个Tab
+    # ══════════════════════════════════════════════════════
+    tab1, tab2, tab3 = st.tabs(["📊 分层概览", "🎯 价值矩阵", "🔍 群体洞察"])
 
-    heat_data = rfm.groupby(['r_score', 'f_score']).size().reset_index(name='客户数')
-    heat_pivot = heat_data.pivot(index='r_score', columns='f_score', values='客户数').fillna(0)
-    for c in range(1, n_bins + 1):
-        if c not in heat_pivot.columns:
-            heat_pivot[c] = 0
-    for r in range(1, n_bins + 1):
-        if r not in heat_pivot.index:
-            heat_pivot.loc[r] = 0
-    heat_pivot = heat_pivot.sort_index(axis=0).sort_index(axis=1)
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # Tab1: 分层概览（高管视角）
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    with tab1:
+        # ── KPI 指标卡 ──
+        high_value_mask = rfm['客户分层'].isin(["重要保持客户", "重要挽留客户"])
+        high_value_count = int(high_value_mask.sum())
+        high_value_pct = high_value_count / total_users * 100 if total_users > 0 else 0
 
-    fig_heat = go.Figure(data=go.Heatmap(
-        z=heat_pivot.values,
-        x=[f'F={c}' for c in heat_pivot.columns],
-        y=[f'R={r}' for r in heat_pivot.index],
-        text=heat_pivot.values.astype(int),
-        texttemplate='%{text}',
-        textfont=dict(size=12),
-        colorscale='YlOrRd',
-        hovertemplate='R=%{y}, F=%{x}<br>客户数: %{z:.0f}<extra></extra>',
-    ))
-    fig_heat.update_layout(
-        **_PLOTLY_LAYOUT_DEFAULTS,
-        title="R × F 评分交叉热力图（数字为客户数量）",
-        xaxis_title="Frequency 评分",
-        yaxis_title="Recency 评分",
-        margin=dict(t=60, b=40, l=60, r=30)
-    )
-    st.plotly_chart(fig_heat, width='stretch')
+        risk_mask = rfm['客户分层'].isin(["一般挽留客户"])
+        risk_count = int(risk_mask.sum())
+        risk_pct = risk_count / total_users * 100 if total_users > 0 else 0
+
+        high_value_gmv = rfm.loc[high_value_mask, 'monetary'].sum()
+        high_value_gmv_pct = high_value_gmv / total_gmv * 100 if total_gmv > 0 else 0
+
+        k1, k2, k3 = st.columns(3)
+        with k1:
+            st.metric(
+                "💎 高价值客户占比",
+                f"{high_value_pct:.1f}%",
+                delta=f"目标 ≥30%  {'达标' if high_value_pct >= 30 else '未达标'}",
+            )
+            st.caption("重要保持 + 重要挽留客户")
+        with k2:
+            st.metric(
+                "⚠️ 流失风险客户",
+                f"{risk_count:,}",
+                delta=f"占比 {risk_pct:.1f}%  {'预警' if risk_pct > 50 else '可控'}",
+            )
+            st.caption("一般挽留客户（R低/F低/M低）")
+        with k3:
+            st.metric(
+                "💰 高价值GMV贡献率",
+                f"{high_value_gmv_pct:.1f}%",
+                delta=f"基准 ≥60%  {'达标' if high_value_gmv_pct >= 60 else '未达标'}",
+            )
+            st.caption(f"高价值客户贡献 ¥{high_value_gmv:,.0f}")
+
+        st.markdown("---")
+
+        # ── 环形图 + 分层明细表 ──
+        st.subheader("客户资产结构")
+        col_ring, col_table = st.columns([2, 3])
+
+        with col_ring:
+            seg_summary = rfm.groupby('客户分层').agg(
+                人数=('用户名', 'count'),
+                总GMV=('monetary', 'sum'),
+            ).reset_index()
+
+            # 核心分层 vs 其他
+            seg_summary['分组'] = seg_summary['客户分层'].apply(
+                lambda x: x if x in core_segments else "其他"
+            )
+            ring_data = seg_summary.groupby('分组').agg(
+                人数=('人数', 'sum'),
+                总GMV=('总GMV', 'sum'),
+            ).reset_index()
+            ring_data['占比'] = ring_data['人数'] / ring_data['人数'].sum() * 100
+
+            ring_colors = [ENTERPRISE_COLORS.get(s, "#BDBDBD") for s in ring_data['分组']]
+
+            fig_ring = go.Figure(data=[go.Pie(
+                values=ring_data['人数'].tolist(),
+                labels=ring_data['分组'].tolist(),
+                hole=0.55,
+                marker=dict(colors=ring_colors, line=dict(color='white', width=2)),
+                textinfo='percent',
+                textfont=dict(size=13),
+                hovertemplate='<b>%{label}</b><br>人数: %{value:,}<br>占比: %{percent}<extra></extra>',
+            )])
+            fig_ring.add_annotation(
+                text=f"<b>{total_users:,}</b><br>客户总数",
+                x=0.5, y=0.5, font=dict(size=16, family="Microsoft YaHei"),
+                showarrow=False
+            )
+            fig_ring.update_layout(
+                **_PLOTLY_LAYOUT_DEFAULTS,
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=11)),
+                margin=dict(t=20, b=60, l=20, r=20),
+                height=380,
+            )
+            st.plotly_chart(fig_ring, width='stretch')
+
+        with col_table:
+            table_data = rfm.groupby('客户分层').agg(
+                人数=('用户名', 'count'),
+                总GMV=('monetary', 'sum'),
+                人均GMV=('monetary', 'mean'),
+                平均R=('recency_days', 'mean'),
+                平均F=('frequency', 'mean'),
+            ).reset_index()
+            table_data['占比'] = table_data['人数'] / total_users * 100
+            table_data = table_data.sort_values('人数', ascending=False)
+
+            table_data['人数'] = table_data['人数'].apply(lambda x: f"{x:,}")
+            table_data['占比'] = table_data['占比'].apply(lambda x: f"{x:.1f}%")
+            table_data['人均GMV'] = table_data['人均GMV'].apply(lambda x: f"¥{x:,.0f}")
+            table_data['总GMV'] = table_data['总GMV'].apply(lambda x: f"¥{x:,.0f}")
+            table_data['平均R'] = table_data['平均R'].apply(lambda x: f"{x:.0f}天")
+            table_data['平均F'] = table_data['平均F'].apply(lambda x: f"{x:.1f}次")
+
+            table_data = table_data.rename(columns={
+                '客户分层': '客户分层', '人数': '人数', '占比': '占比',
+                '人均GMV': '人均GMV', '平均R': '平均R(天)', '平均F': '平均F(次)', '总GMV': '总GMV'
+            })
+
+            st.dataframe(
+                table_data[['客户分层', '人数', '占比', '人均GMV', '平均R(天)', '平均F(次)', '总GMV']],
+                width='stretch', hide_index=True,
+            )
+
+        st.markdown("---")
+
+        # ── RFM 分层规则说明 ──
+        with st.expander("📖 RFM 分层规则说明", expanded=True):
+            st.markdown(f"""
+| 客户分层 | R条件 | F条件 | M条件 | 业务定义 | 运营策略 |
+|---------|-------|-------|-------|---------|---------|
+| **重要价值客户** | R≤{r_threshold} | F≥{f_threshold} | M≥{m_threshold} | 近期活跃+高频+高额 | VIP专属权益、新品优先体验 |
+| **重要发展客户** | R≤{r_threshold} | F≥{f_threshold} | M＜{m_threshold} | 近期活跃+高频+低额 | 提升客单价、组合推荐 |
+| **重要保持客户** | R≤{r_threshold} | F＜{f_threshold} | M≥{m_threshold} | 近期活跃+低频+高额 | 提高复购率、定期推送 |
+| **重要挽留客户** | R≤{r_threshold} | F＜{f_threshold} | M＜{m_threshold} | 近期活跃+低频+低额 | 促活转化、限时优惠 |
+| **一般价值客户** | R＞{r_threshold} | F≥{f_threshold} | M≥{m_threshold} | 较久未购+高频+高额 | 召回激活、专属回归礼 |
+| **一般发展客户** | R＞{r_threshold} | F≥{f_threshold} | M＜{m_threshold} | 较久未购+高频+低额 | 唤醒提醒、小额优惠券 |
+| **一般保持客户** | R＞{r_threshold} | F＜{f_threshold} | M≥{m_threshold} | 较久未购+低频+高额 | 重点召回、大额优惠 |
+| **一般挽留客户** | R＞{r_threshold} | F＜{f_threshold} | M＜{m_threshold} | 较久未购+低频+低额 | 自动化触达、成本控制 |
+            """)
+            st.info("💡 R评分越小代表越近期消费（越优），F/M评分越大代表消费频次/金额越高（越优）。分层阈值可在左侧参数面板实时调整。")
+
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # Tab2: 价值矩阵（运营视角）
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    with tab2:
+        col_matrix, col_ctrl = st.columns([4, 1])
+
+        # ── 右侧控制面板 ──
+        with col_ctrl:
+            st.markdown("##### 控制面板")
+            filter_platform = []
+            if '平台' in rfm.columns:
+                platform_options = sorted(rfm['平台'].dropna().unique().tolist())
+                filter_platform = st.multiselect("平台筛选", options=platform_options, default=platform_options, key="matrix_platform")
+
+            r_range = st.slider("R 评分范围", 1, n_bins, (1, n_bins), key="matrix_r")
+            if st.button("🔄 重置筛选", key="reset_matrix"):
+                st.rerun()
+
+            st.markdown("---")
+            total_filtered = len(rfm)
+            st.metric("当前客户数", f"{total_filtered:,}")
+
+        with col_matrix:
+            rfm_m = rfm.copy()
+            if filter_platform and '平台' in rfm_m.columns:
+                rfm_m = rfm_m[rfm_m['平台'].isin(filter_platform)]
+            rfm_m = rfm_m[rfm_m['r_score'].between(r_range[0], r_range[1])]
+
+            # ── 预聚合 F×M ──
+            all_f = list(range(1, n_bins + 1))
+            all_m = list(range(1, n_bins + 1))
+
+            fm_agg = rfm_m.groupby(['f_score', 'm_score']).agg(
+                客户数=('用户名', 'count'),
+                总GMV=('monetary', 'sum'),
+                平均R=('recency_days', 'mean'),
+                主要分层=('客户分层', lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]),
+            ).reset_index()
+
+            full_idx = pd.MultiIndex.from_product([all_f, all_m], names=['f_score', 'm_score'])
+            fm_agg = fm_agg.set_index(['f_score', 'm_score']).reindex(full_idx).reset_index()
+            fm_agg['客户数'] = fm_agg['客户数'].fillna(0).astype(int)
+            fm_agg['总GMV'] = fm_agg['总GMV'].fillna(0)
+            fm_agg['平均R'] = fm_agg['平均R'].fillna(0)
+            fm_agg['主要分层'] = fm_agg['主要分层'].fillna('其他')
+
+            # ── 主图：F×M 价值矩阵 ──
+            st.markdown("##### F×M 价值矩阵")
+
+            # 热力底图
+            fm_pivot = fm_agg.pivot(index='m_score', columns='f_score', values='客户数').fillna(0)
+            for c in all_f:
+                if c not in fm_pivot.columns:
+                    fm_pivot[c] = 0
+            for r in all_m:
+                if r not in fm_pivot.index:
+                    fm_pivot.loc[r] = 0
+            fm_pivot = fm_pivot.sort_index(axis=0).sort_index(axis=1)
+
+            fig_matrix = go.Figure()
+
+            fig_matrix.add_trace(go.Heatmap(
+                z=fm_pivot.values,
+                x=[f'F={c}' for c in fm_pivot.columns],
+                y=[f'M={r}' for r in fm_pivot.index],
+                colorscale='YlOrRd',
+                colorbar=dict(title="客户规模", len=0.5, y=0.5),
+                hovertemplate='F=%{x}, M=%{y}<br>客户数: %{z:,.0f}<extra></extra>',
+                showscale=True,
+                xgap=3, ygap=3,
+            ))
+
+            # 气泡叠加：按segment着色
+            bubble = fm_agg[fm_agg['客户数'] > 0].copy()
+            if len(bubble) > 0:
+                max_gmv = bubble['总GMV'].max() if bubble['总GMV'].max() > 0 else 1
+                bubble['气泡大小'] = np.log1p(bubble['总GMV']) / np.log1p(max_gmv) * 45 + 5
+                bubble['颜色'] = bubble['主要分层'].map(ENTERPRISE_COLORS_FULL).fillna("#BDBDBD")
+
+                bubble['hover'] = bubble.apply(lambda row: (
+                    f"F={int(row['f_score'])}, M={int(row['m_score'])}<br>"
+                    f"客户数: {int(row['客户数']):,}<br>"
+                    f"GMV: ¥{row['总GMV']:,.0f}<br>"
+                    f"平均R: {row['平均R']:.1f}天<br>"
+                    f"分层: {row['主要分层']}"
+                ), axis=1)
+
+                fig_matrix.add_trace(go.Scatter(
+                    x=['F=' + str(int(f)) for f in bubble['f_score']],
+                    y=['M=' + str(int(m)) for m in bubble['m_score']],
+                    mode='markers',
+                    marker=dict(
+                        size=bubble['气泡大小'].values,
+                        color=bubble['颜色'].values,
+                        opacity=0.7,
+                        line=dict(width=1, color='white'),
+                    ),
+                    hovertext=bubble['hover'],
+                    hoverinfo='text',
+                    showlegend=False,
+                ))
+
+                # 标注分层标签（仅核心分层格子）
+                for _, row in bubble.iterrows():
+                    f_v, m_v = int(row['f_score']), int(row['m_score'])
+                    seg = row['主要分层']
+                    # 仅在符合分层条件的格子标注
+                    should_label = False
+                    if seg == "重要保持客户" and f_v >= f_threshold and m_v >= m_threshold and f_v >= f_threshold:
+                        should_label = True
+                    elif seg == "重要挽留客户" and f_v < f_threshold and m_v < m_threshold:
+                        should_label = True
+                    elif seg == "一般保持客户" and m_v >= m_threshold:
+                        should_label = True
+                    elif seg == "一般挽留客户" and f_v < f_threshold and m_v < m_threshold:
+                        should_label = True
+
+                    if should_label and int(row['客户数']) > 0:
+                        short_name = seg.replace('客户', '')
+                        fig_matrix.add_annotation(
+                            x=f'F={f_v}', y=f'M={m_v}',
+                            text=f"<b>{short_name}</b>",
+                            showarrow=False,
+                            font=dict(size=10, color="white", family="Microsoft YaHei"),
+                            bgcolor=_hex_to_rgba(ENTERPRISE_COLORS_FULL.get(seg, "#999"), 0.8),
+                            borderpad=2,
+                        )
+
+            fig_matrix.update_layout(
+                **_PLOTLY_LAYOUT_DEFAULTS,
+                xaxis_title="Frequency 评分（越高=消费越频繁）",
+                yaxis_title="Monetary 评分（越高=消费金额越大）",
+                margin=dict(t=40, b=50, l=60, r=60),
+                height=480,
+            )
+            st.plotly_chart(fig_matrix, width='stretch')
+
+            st.markdown("---")
+
+            # ── 辅助图：R评分分布堆叠柱状图 ──
+            st.markdown("##### R 评分分布（按分层堆叠）")
+
+            r_seg = rfm_m.groupby(['r_score', '客户分层']).size().reset_index(name='客户数')
+            full_r_idx = pd.MultiIndex.from_product([all_f, seg_order], names=['r_score', '客户分层'])
+            r_seg = r_seg.set_index(['r_score', '客户分层']).reindex(full_r_idx).reset_index()
+            r_seg['客户数'] = r_seg['客户数'].fillna(0).astype(int)
+            r_seg['r_label'] = 'R=' + r_seg['r_score'].astype(str)
+
+            fig_r_stack = px.bar(
+                r_seg, x='r_label', y='客户数', color='客户分层',
+                barmode='stack',
+                color_discrete_map=ENTERPRISE_COLORS_FULL,
+                labels={'r_label': 'R 评分', '客户数': '客户数量', '客户分层': '分层'},
+            )
+            fig_r_stack.update_traces(
+                hovertemplate='<b>%{data.name}</b><br>R=%{x}<br>客户数: %{y:,}<extra></extra>',
+            )
+            # 高价值分界线 & 流失预警线
+            fig_r_stack.add_vline(
+                x=r_threshold - 0.5, line_dash="dash", line_color="#1E88E5", line_width=2,
+                annotation_text=f"← 高价值（R≤{r_threshold}）", annotation_position="top left",
+                annotation=dict(font=dict(size=11, color="#1E88E5"))
+            )
+            fig_r_stack.add_vline(
+                x=r_threshold + 0.5, line_dash="dash", line_color="#FF5722", line_width=2,
+                annotation_text=f"流失预警（R>{r_threshold}）→", annotation_position="top right",
+                annotation=dict(font=dict(size=11, color="#FF5722"))
+            )
+            fig_r_stack.update_layout(
+                **_PLOTLY_LAYOUT_DEFAULTS,
+                xaxis_title="R 评分（越小=越近期消费）",
+                yaxis_title="客户数量",
+                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, font=dict(size=10)),
+                margin=dict(t=40, b=80, l=50, r=20),
+                bargap=0.15,
+                height=350,
+            )
+            st.plotly_chart(fig_r_stack, width='stretch')
+
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # Tab3: 群体洞察（执行视角）
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    with tab3:
+        # ── 分层选择器 ──
+        seg_counts = rfm['客户分层'].value_counts()
+        seg_options = [f"{s} ({seg_counts.get(s, 0):,}人)" for s in seg_order]
+        sel_label = st.selectbox("选择查看的客户分层", options=seg_options, key="insight_seg")
+        sel_segment = sel_label.split(" (")[0]
+
+        seg_users = rfm[rfm['客户分层'] == sel_segment].copy()
+        seg_count = len(seg_users)
+
+        if seg_count == 0:
+            st.info("该分层暂无客户数据，请调整筛选条件。")
+        else:
+            # ── 画像指标卡 ──
+            st.markdown(f"##### {sel_segment} 画像概览")
+
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric("客户数", f"{seg_count:,}")
+            c2.metric("占总客户", f"{seg_count/total_users*100:.1f}%")
+            seg_gmv = seg_users['monetary'].sum()
+            c3.metric("贡献GMV", f"¥{seg_gmv:,.0f}")
+            c4.metric("人均消费", f"¥{seg_users['monetary'].mean():,.0f}")
+            c5.metric("人均频次", f"{seg_users['frequency'].mean():.1f}次")
+
+            c6, c7, c8, c9, c10 = st.columns(5)
+            c6.metric("平均R评分", f"{seg_users['r_score'].mean():.1f}")
+            c7.metric("平均F评分", f"{seg_users['f_score'].mean():.1f}")
+            c8.metric("平均M评分", f"{seg_users['m_score'].mean():.1f}")
+            c9.metric("平均消费间隔", f"{seg_users['recency_days'].mean():.0f}天")
+            repurchase_rate = (seg_users['frequency'] >= 2).mean() * 100
+            c10.metric("复购率", f"{repurchase_rate:.1f}%")
+
+            st.markdown("---")
+
+            # ── 行为趋势（按月聚合） ──
+            st.markdown("##### 月度趋势")
+            if '下单时间' in paid_df.columns:
+                seg_orders = paid_df[paid_df['用户名'].isin(seg_users['用户名'])].copy()
+                seg_orders['月份'] = seg_orders['下单时间'].dt.to_period('M').astype(str)
+                monthly = seg_orders.groupby('月份').agg(
+                    GMV=('付款金额', 'sum'),
+                    订单数=('订单号', 'nunique'),
+                    活跃人数=('用户名', 'nunique'),
+                ).reset_index()
+
+                fig_trend = go.Figure()
+                fig_trend.add_trace(go.Bar(
+                    x=monthly['月份'], y=monthly['GMV'],
+                    name='GMV', marker_color='#1E88E5', opacity=0.7,
+                    yaxis='y',
+                ))
+                fig_trend.add_trace(go.Scatter(
+                    x=monthly['月份'], y=monthly['活跃人数'],
+                    name='活跃人数', mode='lines+markers',
+                    line=dict(color='#FF5722', width=2),
+                    yaxis='y2',
+                ))
+                fig_trend.update_layout(
+                    **_PLOTLY_LAYOUT_DEFAULTS,
+                    title=f"{sel_segment} 月度趋势",
+                    yaxis=dict(title="GMV (元)", side="left"),
+                    yaxis2=dict(title="活跃人数", overlaying="y", side="right", showgrid=False),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+                    margin=dict(t=60, b=40, l=60, r=60),
+                    height=350,
+                )
+                st.plotly_chart(fig_trend, width='stretch')
+
+            st.markdown("---")
+
+            # ── 行动建议卡 ──
+            st.markdown("##### 📋 运营行动建议")
+
+            ACTION_MAP = {
+                "重要价值客户": [
+                    ("✅ VIP专属服务升级", "开放专属客服通道、新品优先试用权益", "数据来源：2025Q4策略复盘报告"),
+                    ("✅ 高价值品类推荐", "推送高毛利品类（历史转化率35%）", "数据来源：2025Q4品类分析"),
+                    ("✅ 会员积分加速", "双倍积分激励，提升粘性", "数据来源：会员运营SOP"),
+                ],
+                "重要发展客户": [
+                    ("✅ 提升客单价组合推荐", "推送关联商品组合（历史客单价提升22%）", "数据来源：2025Q4策略复盘报告"),
+                    ("✅ 满减门槛引导", "设置略高于当前客单价的满减门槛", "数据来源：价格敏感度分析"),
+                    ("✅ 品类交叉推荐", "根据已购品类推荐高关联品类", "数据来源：购物篮分析"),
+                ],
+                "重要保持客户": [
+                    ("✅ 复购提醒推送", "周期性推送复购提醒（历史召回率18%）", "数据来源：2025Q4策略复盘报告"),
+                    ("✅ 专属客服外呼", "大客户经理主动触达，了解需求", "数据来源：大客户运营SOP"),
+                    ("✅ 定期专属优惠", "每月发放高面额专属券", "数据来源：优惠券ROI分析"),
+                ],
+                "重要挽留客户": [
+                    ("✅ 推送高毛利品类券", "发放专属品类券（历史转化率22%）", "数据来源：2025Q4策略复盘报告"),
+                    ("✅ 触发专属客服外呼", "人工外呼了解流失原因", "数据来源：客户挽留SOP"),
+                    ("✅ 排除低价引流广告", "该群体对价格敏感度低，避免低价引流", "数据来源：广告投放效果分析"),
+                ],
+                "一般价值客户": [
+                    ("✅ 召回激活短信", "发送专属回归礼召回（历史召回率15%）", "数据来源：2025Q4策略复盘报告"),
+                    ("✅ 高价值商品推荐", "推送其历史偏好的高价值品类", "数据来源：用户偏好分析"),
+                    ("✅ 限时回归优惠", "72小时限时大额优惠券", "数据来源：限时促销效果分析"),
+                ],
+                "一般发展客户": [
+                    ("✅ 唤醒提醒短信", "定期唤醒推送（频率≤2次/月）", "数据来源：推送频率优化报告"),
+                    ("✅ 小额优惠券投放", "发放小额无门槛券降低复购门槛", "数据来源：优惠券ROI分析"),
+                    ("✅ 新品上新通知", "根据历史偏好推送新品", "数据来源：新品推荐策略"),
+                ],
+                "一般保持客户": [
+                    ("✅ 加入会员成长体系", "引导进入积分/等级体系", "数据来源：会员运营SOP"),
+                    ("✅ 复购提醒短信", "基于上次购买周期推送复购提醒", "数据来源：2025Q4策略复盘报告"),
+                    ("✅ 开放积分兑换权益", "积分兑换优惠券/实物", "数据来源：积分体系运营报告"),
+                ],
+                "一般挽留客户": [
+                    ("✅ 自动化触达", "低成本自动化营销触达", "数据来源：自动化营销SOP"),
+                    ("✅ 成本控制策略", "降低服务成本，聚焦高ROI渠道", "数据来源：渠道ROI分析"),
+                    ("✅ 沉默用户清理", "超过180天未购转入沉默库", "数据来源：用户生命周期管理"),
+                ],
+            }
+
+            actions = ACTION_MAP.get(sel_segment, [])
+            if actions:
+                for title, desc, source in actions:
+                    with st.container():
+                        st.markdown(f"**{title}**")
+                        st.markdown(f"    {desc}")
+                        st.caption(f"    *{source}*")
+
+            st.markdown("---")
+
+            # ── 客户明细表 ──
+            st.markdown(f"##### 📋 {sel_segment} 客户明细（前200条）")
+
+            display_cols = ['用户名', 'r_score', 'f_score', 'm_score', 'recency_days', 'frequency', 'monetary']
+            display_labels = {
+                '用户名': '客户ID', 'r_score': 'R评分', 'f_score': 'F评分', 'm_score': 'M评分',
+                'recency_days': '最近消费(天)', 'frequency': '消费频次', 'monetary': '累计GMV(元)',
+            }
+            show_cols = [c for c in display_cols if c in seg_users.columns]
+
+            detail_df = seg_users[show_cols].sort_values('monetary', ascending=False).head(200).rename(columns=display_labels)
+            st.dataframe(detail_df, width='stretch', hide_index=True, height=400)
+
+            # ── 导出CSV ──
+            csv_data = detail_df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 导出CSV",
+                data=csv_data,
+                file_name=f"{sel_segment}_客户明细.csv",
+                mime="text/csv",
+            )
 
     st.markdown("---")
-
-    st.subheader("📐 RFM 三维散点图")
-    st.markdown("以三维视角展示客户在 Recency、Frequency、Monetary 三个维度上的分布，颜色标识客户分层。")
-
-    sample_n = min(2000, len(rfm))
-    if len(rfm) > sample_n:
-        important = rfm[rfm['客户分层'].str.contains('重要')]
-        other = rfm[~rfm['客户分层'].str.contains('重要')]
-        other_sample = other.sample(n=min(sample_n - len(important), len(other)), random_state=42)
-        rfm_sample = pd.concat([important, other_sample])
-    else:
-        rfm_sample = rfm
-
-    fig_3d = px.scatter_3d(
-        rfm_sample, x='recency_days', y='frequency', z='monetary',
-        color='客户分层', color_discrete_map=SEGMENT_COLORS,
-        opacity=0.6, size_max=8,
-        title="RFM 三维客户分布",
-        hover_data={'用户名': True, 'recency_days': True, 'frequency': True, 'monetary': True, '客户分层': True}
-    )
-    fig_3d.update_layout(
-        **_PLOTLY_LAYOUT_DEFAULTS,
-        scene=dict(
-            xaxis_title='Recency (天)',
-            yaxis_title='Frequency (次)',
-            zaxis_title='Monetary (元)',
-        ),
-        margin=dict(t=50, b=20, l=20, r=20),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.05, xanchor="center", x=0.5, font=dict(size=10))
-    )
-    st.plotly_chart(fig_3d, width='stretch')
-
-    st.markdown("---")
-
-    st.subheader("📊 R / F / M 评分分布")
-    col_r, col_f, col_m = st.columns(3)
-
-    with col_r:
-        fig_r = px.histogram(rfm, x='r_score', nbins=n_bins, title="R 评分分布（最近消费）", color_discrete_sequence=['#E74C3C'])
-        fig_r.update_layout(**_PLOTLY_LAYOUT_DEFAULTS, xaxis_title="R 评分", yaxis_title="人数", showlegend=False, margin=dict(t=50, b=30, l=40, r=20))
-        fig_r.add_vline(x=r_threshold, line_dash="dash", line_color="blue", annotation_text=f"阈值={r_threshold}")
-        st.plotly_chart(fig_r, width='stretch')
-
-    with col_f:
-        fig_f = px.histogram(rfm, x='f_score', nbins=n_bins, title="F 评分分布（消费频率）", color_discrete_sequence=['#3498DB'])
-        fig_f.update_layout(**_PLOTLY_LAYOUT_DEFAULTS, xaxis_title="F 评分", yaxis_title="人数", showlegend=False, margin=dict(t=50, b=30, l=40, r=20))
-        fig_f.add_vline(x=f_threshold, line_dash="dash", line_color="red", annotation_text=f"阈值={f_threshold}")
-        st.plotly_chart(fig_f, width='stretch')
-
-    with col_m:
-        fig_m = px.histogram(rfm, x='m_score', nbins=n_bins, title="M 评分分布（消费金额）", color_discrete_sequence=['#2ECC71'])
-        fig_m.update_layout(**_PLOTLY_LAYOUT_DEFAULTS, xaxis_title="M 评分", yaxis_title="人数", showlegend=False, margin=dict(t=50, b=30, l=40, r=20))
-        fig_m.add_vline(x=m_threshold, line_dash="dash", line_color="red", annotation_text=f"阈值={m_threshold}")
-        st.plotly_chart(fig_m, width='stretch')
-
-    st.markdown("---")
-
-    st.subheader("💰 各分层消费金额对比")
-    seg_monetary = rfm.groupby('客户分层').agg(
-        总消费金额=('monetary', 'sum'),
-        平均消费金额=('monetary', 'mean'),
-        人数=('用户名', 'count')
-    ).reset_index()
-    _sort_map3 = {name: i for i, name in enumerate(seg_order)}
-    seg_monetary['_sort_key'] = seg_monetary['客户分层'].map(_sort_map3)
-    seg_monetary = seg_monetary.sort_values('_sort_key').drop(columns=['_sort_key'])
-
-    col_mon1, col_mon2 = st.columns([1, 1])
-
-    with col_mon1:
-        fig_mon_bar = px.bar(
-            seg_monetary, x='客户分层', y='总消费金额',
-            title="各分层总消费金额",
-            color='客户分层',
-            color_discrete_map=SEGMENT_COLORS,
-        )
-        fig_mon_bar.update_traces(
-            texttemplate='¥%{y:,.0f}',
-            textposition='outside',
-            hovertemplate='<b>%{x}</b><br>总消费: ¥%{y:,.2f}<extra></extra>'
-        )
-        fig_mon_bar.update_layout(
-            **_PLOTLY_LAYOUT_DEFAULTS,
-            xaxis_title="客户分层", yaxis_title="总消费金额 (元)",
-            showlegend=False, xaxis=dict(tickangle=30, tickfont=dict(size=11)),
-            margin=dict(t=50, b=100, l=60, r=20)
-        )
-        st.plotly_chart(fig_mon_bar, width='stretch')
-
-    with col_mon2:
-        fig_mon_avg = px.bar(
-            seg_monetary, x='客户分层', y='平均消费金额',
-            title="各分层人均消费金额",
-            color='客户分层',
-            color_discrete_map=SEGMENT_COLORS,
-        )
-        fig_mon_avg.update_traces(
-            texttemplate='¥%{y:,.0f}',
-            textposition='outside',
-            hovertemplate='<b>%{x}</b><br>人均消费: ¥%{y:,.2f}<extra></extra>'
-        )
-        fig_mon_avg.update_layout(
-            **_PLOTLY_LAYOUT_DEFAULTS,
-            xaxis_title="客户分层", yaxis_title="人均消费金额 (元)",
-            showlegend=False, xaxis=dict(tickangle=30, tickfont=dict(size=11)),
-            margin=dict(t=50, b=100, l=60, r=20)
-        )
-        st.plotly_chart(fig_mon_avg, width='stretch')
-
-    st.markdown("---")
-
-    st.subheader("📋 分层客户明细")
-    selected_segment = st.selectbox(
-        "选择查看的客户分层",
-        options=seg_order,
-        index=0
-    )
-
-    segment_users = rfm[rfm['客户分层'] == selected_segment].sort_values('monetary', ascending=False)
-    st.markdown(f"**{SEGMENT_ICONS.get(selected_segment, '')} {selected_segment}** — 共 **{len(segment_users):,}** 位客户")
-
-    display_cols = ['用户名', 'recency_days', 'frequency', 'monetary', 'r_score', 'f_score', 'm_score', '客户分层']
-    display_labels = {
-        '用户名': '用户名', 'recency_days': '最近消费天数', 'frequency': '消费频次',
-        'monetary': '消费金额(元)', 'r_score': 'R评分', 'f_score': 'F评分',
-        'm_score': 'M评分', '客户分层': '客户分层'
-    }
-
-    page_size = 20
-    total_pages = (len(segment_users) + page_size - 1) // page_size
-    page_num = st.number_input("页码", min_value=1, max_value=max(total_pages, 1), value=1, step=1)
-    start_idx = (page_num - 1) * page_size
-    end_idx = start_idx + page_size
-
-    st.dataframe(
-        segment_users[display_cols].iloc[start_idx:end_idx].rename(columns=display_labels),
-        width='stretch',
-        hide_index=True,
-    )
-    st.caption(f"第 {page_num}/{total_pages} 页 | 每页 {page_size} 条")
-
-    st.markdown("---")
-
-    st.subheader("📖 RFM 分层说明")
-    with st.expander("点击查看 RFM 分层逻辑详解", expanded=False):
-        st.markdown("""
-        | 分层名称 | R评分 | F评分 | M评分 | 含义 | 运营建议 |
-        |---------|-------|-------|-------|------|---------|
-        | 💎 重要价值客户 | 高 | 高 | 高 | 最近消费、高频次、高金额 | VIP专属服务、优先体验新品 |
-        | 📈 重要发展客户 | 高 | 高 | 低 | 最近消费、高频次、低金额 | 提升客单价、组合推荐 |
-        | 🔄 重要保持客户 | 高 | 低 | 高 | 最近消费、低频次、高金额 | 提高复购率、定期推送 |
-        | ⚠️ 重要挽留客户 | 高 | 低 | 低 | 最近消费、低频次、低金额 | 促活转化、限时优惠 |
-        | 🌟 一般价值客户 | 低 | 高 | 高 | 较久未消费、高频次、高金额 | 召回激活、专属回归礼 |
-        | 🌱 一般发展客户 | 低 | 高 | 低 | 较久未消费、高频次、低金额 | 唤醒提醒、小额优惠券 |
-        | 🔵 一般保持客户 | 低 | 低 | 高 | 较久未消费、低频次、高金额 | 重点召回、大额优惠 |
-        | ⚪ 一般挽留客户 | 低 | 低 | 低 | 较久未消费、低频次、低金额 | 自动化触达、成本控制 |
-        """)
-
-    st.markdown("---")
-    st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 参考日期：{ref_date_input} | 分组数：{n_bins} | 电商数据分析系统 v1.2")
+    st.caption(f"数据更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 企业级RFM分层页面 v3.0 | 电商数据分析系统")
