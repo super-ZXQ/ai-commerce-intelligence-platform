@@ -6,7 +6,19 @@
 <title>电商数据分析系统 - 系统监控</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; }
+
+/* 粒子背景 */
+#particle-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+}
+.header, .container, .footer { position: relative; z-index: 1; }
+
+/* 动画就绪态 */
+.card, .header, .metric-box, .health-item, .endpoint-table tr {
+    will-change: transform, opacity;
+}
 
 .header {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
@@ -201,8 +213,11 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; 
     border-top: 1px solid rgba(148,163,184,0.05);
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
 </head>
 <body>
+<canvas id="particle-canvas"></canvas>
 
 <div class="header">
     <div class="logo-icon">📈</div>
@@ -224,6 +239,175 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; 
 </div>
 
 <script>
+// ====== 粒子背景 ======
+(function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const COUNT = 35;
+    let mouse = { x: -999, y: -999 };
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    class P {
+        constructor() { this.reset(); }
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.vx = (Math.random() - 0.5) * 0.2;
+            this.vy = (Math.random() - 0.5) * 0.2;
+            this.size = Math.random() * 1.5 + 0.5;
+            this.alpha = Math.random() * 0.3 + 0.08;
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy;
+            if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            const dx = mouse.x - this.x, dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 100) { this.x -= dx * 0.003; this.y -= dy * 0.003; }
+        }
+        draw() {
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(245,158,11,${this.alpha})`; ctx.fill();
+        }
+    }
+
+    for (let i = 0; i < COUNT; i++) particles.push(new P());
+
+    function connect() {
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 90) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(245,158,11,${0.04 * (1 - dist / 90)})`;
+                    ctx.lineWidth = 0.4;
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    (function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        connect();
+        requestAnimationFrame(loop);
+    })();
+})();
+
+// ====== GSAP 动画 ======
+gsap.registerPlugin(ScrollTrigger);
+
+// Header 入场
+gsap.from('.header', { y: -50, opacity: 0, duration: 0.7, ease: 'power3.out' });
+
+// 数据加载后动画
+let monitorAnimated = false;
+function animateDashboard() {
+    if (monitorAnimated) return;
+    monitorAnimated = true;
+
+    // 总体状态横幅
+    gsap.from('.overall-status', {
+        scale: 0.9, opacity: 0, duration: 0.6, ease: 'back.out(1.3)'
+    });
+
+    // 指标盒子交错入场 + 数字计数器
+    gsap.from('.metric-box', {
+        y: 30, opacity: 0, scale: 0.9,
+        stagger: 0.08, duration: 0.5, ease: 'power2.out',
+        onComplete: () => {
+            document.querySelectorAll('.metric-box .value').forEach(el => {
+                const text = el.textContent.trim();
+                const num = parseFloat(text.replace(/[,%]/g, ''));
+                if (isNaN(num)) return;
+                const hasPercent = text.includes('%');
+                const obj = { val: 0 };
+                gsap.to(obj, {
+                    val: num, duration: 1.2, ease: 'power2.out',
+                    onUpdate: () => {
+                        if (hasPercent) {
+                            el.textContent = obj.val.toFixed(1) + '%';
+                        } else {
+                            el.textContent = Math.round(obj.val).toLocaleString('zh-CN');
+                        }
+                    }
+                });
+            });
+        }
+    });
+
+    // 健康状态项
+    gsap.from('.health-item', {
+        x: -30, opacity: 0, stagger: 0.1, duration: 0.5, ease: 'power2.out', delay: 0.3
+    });
+
+    // 服务器信息项
+    gsap.from('.info-item', {
+        x: 30, opacity: 0, stagger: 0.06, duration: 0.4, ease: 'power2.out', delay: 0.4
+    });
+
+    // 接口表格行
+    gsap.from('.endpoint-table tbody tr', {
+        y: 15, opacity: 0, stagger: 0.05, duration: 0.4, ease: 'power2.out', delay: 0.5
+    });
+
+    // 接口进度条动画
+    document.querySelectorAll('.endpoint-bar-fill').forEach(bar => {
+        const target = bar.style.width;
+        bar.style.width = '0%';
+        gsap.to(bar, { width: target, duration: 1, ease: 'power2.out', delay: 0.6 });
+    });
+}
+
+// ====== 状态指示灯脉冲 ======
+function pulseStatusDot() {
+    const dot = document.querySelector('.overall-status .dot');
+    if (dot) {
+        gsap.to(dot, {
+            boxShadow: '0 0 20px rgba(34,197,94,0.8)',
+            repeat: -1, yoyo: true, duration: 1.5, ease: 'sine.inOut'
+        });
+    }
+}
+
+// ====== 卡片 3D 倾斜 ======
+document.addEventListener('mousemove', (e) => {
+    document.querySelectorAll('.card').forEach(card => {
+        const rect = card.getBoundingClientRect();
+        if (e.clientX < rect.left || e.clientX > rect.right ||
+            e.clientY < rect.top || e.clientY > rect.bottom) return;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cx = rect.width / 2, cy = rect.height / 2;
+        const rx = (y - cy) / cy * -2;
+        const ry = (x - cx) / cx * 2;
+        gsap.to(card, {
+            rotateX: rx, rotateY: ry, transformPerspective: 800,
+            duration: 0.2, ease: 'power2.out'
+        });
+    });
+});
+
+document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('mouseleave', () => {
+        gsap.to(card, {
+            rotateX: 0, rotateY: 0, duration: 0.4, ease: 'power2.out'
+        });
+    });
+});
+
+// ====== 监控数据加载 ======
 const BASE = window.location.origin;
 let maxCount = 1;
 
@@ -357,13 +541,20 @@ async function loadDashboard() {
         }
 
         document.getElementById('dashboard').innerHTML = html;
+
+        // 触发动画
+        animateDashboard();
+        pulseStatusDot();
     } catch(e) {
         document.getElementById('dashboard').innerHTML = `<div class="card col-12"><div class="card-body"><div class="error-text">加载失败: ${e.message}</div></div></div>`;
     }
 }
 
 loadDashboard();
-setInterval(loadDashboard, 5000);
+setInterval(() => {
+    monitorAnimated = false;
+    loadDashboard();
+}, 5000);
 </script>
 </body>
 </html>

@@ -64,8 +64,8 @@ def decode_token(token: str) -> Optional[TokenData]:
 
 
 DEFAULT_USERS: dict[str, str] = {
-    "admin": _hash_password("admin123"),
-    "analyst": _hash_password("analyst123"),
+    "admin": "$2b$12$Xq5inXxXtfU6.hqkK6sDveN7hkur1KxNDkW4/IFcADscx4wgGWZw6",
+    "analyst": "$2b$12$WQWnIBiiUtfIHJwm1X.RaOdTaA3ZszhRQXHQLVVxrHzhaGzye5sdu",
 }
 
 

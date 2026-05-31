@@ -45,8 +45,15 @@ def _periodic_cleanup() -> None:
                 logger.info(f"限流器清理: 保留 {len(_rate_store)}/{_MAX_STORE_SIZE} 条记录")
 
 
-_cleanup_thread = threading.Thread(target=_periodic_cleanup, daemon=True)
-_cleanup_thread.start()
+_cleanup_thread_started = False
+
+
+def _ensure_cleanup_thread():
+    global _cleanup_thread_started
+    if not _cleanup_thread_started:
+        _cleanup_thread_started = True
+        t = threading.Thread(target=_periodic_cleanup, daemon=True)
+        t.start()
 
 
 def _get_client_id(request: Request) -> str:
@@ -57,6 +64,7 @@ def _get_client_id(request: Request) -> str:
 
 
 def check_rate_limit(request: Request) -> dict:
+    _ensure_cleanup_thread()
     path = request.url.path
     limit_config = RATE_LIMITS.get(path)
     if not limit_config:

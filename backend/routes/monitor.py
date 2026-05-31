@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/monitor", tags=["监控"])
 
+# 注意：以下统计变量为进程级状态，在多 worker 部署时每个 worker 进程各自独立计数，
+# 不会跨进程聚合。如需全局统计，请使用 Redis 或外部存储进行汇总。
 _start_time = time.time()
 _request_stats = {
     "total": 0,

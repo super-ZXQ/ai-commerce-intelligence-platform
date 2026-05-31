@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     redis_enabled: bool = False
 
     llm_api_key: str = ""
-    llm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    llm_model: str = "qwen-plus"
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_model: str = "deepseek-v4-flash"
 
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"

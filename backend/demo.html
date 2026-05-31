@@ -6,7 +6,19 @@
 <title>电商数据分析API - 可视化体验</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; }
+
+/* 粒子背景 */
+#particle-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+}
+.header, .container, .footer { position: relative; z-index: 1; }
+
+/* 动画就绪态 */
+.card, .header, .metric-item, .rank-item, .platform-bar, .ai-chat {
+    will-change: transform, opacity;
+}
 
 .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 24px 32px; border-bottom: 1px solid #475569; display: flex; align-items: center; gap: 16px; }
 .header h1 { font-size: 22px; font-weight: 600; }
@@ -83,8 +95,11 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0f172a; 
     .container { grid-template-columns: 1fr; padding: 12px; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
 </head>
 <body>
+<canvas id="particle-canvas"></canvas>
 
 <div class="header">
     <h1>🛒 电商数据分析系统 - FastAPI 后端</h1>
@@ -141,9 +156,200 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0f172a; 
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
 <script>
-const BASE = window.location.origin;
+// ====== 粒子背景 ======
+(function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const COUNT = 40;
+    let mouse = { x: -999, y: -999 };
 
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    class P {
+        constructor() { this.reset(); }
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.vx = (Math.random() - 0.5) * 0.25;
+            this.vy = (Math.random() - 0.5) * 0.25;
+            this.size = Math.random() * 1.8 + 0.5;
+            this.alpha = Math.random() * 0.35 + 0.1;
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy;
+            if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            const dx = mouse.x - this.x, dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 120) { this.x -= dx * 0.004; this.y -= dy * 0.004; }
+        }
+        draw() {
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(129,140,248,${this.alpha})`; ctx.fill();
+        }
+    }
+
+    for (let i = 0; i < COUNT; i++) particles.push(new P());
+
+    function connect() {
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 100) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(129,140,248,${0.05 * (1 - dist / 100)})`;
+                    ctx.lineWidth = 0.4;
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    (function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        connect();
+        requestAnimationFrame(loop);
+    })();
+})();
+
+// ====== GSAP 动画 ======
+gsap.registerPlugin(ScrollTrigger);
+
+// 页面加载动画
+const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+// Header 入场
+tl.from('.header', { y: -60, opacity: 0, duration: 0.7 });
+
+// 卡片交错入场
+tl.from('.card', {
+    y: 40, opacity: 0, scale: 0.96,
+    duration: 0.6, stagger: 0.1, ease: 'back.out(1.1)'
+}, '-=0.3');
+
+// 页脚
+tl.from('.footer', { opacity: 0, y: 20, duration: 0.4 }, '-=0.2');
+
+// ====== 数据加载后动画 ======
+// 指标数字计数器
+function animateCounters() {
+    document.querySelectorAll('.metric-value').forEach(el => {
+        const text = el.textContent.trim();
+        const num = text.replace(/[¥,%]/g, '');
+        const prefix = text.startsWith('¥') ? '¥' : '';
+        const suffix = text.includes('%') ? '%' : '';
+        const val = parseFloat(num);
+        if (isNaN(val)) return;
+        const obj = { val: 0 };
+        gsap.to(obj, {
+            val: val, duration: 1.5, ease: 'power2.out',
+            onUpdate: () => {
+                if (suffix === '%') {
+                    el.textContent = prefix + obj.val.toFixed(1) + suffix;
+                } else if (val >= 1000) {
+                    el.textContent = prefix + Math.round(obj.val).toLocaleString('zh-CN') + suffix;
+                } else {
+                    el.textContent = prefix + obj.val.toFixed(2) + suffix;
+                }
+            }
+        });
+    });
+}
+
+// 排行项交错入场
+function animateRankItems() {
+    gsap.from('.rank-item', {
+        x: -30, opacity: 0, stagger: 0.08, duration: 0.5, ease: 'power2.out'
+    });
+}
+
+// 平台进度条动画
+function animatePlatformBars() {
+    document.querySelectorAll('.bar-fill').forEach(bar => {
+        const target = bar.style.width;
+        bar.style.width = '0%';
+        gsap.to(bar, { width: target, duration: 1.2, ease: 'power2.out', delay: 0.3 });
+    });
+}
+
+// 订单表格行交错
+function animateOrderRows() {
+    gsap.from('.order-table tbody tr', {
+        y: 15, opacity: 0, stagger: 0.06, duration: 0.4, ease: 'power2.out'
+    });
+}
+
+// AI 对话区入场
+function animateAIChat() {
+    gsap.from('.ai-chat', {
+        y: 20, opacity: 0, duration: 0.6, ease: 'power2.out'
+    });
+}
+
+// 监听数据加载完成 (MutationObserver)
+const overviewEl = document.getElementById('overview_content');
+if (overviewEl) {
+    const observer = new MutationObserver(() => {
+        if (!overviewEl.querySelector('.loading-spinner')) {
+            setTimeout(() => {
+                animateCounters();
+                animateRankItems();
+                animatePlatformBars();
+                animateOrderRows();
+                animateAIChat();
+            }, 100);
+            observer.disconnect();
+        }
+    });
+    observer.observe(overviewEl, { childList: true });
+}
+
+// ====== 卡片 3D 倾斜 ======
+document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cx = rect.width / 2, cy = rect.height / 2;
+        const rx = (y - cy) / cy * -3;
+        const ry = (x - cx) / cx * 3;
+        gsap.to(card, {
+            rotateX: rx, rotateY: ry, transformPerspective: 800,
+            duration: 0.25, ease: 'power2.out',
+            boxShadow: `${-ry * 2}px ${rx * 2}px 25px rgba(0,0,0,0.35), 0 0 30px rgba(129,140,248,0.1)`
+        });
+    });
+    card.addEventListener('mouseleave', () => {
+        gsap.to(card, {
+            rotateX: 0, rotateY: 0,
+            boxShadow: '0 8px 30px rgba(129,140,248,0.15)',
+            duration: 0.4, ease: 'power2.out'
+        });
+    });
+});
+
+// ====== 状态指示灯脉冲 ======
+document.querySelectorAll('.status.ok').forEach(dot => {
+    gsap.to(dot, {
+        boxShadow: '0 0 16px rgba(34,197,94,0.7)',
+        repeat: -1, yoyo: true, duration: 1.5, ease: 'sine.inOut'
+    });
+});
+
+const BASE = window.location.origin;
 let authToken = null;
 
 async function ensureAuth() {
@@ -341,6 +547,9 @@ async function askAI() {
                     <div style="color:#818cf8;font-size:12px;margin-bottom:4px;">🔍 生成的SQL:</div>
                     <code style="display:block;background:#0a0f1e;padding:10px;border-radius:6px;font-size:12px;color:#a5b4fc;overflow-x:auto;">${d.sql}</code>
                 </div>`;
+
+            // AI 回答动画
+            gsap.from(resp, { y: 10, opacity: 0, duration: 0.4, ease: 'power2.out' });
         } else {
             resp.innerHTML = `<div style="color:#f59e0b;">⚠️ ${d.answer || JSON.stringify(d)}</div>`;
         }

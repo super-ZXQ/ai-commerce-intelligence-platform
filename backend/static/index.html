@@ -14,7 +14,48 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
 }
+
+/* 粒子背景画布 */
+#particle-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+}
+
+/* 文字逐字揭示容器 */
+.reveal-chars { display: inline-block; overflow: hidden; }
+.reveal-chars span { display: inline-block; }
+
+/* 脉冲光环 */
+@keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.15); }
+    50% { box-shadow: 0 0 40px rgba(99,102,241,0.35); }
+}
+.glow-active { animation: glow-pulse 3s ease-in-out infinite; }
+
+/* 卡片入场动画 */
+@keyframes card-enter {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.cards-grid .card {
+    animation: card-enter 0.6s ease-out backwards;
+}
+.cards-grid .card:nth-child(1) { animation-delay: 0.1s; }
+.cards-grid .card:nth-child(2) { animation-delay: 0.2s; }
+.cards-grid .card:nth-child(3) { animation-delay: 0.3s; }
+.cards-grid .card:nth-child(4) { animation-delay: 0.4s; }
+.cards-grid .card:nth-child(5) { animation-delay: 0.5s; }
+.cards-grid .card:nth-child(6) { animation-delay: 0.6s; }
+
+/* 卡片悬停 */
+.card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(129,140,248,0.3);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 60px rgba(99,102,241,0.06);
+}
+.card:hover::before { opacity: 1; }
 
 /* 顶部导航 */
 .header {
@@ -99,21 +140,16 @@ body {
     padding: 28px;
     text-decoration: none;
     color: inherit;
-    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
     position: relative;
     overflow: hidden;
+    opacity: 1;
+    transform: translateY(0);
 }
 .card::before {
     content: '';
     position: absolute; top: 0; left: 0; right: 0; height: 3px;
     opacity: 0; transition: opacity 0.3s;
 }
-.card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(129,140,248,0.3);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 60px rgba(99,102,241,0.06);
-}
-.card:hover::before { opacity: 1; }
 
 .card-bi::before { background: linear-gradient(90deg, #ef4444, #f97316); }
 .card-ai::before { background: linear-gradient(90deg, #818cf8, #6366f1); }
@@ -186,8 +222,11 @@ body {
     .header-right { display: none; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
 </head>
 <body>
+<canvas id="particle-canvas"></canvas>
 
 <div class="header">
     <div class="logo-icon">🛒</div>
@@ -317,6 +356,135 @@ body {
 </div>
 
 <script>
+// ====== 粒子背景 ======
+(function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const PARTICLE_COUNT = 60;
+    let mouse = { x: -1000, y: -1000 };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    document.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+
+    class Particle {
+        constructor() {
+            this.reset();
+        }
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.vx = (Math.random() - 0.5) * 0.3;
+            this.vy = (Math.random() - 0.5) * 0.3;
+            this.size = Math.random() * 2 + 0.5;
+            this.alpha = Math.random() * 0.4 + 0.1;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 150) {
+                this.x -= dx * 0.005;
+                this.y -= dy * 0.005;
+            }
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(129, 140, 248, ${this.alpha})`;
+            ctx.fill();
+        }
+    }
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+
+    function connectParticles() {
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 120) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(129, 140, 248, ${0.06 * (1 - dist / 120)})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        connectParticles();
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+// ====== GSAP 入场动画（仅头部元素）======
+gsap.registerPlugin(ScrollTrigger);
+
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+        // Logo 入场
+        tl.from('.logo-icon', {
+            scale: 0, rotation: -180, duration: 0.8, ease: 'back.out(1.7)'
+        });
+
+        // 标题组
+        tl.from('.title-group', {
+            x: -30, opacity: 0, duration: 0.6
+        }, '-=0.3');
+
+        // Hero 标题
+        tl.from('.hero h2', {
+            y: 30, opacity: 0, duration: 0.8
+        }, '-=0.2');
+
+        // Hero 描述
+        tl.from('.hero p', {
+            y: 20, opacity: 0, duration: 0.6
+        }, '-=0.4');
+
+        // 页脚
+        tl.from('.footer', {
+            opacity: 0, y: 20, duration: 0.5
+        }, '-=0.2');
+    } catch(e) {
+        console.warn('GSAP animation failed:', e);
+    }
+});
+
+// ====== 状态徽章弹跳 ======
+function animateStatusBadge(elementId, isSuccess) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    gsap.fromTo(el, { scale: 0.5, opacity: 0 }, {
+        scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(2)'
+    });
+}
+
+// ====== API 服务检查 ======
 const BASE = window.location.origin;
 
 async function checkService(url, elementId) {
@@ -329,9 +497,11 @@ async function checkService(url, elementId) {
         clearTimeout(timer);
         el.textContent = '✅ 运行中';
         el.className = 'card-status status-ready';
+        animateStatusBadge(elementId, true);
     } catch(e) {
         el.textContent = '❌ 未启动';
         el.className = 'card-status status-manual';
+        animateStatusBadge(elementId, false);
     }
 }
 
@@ -353,11 +523,13 @@ async function init() {
             const s = data.bi_dashboard || {};
             biEl.textContent = s.status === 'ok' ? '✅ 运行中' : '❌ 未启动';
             biEl.className = 'card-status ' + (s.status === 'ok' ? 'status-ready' : 'status-manual');
+            animateStatusBadge('biStatus', s.status === 'ok');
         }
         if (aiEl) {
             const s = data.ai_assistant || {};
             aiEl.textContent = s.status === 'ok' ? '✅ 运行中' : '❌ 未启动';
             aiEl.className = 'card-status ' + (s.status === 'ok' ? 'status-ready' : 'status-manual');
+            animateStatusBadge('aiStatus', s.status === 'ok');
         }
     } catch(e) {
         ['biStatus', 'aiStatus'].forEach(id => {

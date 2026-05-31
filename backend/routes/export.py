@@ -62,6 +62,8 @@ async def export_orders(
         )
         result = await db.execute(stmt)
         rows = result.scalars().all()
+        if not rows:
+            break
         for o in rows:
             all_data.append({
                 "订单编号": o.id,
@@ -76,7 +78,7 @@ async def export_orders(
                 "是否退款": o.is_refunded,
                 "优惠金额": o.discount_amount,
             })
-        offset += _EXPORT_CHUNK_SIZE
+        offset += len(rows)
         logger.info(f"导出进度: {min(offset, total)}/{total}")
 
     df = pd.DataFrame(all_data)

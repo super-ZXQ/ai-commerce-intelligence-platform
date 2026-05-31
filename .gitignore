@@ -30,3 +30,6 @@ query/
 
 # 内部文档（不推送到 GitHub）
 PROJECT_INTRODUCTION.md
+
+# 本地产出物
+output/

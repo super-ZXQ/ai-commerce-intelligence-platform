@@ -95,7 +95,7 @@ app = FastAPI(
 - 响应缓存（热门查询加速）
 
 ### 技术栈
-FastAPI + SQLAlchemy (async) + MySQL + LangChain + Pydantic v2
+FastAPI + SQLAlchemy (async) + MySQL + LangChain + DeepSeek V4 Flash + Pydantic v2
     """,
     lifespan=lifespan,
 )

@@ -16,8 +16,8 @@ from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseTool
 load_dotenv()
 
 API_KEY = os.getenv("LLM_API_KEY")
-BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-MODEL_NAME = os.getenv("LLM_MODEL", "qwen-plus")
+BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
+MODEL_NAME = os.getenv("LLM_MODEL", "deepseek-v4-flash")
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -120,7 +120,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🤖 AI 电商数据分析助手")
-st.caption("基于 LangChain + Qwen 的 Text-to-SQL 智能查询 | 自然语言提问 → 自动生成 SQL → 数据可视化")
+st.caption("基于 LangChain + DeepSeek V4 Flash 的 Text-to-SQL 智能查询 | 自然语言提问 → 自动生成 SQL → 数据可视化")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -756,7 +756,7 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                 if len(chart_df) > 0 and len(chart_df.columns) >= 2:
                     fig = create_chart(chart_df, msg.get("chart_title", ""), msg.get("question", ""))
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, key=f"msg_chart_{msg_idx}", config={
+                        st.plotly_chart(fig, width='stretch', key=f"msg_chart_{msg_idx}", config={
                             'displaylogo': False,
                             'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
                         })
@@ -824,7 +824,7 @@ if prompt:
                     if len(chart_df) > 0 and len(chart_df.columns) >= 2:
                         fig = create_chart(chart_df, cached.get("chart_title", ""), prompt)
                         if fig:
-                            st.plotly_chart(fig, use_container_width=True, key=f"cache_chart_{cache_key}", config={
+                            st.plotly_chart(fig, width='stretch', key=f"cache_chart_{cache_key}", config={
                                 'displaylogo': False,
                                 'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
                             })
@@ -973,7 +973,7 @@ if prompt:
                 
                 fig = create_chart(result_df, chart_title, prompt)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, key=f"live_chart_{cache_key}", config={
+                    st.plotly_chart(fig, width='stretch', key=f"live_chart_{cache_key}", config={
                         'displaylogo': False,
                         'modeBarButtonsToAdd': ['downloadPNG', 'zoomIn', 'zoomOut', 'fullscreen'],
                     })

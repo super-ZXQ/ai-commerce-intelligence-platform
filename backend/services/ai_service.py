@@ -2,6 +2,7 @@ import logging
 import re
 import json
 import asyncio
+import hashlib
 from typing import Optional
 from functools import lru_cache
 
@@ -124,14 +125,28 @@ def _get_sync_db() -> SQLDatabase:
     db_url = (
         f"mysql+pymysql://{settings.db_user}:{settings.db_password}"
         f"@{settings.db_host}:{settings.db_port}/{settings.db_name}?charset=utf8mb4"
+        f"&pool_size=3&max_overflow=2&pool_recycle=3600"
     )
-    return SQLDatabase.from_uri(db_url)
+    return SQLDatabase.from_uri(db_url, engine_args={"pool_pre_ping": True})
 
 
-@lru_cache(maxsize=1)
+_agent_cache: dict = {"agent": None, "settings_hash": None}
+
+
+def _get_settings_hash() -> str:
+    return hashlib.md5(
+        f"{settings.llm_api_key}:{settings.llm_base_url}:{settings.llm_model}".encode()
+    ).hexdigest()
+
+
 def _get_agent():
     if not settings.llm_api_key:
         return None
+
+    current_hash = _get_settings_hash()
+    if _agent_cache["agent"] is not None and _agent_cache["settings_hash"] == current_hash:
+        return _agent_cache["agent"]
+
     db = _get_sync_db()
     llm = ChatOpenAI(
         api_key=settings.llm_api_key,
@@ -155,7 +170,7 @@ def _get_agent():
 
 请始终用中文回答。"""
 
-    return create_sql_agent(
+    agent = create_sql_agent(
         llm=llm,
         toolkit=toolkit,
         prefix=prefix,
@@ -163,6 +178,9 @@ def _get_agent():
         agent_type="zero-shot-react-description",
         handle_parsing_errors=True,
     )
+    _agent_cache["agent"] = agent
+    _agent_cache["settings_hash"] = current_hash
+    return agent
 
 
 async def process_natural_language_query(query: str) -> AIQueryResponse:

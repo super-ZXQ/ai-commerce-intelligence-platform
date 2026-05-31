@@ -6,7 +6,19 @@
 <title>电商数据分析系统 - 健康检查</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; }
+
+/* 粒子背景 */
+#particle-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+}
+.header, .container, .footer { position: relative; z-index: 1; }
+
+/* 动画就绪态 */
+.card, .header, .check-card, .detail-item, .timeline-item {
+    will-change: transform, opacity;
+}
 
 .header {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
@@ -214,8 +226,11 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; 
     border-top: 1px solid rgba(148,163,184,0.05);
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
 </head>
 <body>
+<canvas id="particle-canvas"></canvas>
 
 <div class="header">
     <div class="logo-icon">🏥</div>
@@ -240,6 +255,168 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; 
 </div>
 
 <script>
+// ====== 粒子背景 ======
+(function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const COUNT = 30;
+    let mouse = { x: -999, y: -999 };
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    class P {
+        constructor() { this.reset(); }
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.vx = (Math.random() - 0.5) * 0.2;
+            this.vy = (Math.random() - 0.5) * 0.2;
+            this.size = Math.random() * 1.5 + 0.5;
+            this.alpha = Math.random() * 0.3 + 0.08;
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy;
+            if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            const dx = mouse.x - this.x, dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 100) { this.x -= dx * 0.003; this.y -= dy * 0.003; }
+        }
+        draw() {
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(34,197,94,${this.alpha})`; ctx.fill();
+        }
+    }
+
+    for (let i = 0; i < COUNT; i++) particles.push(new P());
+
+    function connect() {
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 90) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(34,197,94,${0.04 * (1 - dist / 90)})`;
+                    ctx.lineWidth = 0.4;
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    (function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        connect();
+        requestAnimationFrame(loop);
+    })();
+})();
+
+// ====== GSAP 动画 ======
+gsap.registerPlugin(ScrollTrigger);
+
+// Header 入场
+gsap.from('.header', { y: -50, opacity: 0, duration: 0.7, ease: 'power3.out' });
+
+// 健康数据加载后动画
+let healthAnimated = false;
+function animateHealth() {
+    if (healthAnimated) return;
+    healthAnimated = true;
+
+    // 总体状态横幅 - 戏剧性入场
+    gsap.from('.status-banner', {
+        scale: 0.85, opacity: 0, duration: 0.8, ease: 'back.out(1.4)'
+    });
+
+    // 状态图标脉冲光环 - GSAP 驱动
+    const statusDot = document.querySelector('.pulse-ring');
+    if (statusDot) {
+        gsap.fromTo(statusDot,
+            { scale: 0.8, opacity: 0.6 },
+            { scale: 1.2, opacity: 0, duration: 1.5, repeat: -1, ease: 'power1.out' }
+        );
+    }
+
+    // 组件检查卡片 - 从两侧交错入场
+    gsap.from('.check-card', {
+        x: (i) => i % 2 === 0 ? -40 : 40,
+        opacity: 0, stagger: 0.15, duration: 0.6, ease: 'power2.out', delay: 0.3
+    });
+
+    // 详情网格项
+    gsap.from('.detail-item', {
+        y: 20, opacity: 0, stagger: 0.06, duration: 0.4, ease: 'power2.out', delay: 0.5
+    });
+
+    // 时间线项 - 逐个揭示
+    gsap.from('.timeline-item', {
+        x: -25, opacity: 0, stagger: 0.1, duration: 0.5, ease: 'power2.out', delay: 0.6
+    });
+
+    // 时间线连接线动画
+    const timelineLine = document.querySelector('.timeline::before');
+    gsap.from('.timeline', {
+        '--line-height': '0%',
+        duration: 1, ease: 'power2.out', delay: 0.5
+    });
+}
+
+// ====== 呼吸光效 ======
+function pulseHealthyDot() {
+    const banner = document.querySelector('.status-banner.healthy');
+    if (banner) {
+        const dot = banner.querySelector('.status-icon-big');
+        if (dot) {
+            gsap.to(dot, {
+                boxShadow: '0 0 30px rgba(34,197,94,0.5)',
+                repeat: -1, yoyo: true, duration: 2, ease: 'sine.inOut'
+            });
+        }
+    }
+}
+
+// ====== 卡片 3D 倾斜 ======
+document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        if (e.clientX < rect.left || e.clientX > rect.right ||
+            e.clientY < rect.top || e.clientY > rect.bottom) return;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cx = rect.width / 2, cy = rect.height / 2;
+        const rx = (y - cy) / cy * -2;
+        const ry = (x - cx) / cx * 2;
+        gsap.to(card, {
+            rotateX: rx, rotateY: ry, transformPerspective: 800,
+            duration: 0.2, ease: 'power2.out'
+        });
+    });
+    card.addEventListener('mouseleave', () => {
+        gsap.to(card, {
+            rotateX: 0, rotateY: 0, duration: 0.4, ease: 'power2.out'
+        });
+    });
+});
+
+// ====== 加载动画 ======
+const loadingEl = document.querySelector('.loading');
+if (loadingEl) {
+    gsap.from('.loading-spinner', {
+        scale: 0.5, rotation: -180, duration: 0.6, ease: 'back.out(1.7)'
+    });
+}
+
+// ====== 健康检查数据加载 ======
 const BASE = window.location.origin;
 let historyLog = [];
 const MAX_LOG = 20;
@@ -361,13 +538,20 @@ async function loadHealth() {
         </div>`;
 
         document.getElementById('dashboard').innerHTML = html;
+
+        // 触发动画
+        animateHealth();
+        pulseHealthyDot();
     } catch(e) {
         document.getElementById('dashboard').innerHTML = `<div class="card col-12"><div class="card-body"><div class="error-text">❌ 健康检查请求失败: ${e.message}<br><br>可能原因：API 服务未启动或网络不通</div></div></div>`;
     }
 }
 
 loadHealth();
-setInterval(loadHealth, 5000);
+setInterval(() => {
+    healthAnimated = false;
+    loadHealth();
+}, 5000);
 </script>
 </body>
 </html>

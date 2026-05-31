@@ -67,9 +67,9 @@ async def rfm_top_users(
     result = await compute_rfm(db)
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
-    all_users = result.get("all_users", result.get("top_users", []))
+    top_users = result.get("top_users", [])
     return {
         "reference_date": result["reference_date"],
         "total_users": result["total_users"],
-        "top_users": all_users[:limit],
+        "top_users": top_users[:limit],
     }

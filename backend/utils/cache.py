@@ -135,9 +135,13 @@ def invalidate_pattern(pattern: str) -> int:
     count = 0
     if _redis_available and _redis_client:
         try:
-            keys = _redis_client.keys(f"*{pattern}*")
-            if keys:
-                count = _redis_client.delete(*keys)
+            cursor = 0
+            while True:
+                cursor, keys = _redis_client.scan(cursor, match=f"*{pattern}*", count=100)
+                if keys:
+                    count += _redis_client.delete(*keys)
+                if cursor == 0:
+                    break
         except Exception:
             pass
     keys_to_delete = [k for k in _memory_cache if pattern in k]
