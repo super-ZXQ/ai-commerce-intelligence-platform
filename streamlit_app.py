@@ -11,10 +11,10 @@ import numpy as np
 # 全局样式
 # ══════════════════════════════════════════════════════════════
 _PLOTLY_LAYOUT_DEFAULTS = dict(
-    template="plotly_white",
-    font=dict(family="Microsoft YaHei, PingFang SC, sans-serif", size=13),
+    template="plotly_dark",
+    font=dict(family="Microsoft YaHei, PingFang SC, sans-serif", size=13, color='#e2e8f0'),
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor='rgba(15,23,42,0.4)',
 )
 
 # 企业标准色
@@ -103,10 +103,10 @@ if page == "📊 销售总览":
     total_users = filtered_df['用户名'].nunique()
     avg_order_value = total_sales / total_orders if total_orders > 0 else 0
 
-    col1.metric(label="💰 总销售额", value=f"¥{total_sales:,.2f}", delta=f"¥{total_sales/len(filtered_df['下单时间'].dt.date.unique()):,.0f}/天")
+    col1.metric(label="💰 总销售额", value=f"{total_sales:,.2f} 元", delta=f"{total_sales/len(filtered_df['下单时间'].dt.date.unique()):,.0f} 元/天")
     col2.metric(label="📦 总订单数", value=f"{total_orders:,}", delta=f"平均每用户 {total_orders/total_users:.1f} 单" if total_users > 0 else "0")
     col3.metric(label="👥 活跃用户", value=f"{total_users:,}", delta=f"占比 {total_users/df['用户名'].nunique()*100:.1f}%" if df['用户名'].nunique() > 0 else "0%")
-    col4.metric(label="💵 客单价", value=f"¥{avg_order_value:.2f}", delta="较总体" + ("↑" if avg_order_value > df['付款金额'].mean() else "↓"))
+    col4.metric(label="💵 客单价", value=f"{avg_order_value:.2f} 元", delta="较总体" + ("↑" if avg_order_value > df['付款金额'].mean() else "↓"))
 
     st.markdown("---")
     st.subheader("📈 每日销售趋势")
@@ -252,7 +252,7 @@ elif page == "👥 RFM 客户分层":
             return "一般保持客户"
         return "一般挽留客户"
 
-    rfm['客户分层'] = rfm.apply(lambda row: assign_segment(row, r_threshold, f_threshold, m_threshold), axis=1)
+    rfm['客户分层'] = rfm.apply(lambda row: assign_segment(row, r_threshold, f_threshold, m_threshold), axis=1).astype(str)
 
     seg_order = ["重要价值客户", "重要发展客户", "重要保持客户", "重要挽留客户",
                  "一般价值客户", "一般发展客户", "一般保持客户", "一般挽留客户"]
@@ -265,7 +265,7 @@ elif page == "👥 RFM 客户分层":
 
     # ── 页面标题 ──
     st.title("👥 RFM 客户分层分析")
-    st.caption(f"数据截止：{ref_date_input} | 分组数：{n_bins} | R阈值≤{r_threshold} F/M阈值≥{f_threshold} | 共 {total_users:,} 位客户 | 总GMV ¥{total_gmv:,.0f}")
+    st.caption(f"数据截止：{ref_date_input} | 分组数：{n_bins} | R阈值≤{r_threshold} F/M阈值≥{f_threshold} | 共 {total_users:,} 位客户 | 总GMV {total_gmv:,.0f} 元")
     st.markdown("---")
 
     # ══════════════════════════════════════════════════════
@@ -278,11 +278,11 @@ elif page == "👥 RFM 客户分层":
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     with tab1:
         # ── KPI 指标卡 ──
-        high_value_mask = rfm['客户分层'].isin(["重要保持客户", "重要挽留客户"])
+        high_value_mask = rfm['客户分层'].astype(str).isin(["重要保持客户", "重要挽留客户"])
         high_value_count = int(high_value_mask.sum())
         high_value_pct = high_value_count / total_users * 100 if total_users > 0 else 0
 
-        risk_mask = rfm['客户分层'].isin(["一般挽留客户"])
+        risk_mask = rfm['客户分层'].astype(str).isin(["一般挽留客户"])
         risk_count = int(risk_mask.sum())
         risk_pct = risk_count / total_users * 100 if total_users > 0 else 0
 
@@ -310,9 +310,23 @@ elif page == "👥 RFM 客户分层":
                 f"{high_value_gmv_pct:.1f}%",
                 delta=f"基准 ≥60%  {'达标' if high_value_gmv_pct >= 60 else '未达标'}",
             )
-            st.caption(f"高价值客户贡献 ¥{high_value_gmv:,.0f}")
+            st.caption(f"高价值客户贡献 {high_value_gmv:,.0f} 元")
 
         st.markdown("---")
+
+        # ── 分群完整性检测 ──
+        all_seg_counts = rfm['客户分层'].astype(str).value_counts()
+        empty_segments = [s for s in seg_order if all_seg_counts.get(s, 0) == 0]
+        if empty_segments:
+            avg_freq = rfm['frequency'].mean()
+            suggest_f = min(3, f_threshold - 1) if avg_freq < 2 else f_threshold
+            st.warning(
+                f"⚠️ 当前参数下 **{len(empty_segments)} 个分群为空**："
+                f" {', '.join(empty_segments)}\n\n"
+                f"💡 建议调整：当前数据平均消费频次仅 **{avg_freq:.1f}次/人**，"
+                f"F阈值建议降至 **{suggest_f}** 或更低，以激活更多分群。"
+                f"可在左侧面板调整「F评分阈值」。"
+            )
 
         # ── 环形图 + 分层明细表 ──
         st.subheader("客户资产结构")
@@ -341,21 +355,25 @@ elif page == "👥 RFM 客户分层":
                 labels=ring_data['分组'].tolist(),
                 hole=0.55,
                 marker=dict(colors=ring_colors, line=dict(color='white', width=2)),
-                textinfo='percent',
-                textfont=dict(size=13),
+                textinfo='percent+label',
+                textfont=dict(size=12),
+                textposition='outside',
+                pull=[0.05 if i == ring_data['人数'].idxmax() else 0 for i in range(len(ring_data))],
                 hovertemplate='<b>%{label}</b><br>人数: %{value:,}<br>占比: %{percent}<extra></extra>',
+                rotation=-90,
             )])
             fig_ring.add_annotation(
                 text=f"<b>{total_users:,}</b><br>客户总数",
-                x=0.5, y=0.5, font=dict(size=16, family="Microsoft YaHei"),
+                x=0.5, y=0.5, font=dict(size=16, family="Microsoft YaHei", color='#f1f5f9'),
                 showarrow=False
             )
             fig_ring.update_layout(
                 **_PLOTLY_LAYOUT_DEFAULTS,
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=11)),
-                margin=dict(t=20, b=60, l=20, r=20),
-                height=380,
+                showlegend=False,
+                uniformtext_minsize=10,
+                uniformtext_mode='hide',
+                margin=dict(t=30, b=60, l=20, r=20),
+                height=400,
             )
             st.plotly_chart(fig_ring, width='stretch')
 
@@ -372,8 +390,8 @@ elif page == "👥 RFM 客户分层":
 
             table_data['人数'] = table_data['人数'].apply(lambda x: f"{x:,}")
             table_data['占比'] = table_data['占比'].apply(lambda x: f"{x:.1f}%")
-            table_data['人均GMV'] = table_data['人均GMV'].apply(lambda x: f"¥{x:,.0f}")
-            table_data['总GMV'] = table_data['总GMV'].apply(lambda x: f"¥{x:,.0f}")
+            table_data['人均GMV'] = table_data['人均GMV'].apply(lambda x: f"{x:,.0f} 元")
+            table_data['总GMV'] = table_data['总GMV'].apply(lambda x: f"{x:,.0f} 元")
             table_data['平均R'] = table_data['平均R'].apply(lambda x: f"{x:.0f}天")
             table_data['平均F'] = table_data['平均F'].apply(lambda x: f"{x:.1f}次")
 
@@ -466,16 +484,31 @@ elif page == "👥 RFM 客户分层":
 
             fig_matrix = go.Figure()
 
+            z_display = fm_pivot.values.copy()
+            text_annotations = []
+            for i, r_val in enumerate(fm_pivot.index):
+                for j, c_val in enumerate(fm_pivot.columns):
+                    if z_display[i, j] == 0:
+                        text_annotations.append(dict(
+                            x=f'F={c_val}', y=f'M={r_val}',
+                            text='—', showarrow=False,
+                            font=dict(size=14, color='#475569'),
+                        ))
+
             fig_matrix.add_trace(go.Heatmap(
-                z=fm_pivot.values,
+                z=z_display,
                 x=[f'F={c}' for c in fm_pivot.columns],
                 y=[f'M={r}' for r in fm_pivot.index],
-                colorscale='YlOrRd',
-                colorbar=dict(title="客户规模", len=0.5, y=0.5),
+                colorscale=[[0, '#1e293b'], [0.01, '#334155'], [0.5, '#fbbf24'], [1, '#dc2626']],
+                zmin=0, zmax=max(1, fm_pivot.values.max()),
+                colorbar=dict(title="客户规模", len=0.45, y=0.5, thickness=15),
                 hovertemplate='F=%{x}, M=%{y}<br>客户数: %{z:,.0f}<extra></extra>',
                 showscale=True,
                 xgap=3, ygap=3,
             ))
+
+            for ann in text_annotations:
+                fig_matrix.add_annotation(**ann)
 
             # 气泡叠加：按segment着色
             bubble = fm_agg[fm_agg['客户数'] > 0].copy()
@@ -487,7 +520,7 @@ elif page == "👥 RFM 客户分层":
                 bubble['hover'] = bubble.apply(lambda row: (
                     f"F={int(row['f_score'])}, M={int(row['m_score'])}<br>"
                     f"客户数: {int(row['客户数']):,}<br>"
-                    f"GMV: ¥{row['总GMV']:,.0f}<br>"
+                    f"GMV: {row['总GMV']:,.0f} 元<br>"
                     f"平均R: {row['平均R']:.1f}天<br>"
                     f"分层: {row['主要分层']}"
                 ), axis=1)
@@ -577,10 +610,15 @@ elif page == "👥 RFM 客户分层":
                 **_PLOTLY_LAYOUT_DEFAULTS,
                 xaxis_title="R 评分（越小=越近期消费）",
                 yaxis_title="客户数量",
-                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, font=dict(size=10)),
-                margin=dict(t=40, b=80, l=50, r=20),
+                legend=dict(
+                    orientation="h", yanchor="bottom",
+                    y=-0.32, xanchor="center", x=0.5,
+                    font=dict(size=9),
+                    tracegroupgap=5,
+                ),
+                margin=dict(t=40, b=100, l=50, r=20),
                 bargap=0.15,
-                height=350,
+                height=380,
             )
             st.plotly_chart(fig_r_stack, width='stretch')
 
@@ -588,13 +626,14 @@ elif page == "👥 RFM 客户分层":
     # Tab3: 群体洞察（执行视角）
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     with tab3:
-        # ── 分层选择器 ──
-        seg_counts = rfm['客户分层'].value_counts()
-        seg_options = [f"{s} ({seg_counts.get(s, 0):,}人)" for s in seg_order]
+        # ── 分层选择器（仅显示有数据的分群）──
+        seg_counts = rfm['客户分层'].astype(str).value_counts()
+        active_segments = [s for s in seg_order if seg_counts.get(s, 0) > 0]
+        seg_options = [f"{s} ({seg_counts.get(s, 0):,}人)" for s in active_segments]
         sel_label = st.selectbox("选择查看的客户分层", options=seg_options, key="insight_seg")
         sel_segment = sel_label.split(" (")[0]
 
-        seg_users = rfm[rfm['客户分层'] == sel_segment].copy()
+        seg_users = rfm[rfm['客户分层'].astype(str) == sel_segment].copy()
         seg_count = len(seg_users)
 
         if seg_count == 0:
@@ -607,8 +646,8 @@ elif page == "👥 RFM 客户分层":
             c1.metric("客户数", f"{seg_count:,}")
             c2.metric("占总客户", f"{seg_count/total_users*100:.1f}%")
             seg_gmv = seg_users['monetary'].sum()
-            c3.metric("贡献GMV", f"¥{seg_gmv:,.0f}")
-            c4.metric("人均消费", f"¥{seg_users['monetary'].mean():,.0f}")
+            c3.metric("贡献GMV", f"{seg_gmv:,.0f} 元")
+            c4.metric("人均消费", f"{seg_users['monetary'].mean():,.0f} 元")
             c5.metric("人均频次", f"{seg_users['frequency'].mean():.1f}次")
 
             c6, c7, c8, c9, c10 = st.columns(5)
