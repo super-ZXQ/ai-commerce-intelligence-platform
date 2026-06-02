@@ -102,8 +102,8 @@ async def detailed_health():
 
 
 _EXTERNAL_SERVICES = {
-    "bi_dashboard": "http://localhost:8501/_stcore/health",
-    "ai_assistant": "http://localhost:8505/_stcore/health",
+    "bi_dashboard": os.getenv("BI_HEALTH_URL", "http://ea-streamlit:8501/_stcore/health"),
+    "ai_assistant": os.getenv("AI_HEALTH_URL", "http://ea-ai-assistant:8502/ai/_stcore/health"),
 }
 
 

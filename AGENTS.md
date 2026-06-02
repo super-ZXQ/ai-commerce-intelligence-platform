@@ -1,0 +1,64 @@
+# 电商数据分析系统 — Agent 规则手册
+
+## 项目概览
+
+电商订单数据分析系统，基于 10 万+ 真实订单，提供 BI 看板、AI 分析、RFM 用户画像、RESTful API。
+
+**技术栈**：Python 3.12, FastAPI, SQLAlchemy (async), Streamlit, Plotly, LangChain, MySQL 8, Redis 7, Docker Compose
+
+**虚拟环境**：`.venv\Scripts\`
+
+## 启动服务
+
+```powershell
+# 1. FastAPI 后端 (:8000)
+Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\python.exe" -ArgumentList "-m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+# 2. BI 看板 (:8501)
+Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run streamlit_app.py --server.port 8501"
+# 3. AI 助手 (:8505)
+Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run ai-ecommerce-assistant/app.py --server.port 8505"
+```
+
+主数据文件：`data/cleaned_orders.csv`
+
+## 页面结构
+
+`streamlit_app.py` 包含两个页面（`st.sidebar.selectbox` 切换）：
+- **📊 销售总览** — 指标卡 + 趋势/平台/TOP10 图表
+- **👥 RFM 客户分层** — 三 Tab 布局
+
+RFM 计算在 `streamlit_app.py` 内联 `compute_rfm_data()`，缓存通过用户名/订单数/金额哈希。
+
+## 企业级配色（所有图表必须统一映射）
+
+```python
+ENTERPRISE_COLORS_FULL = {
+    "重要价值客户": "#1565C0",
+    "重要发展客户": "#1E88E5",
+    "重要保持客户": "#1E88E5",
+    "重要挽留客户": "#FF5722",
+    "一般价值客户": "#43A047",
+    "一般发展客户": "#43A047",
+    "一般保持客户": "#43A047",
+    "一般挽留客户": "#7E57C2",
+}
+```
+
+## 硬边界规则
+
+- **禁止使用 `st.metric(delta_delta_color=...)`** — 当前 Streamlit 版本不支持此参数
+- **禁止 `reindex(..., fill_value=0)` 对含字符串列的 DataFrame** — 字符串列与 `fill_value=0` 类型冲突，必须分列处理：数值列 `fillna(0)`，字符串列 `fillna('其他')`
+- **`go.Pie` 使用 `labels=` 而非 `names=`** — `names` 可能被 Plotly 解析为属性路径
+- **`Start-Process` 必须用 `-WindowStyle Hidden`** — Windows 后台运行
+- **RFM 评分语义**：R 评分 ≤ 阈值 = 高价值（近期活跃），F/M 评分 ≥ 阈值 = 高价值
+- **`aggregate(lambda x: x.mode().iloc[0])`** — 分组取众数前需检查 `len(x.mode()) > 0`
+
+## 排查路径
+
+- Streamlit 报错 → 看终端输出 / 检查 `columns()` 和 `reindex` 参数
+- FastAPI 端口占用 → `netstat -ano | Select-String ":8000"` 找 PID 后 `Stop-Process`
+- 数据文件 → `data/cleaned_orders.csv`
+
+## 深入文档
+
+- `README.md` — 完整功能说明、API 列表、部署方式
