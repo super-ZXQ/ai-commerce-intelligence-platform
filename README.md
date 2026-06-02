@@ -28,11 +28,12 @@
 | 应用 | 链接 | 说明 |
 |------|------|------|
 | **BI 数据看板** | [Streamlit Cloud](https://ecommerce-analysis-system-cqd8tpywoxneg8n3wqexfm.streamlit.app) | 在线部署 |
-| **AI 分析助手** | `http://localhost:8505` | 自然语言查数 |
-| **API 文档** | `http://localhost:8000/docs` | Swagger UI |
-| **API 体验页** | `http://localhost:8000/demo` | 可视化大屏 + AI 查询 |
-| **系统监控** | `http://localhost:8000/monitor` | 实时监控面板 |
-| **健康检查** | `http://localhost:8000/health-panel` | 组件健康状态 |
+| **Docker 统一入口** | `http://localhost/` | Nginx 反向代理网关 |
+| **AI 分析助手** | `http://localhost/ai/` | 自然语言查数 |
+| **API 文档** | `http://localhost/docs` | Swagger UI |
+| **API 体验页** | `http://localhost/demo` | 可视化大屏 + AI 查询 |
+| **系统监控** | `http://localhost/monitor` | 实时监控面板 |
+| **健康检查** | `http://localhost/health-panel` | 组件健康状态 |
 
 ## 快速开始
 
@@ -45,20 +46,33 @@ cd ecommerce_analysis
 cp deploy/.env.example .env
 # 编辑 .env 填入 MySQL 密码、JWT Secret、LLM API Key
 
-docker-compose up -d
-docker-compose ps
+docker compose up -d --build
+docker compose ps
 ```
 
 **服务架构：**
 
 ```
-docker-compose up -d
-├── ea-mysql        → MySQL 8.0 (3306) + 自动建表+导入
-├── ea-redis        → Redis 7 Alpine (6379) + AOF持久化 + LRU淘汰
-├── ea-backend      → FastAPI (8000) → 依赖 mysql + redis
-├── ea-streamlit    → BI 看板 (8501) → 依赖 mysql
-└── ea-ai-assistant → AI 助手 (8505) → 依赖 mysql
+docker compose up -d
+├── ea-nginx        → Nginx 统一入口 (:80)
+├── ea-streamlit    → BI 看板 (Docker 内网 :8501)
+├── ea-backend      → FastAPI (Docker 内网 :8000)
+├── ea-ai-assistant → AI 助手 (Docker 内网 :8502, baseUrlPath=/ai)
+├── ea-mysql        → MySQL 8.0 (Docker 内网 :3306) + 自动建表+导入
+└── ea-redis        → Redis 7 Alpine (Docker 内网 :6379) + AOF持久化 + LRU淘汰
 ```
+
+**Nginx 路由分流：**
+
+| 路径 | 转发服务 | 说明 |
+|------|----------|------|
+| `/` | `streamlit:8501` | BI 数据看板默认入口 |
+| `/api/*` | `backend:8000` | FastAPI REST API |
+| `/docs` / `/redoc` / `/openapi.json` | `backend:8000` | API 文档 |
+| `/demo` / `/monitor` / `/health-panel` | `backend:8000` | 后端演示、监控和健康页面 |
+| `/ai/` | `ai-assistant:8502` | AI 分析助手 |
+
+部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
 
 ### 本地开发
 
@@ -77,6 +91,8 @@ streamlit run streamlit_app.py                         # BI 看板 :8501
 streamlit run ai-ecommerce-assistant/app.py            # AI 助手 :8505
 python -m uvicorn backend.main:app --port 8000         # API 服务 :8000
 ```
+
+本地开发模式仍保留三个服务直连端口，便于调试；Docker 部署模式统一通过 `http://localhost/` 访问。
 
 ## 环境变量
 
