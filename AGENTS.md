@@ -78,6 +78,9 @@ ENTERPRISE_COLORS_FULL = {
 - **`Start-Process` 必须用 `-WindowStyle Hidden`** — Windows 后台运行
 - **RFM 评分语义**：R 评分 ≤ 阈值 = 高价值（近期活跃），F/M 评分 ≥ 阈值 = 高价值
 - **`aggregate(lambda x: x.mode().iloc[0])`** — 分组取众数前需检查 `len(x.mode()) > 0`
+- **LLM SQL 必须只读** — `ai_service._is_read_only_sql()` 拦截 DROP/DELETE/UPDATE/INSERT/ALTER/TRUNCATE/CREATE
+- **`@cached` 防击穿** — 基于 `asyncio.Lock` 的 double-check lock，过期时异步重建
+- **内存缓存上限 1000 条** — 满时先清理过期条目再驱逐最旧条目；`cleanup_memory_cache()` 同步清理 `_cache_locks`
 
 ## 排查路径
 
