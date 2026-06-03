@@ -109,7 +109,7 @@ _EXTERNAL_SERVICES = {
 
 
 @router.get("/services-status", summary="外部服务状态")
-async def get_services_status(user: dict = Depends(get_current_user)):
+async def get_services_status():
     results = {}
     for name, url in _EXTERNAL_SERVICES.items():
         try:
