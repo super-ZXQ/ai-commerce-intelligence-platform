@@ -141,6 +141,7 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; 
 }
 .health-icon.ok { background: rgba(34,197,94,0.12); }
 .health-icon.err { background: rgba(239,68,68,0.12); }
+.health-icon.warn { background: rgba(245,158,11,0.12); }
 .health-info .name { font-size: 14px; font-weight: 600; }
 .health-info .detail { font-size: 12px; color: #64748b; margin-top: 2px; }
 .health-badge {
@@ -149,6 +150,7 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0a0e1a; 
 }
 .health-badge.ok { background: rgba(34,197,94,0.12); color: #22c55e; }
 .health-badge.err { background: rgba(239,68,68,0.12); color: #ef4444; }
+.health-badge.warn { background: rgba(245,158,11,0.12); color: #f59e0b; }
 
 .endpoint-table { width: 100%; border-collapse: collapse; }
 .endpoint-table th {
@@ -488,13 +490,21 @@ async function loadDashboard() {
                 <div class="health-grid">
                     ${Object.entries(checks).map(([key, val]) => {
                         const ok = val.status === 'ok';
-                        const icons = { database: '🗄️', cache: '💾' };
-                        const names = { database: '数据库连接', cache: '内存缓存' };
-                        const details = { database: ok ? '连接正常' : (val.detail || '连接异常'), cache: ok ? `${val.keys} 个键活跃` : '缓存异常' };
+                        const disabled = val.status === 'disabled';
+                        const icons = { database: '🗄️', cache: '💾', redis: '⚙️' };
+                        const names = { database: '数据库连接', cache: '内存缓存', redis: 'Redis 缓存' };
+                        const details = {
+                            database: ok ? '连接正常' : (val.detail || '连接异常'),
+                            cache: ok ? `${val.keys || 0} 个键活跃` : '缓存异常',
+                            redis: disabled ? '已禁用（使用内存缓存）' : (ok ? `${val.keys || 0} 个键` : (val.detail || '连接异常'))
+                        };
+                        const badgeText = disabled ? '已禁用' : (ok ? '正常' : '异常');
+                        const badgeClass = disabled ? 'warn' : (ok ? 'ok' : 'err');
+                        const iconClass = disabled ? 'warn' : (ok ? 'ok' : 'err');
                         return `<div class="health-item">
-                            <div class="health-icon ${ok ? 'ok' : 'err'}">${icons[key] || '⚙️'}</div>
+                            <div class="health-icon ${iconClass}">${icons[key] || '⚙️'}</div>
                             <div class="health-info"><div class="name">${names[key] || key}</div><div class="detail">${details[key] || val.status}</div></div>
-                            <span class="health-badge ${ok ? 'ok' : 'err'}">${ok ? '正常' : '异常'}</span>
+                            <span class="health-badge ${badgeClass}">${badgeText}</span>
                         </div>`;
                     }).join('')}
                 </div>

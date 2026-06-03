@@ -30,6 +30,7 @@ docker-compose up -d
 docker-compose down
 # 重建某服务（代码改动后）
 docker-compose up -d --build backend
+docker-compose up -d --build streamlit
 # 重载 Nginx 配置
 docker exec ea-nginx nginx -s reload
 ```
@@ -39,7 +40,7 @@ docker exec ea-nginx nginx -s reload
 | 路径 | 后端 | 说明 |
 |------|------|------|
 | `/` | backend:8000 | 统一导航页（默认入口） |
-| `/BI` | streamlit:8501 | BI 看板 |
+| `/BI/` | streamlit:8501 | BI 看板（baseUrlPath=/BI，访问 `/BI` 会 301 跳转到 `/BI/`） |
 | `/ai/` | ai-assistant:8502 | AI 助手（baseUrlPath=/ai） |
 | `/api/*` | backend:8000 | RESTful API |
 | `/nav` | backend:8000 | 导航页（备用路由） |

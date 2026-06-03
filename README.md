@@ -68,7 +68,7 @@ docker compose up -d
 | 路径 | 转发服务 | 说明 |
 |------|----------|------|
 | `/` | `backend:8000` | 统一导航页（默认入口） |
-| `/BI` | `streamlit:8501` | BI 数据看板 |
+| `/BI/` | `streamlit:8501` | BI 数据看板（baseUrlPath=/BI，访问 /BI 自动跳转） |
 | `/api/*` | `backend:8000` | FastAPI REST API |
 | `/docs` / `/redoc` / `/openapi.json` | `backend:8000` | API 文档 |
 | `/demo` / `/monitor` / `/health-panel` | `backend:8000` | 后端演示、监控和健康页面 |

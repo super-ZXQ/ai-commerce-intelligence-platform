@@ -85,6 +85,14 @@ services:
     restart: unless-stopped
     expose:
       - "8501"
+    command:
+      - streamlit
+      - run
+      - streamlit_app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+      - --server.baseUrlPath=/BI
     depends_on:
       mysql:
         condition: service_healthy

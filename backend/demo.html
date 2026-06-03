@@ -110,7 +110,7 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0f172a; 
 
 <div class="header">
     <h1>🛒 电商数据分析系统 - FastAPI 后端</h1>
-    <span class="badge">API v1.6</span>
+    <span class="badge">API v1.7</span>
     <span class="url" id="apiUrl"></span>
     <a href="/" style="margin-left:16px;color:#94a3b8;text-decoration:none;font-size:14px;">← 返回首页</a>
 </div>
@@ -391,18 +391,50 @@ function setStatus(id, ok) {
     el.className = 'status ' + (ok ? 'ok' : 'err');
 }
 
+// 防御式格式化：遇到 undefined/null/NaN 显示占位符，避免页面出现 ¥NaN/NaN/undefined%
 function formatMoney(n) {
-    return '¥' + Number(n).toLocaleString('zh-CN', {minimumFractionDigits: 2});
+    if (n === undefined || n === null || (typeof n === 'number' && isNaN(n))) return '¥--';
+    const v = Number(n);
+    if (isNaN(v)) return '¥--';
+    return '¥' + v.toLocaleString('zh-CN', {minimumFractionDigits: 2});
 }
 
 function formatNum(n) {
-    return Number(n).toLocaleString('zh-CN');
+    if (n === undefined || n === null || (typeof n === 'number' && isNaN(n))) return '--';
+    const v = Number(n);
+    if (isNaN(v)) return '--';
+    return v.toLocaleString('zh-CN');
+}
+
+function formatPercent(n) {
+    if (n === undefined || n === null || (typeof n === 'number' && isNaN(n))) return '--%';
+    return n + '%';
+}
+
+// 统一处理非 2xx 响应：读取错误体并以"加载失败"形式回填对应内容区
+async function renderError(res, contentId, statusId) {
+    setStatus(statusId, false);
+    let detail = '';
+    try {
+        const body = await res.text();
+        try {
+            const j = JSON.parse(body);
+            detail = j.detail || j.message || body;
+        } catch (_) {
+            detail = body;
+        }
+    } catch (_) { detail = res.statusText || ''; }
+    const el = document.getElementById(contentId);
+    if (el) {
+        el.innerHTML = `<div class="error-text">加载失败 (HTTP ${res.status}): ${String(detail).substring(0, 200)}</div>`;
+    }
 }
 
 // ====== 1. 销售总览 ======
 async function loadOverview() {
     try {
         const r = await authFetch(BASE + '/api/analytics/sales-overview');
+        if (!r.ok) { await renderError(r, 'overview_content', 's1_status'); return; }
         const d = await r.json();
         setStatus('s1_status', true);
         document.getElementById('overview_content').innerHTML = `
@@ -411,7 +443,7 @@ async function loadOverview() {
                 <div class="metric-item"><div class="metric-value">${formatNum(d.total_orders)}</div><div class="metric-label">总订单数</div></div>
                 <div class="metric-item"><div class="metric-value">${formatMoney(d.avg_order_value)}</div><div class="metric-label">平均客单价</div></div>
                 <div class="metric-item"><div class="metric-value">${formatNum(d.total_users)}</div><div class="metric-label">总用户数</div></div>
-                <div class="metric-item"><div class="metric-value">${d.refund_rate}%</div><div class="metric-label">退款率</div></div>
+                <div class="metric-item"><div class="metric-value">${formatPercent(d.refund_rate)}</div><div class="metric-label">退款率</div></div>
                 <div class="metric-item"><div class="metric-value">${formatMoney(d.total_refund_amount)}</div><div class="metric-label">退款总额</div></div>
             </div>`;
     } catch(e) {
@@ -424,18 +456,23 @@ async function loadOverview() {
 async function loadProducts() {
     try {
         const r = await authFetch(BASE + '/api/analytics/top-products?limit=5');
+        if (!r.ok) { await renderError(r, 'products_content', 's2_status'); return; }
         const d = await r.json();
         setStatus('s2_status', true);
+        if (!Array.isArray(d) || d.length === 0) {
+            document.getElementById('products_content').innerHTML = '<div class="loading-spinner">暂无热销商品数据</div>';
+            return;
+        }
         let html = '<ul class="rank-list">';
         d.forEach((p, i) => {
             const cls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : 'normal';
-            html += `<li class="rank-item"><span class="rank-num ${cls}">${i + 1}</span><span class="rank-name">${p.product_id}</span><span class="rank-val">${formatMoney(p.total_sales)} (${p.order_count}笔)</span></li>`;
+            html += `<li class="rank-item"><span class="rank-num ${cls}">${i + 1}</span><span class="rank-name">${p.product_id || '--'}</span><span class="rank-val">${formatMoney(p.total_sales)} (${formatNum(p.order_count)}笔)</span></li>`;
         });
         html += '</ul>';
         document.getElementById('products_content').innerHTML = html;
     } catch(e) {
         setStatus('s2_status', false);
-        document.getElementById('products_content').innerHTML = '<div class="error-text">加载失败</div>';
+        document.getElementById('products_content').innerHTML = '<div class="error-text">加载失败: ' + e.message + '</div>';
     }
 }
 
@@ -443,12 +480,13 @@ async function loadProducts() {
 async function loadBehavior() {
     try {
         const r = await authFetch(BASE + '/api/analytics/user-behavior');
+        if (!r.ok) { await renderError(r, 'behavior_content', 's3_status'); return; }
         const d = await r.json();
         setStatus('s3_status', true);
         document.getElementById('behavior_content').innerHTML = `
             <div class="metric-grid">
-                <div class="metric-item"><div class="metric-value">${d.repeat_purchase_rate}%</div><div class="metric-label">复购率</div></div>
-                <div class="metric-item"><div class="metric-value">${d.avg_order_frequency}</div><div class="metric-label">人均消费频次</div></div>
+                <div class="metric-item"><div class="metric-value">${formatPercent(d.repeat_purchase_rate)}</div><div class="metric-label">复购率</div></div>
+                <div class="metric-item"><div class="metric-value">${formatNum(d.avg_order_frequency)}</div><div class="metric-label">人均消费频次</div></div>
                 <div class="metric-item"><div class="metric-value">${formatNum(d.active_users_7d)}</div><div class="metric-label">7日活跃用户</div></div>
                 <div class="metric-item"><div class="metric-value">${formatNum(d.active_users_30d)}</div><div class="metric-label">30日活跃用户</div></div>
                 <div class="metric-item"><div class="metric-value">${formatMoney(d.avg_customer_value)}</div><div class="metric-label">平均客单价</div></div>
@@ -456,7 +494,7 @@ async function loadBehavior() {
             </div>`;
     } catch(e) {
         setStatus('s3_status', false);
-        document.getElementById('behavior_content').innerHTML = '<div class="error-text">加载失败</div>';
+        document.getElementById('behavior_content').innerHTML = '<div class="error-text">加载失败: ' + e.message + '</div>';
     }
 }
 
@@ -464,20 +502,25 @@ async function loadBehavior() {
 async function loadCategory() {
     try {
         const r = await authFetch(BASE + '/api/analytics/category-analysis');
+        if (!r.ok) { await renderError(r, 'category_content', 's4_status'); return; }
         const d = await r.json();
         setStatus('s4_status', true);
+        if (!d.categories || d.categories.length === 0) {
+            document.getElementById('category_content').innerHTML = '<div class="loading-spinner">暂无平台销售数据</div>';
+            return;
+        }
         const colors = ['#818cf8', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
         let html = '';
         d.categories.forEach((c, i) => {
             html += `<div class="platform-bar">
-                <div class="platform-info"><span class="name">${c.platform_type}</span><span class="pct">${c.sales_ratio}% · ${formatMoney(c.total_sales)}</span></div>
-                <div class="bar-track"><div class="bar-fill" style="width:${c.sales_ratio}%;background:${colors[i % colors.length]}"></div></div>
+                <div class="platform-info"><span class="name">${c.platform_type || '--'}</span><span class="pct">${formatPercent(c.sales_ratio)} · ${formatMoney(c.total_sales)}</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:${c.sales_ratio || 0}%;background:${colors[i % colors.length]}"></div></div>
             </div>`;
         });
         document.getElementById('category_content').innerHTML = html;
     } catch(e) {
         setStatus('s4_status', false);
-        document.getElementById('category_content').innerHTML = '<div class="error-text">加载失败</div>';
+        document.getElementById('category_content').innerHTML = '<div class="error-text">加载失败: ' + e.message + '</div>';
     }
 }
 
@@ -485,19 +528,25 @@ async function loadCategory() {
 async function loadOrders() {
     try {
         const r = await authFetch(BASE + '/api/orders?page_size=6');
+        if (!r.ok) { await renderError(r, 'orders_content', 's5_status'); return; }
         const d = await r.json();
         setStatus('s5_status', true);
+        if (!d.items || d.items.length === 0) {
+            document.getElementById('orders_content').innerHTML = '<div class="loading-spinner">暂无订单数据</div>';
+            return;
+        }
         let html = '<table class="order-table"><thead><tr><th>订单号</th><th>商品编号</th><th>付款金额</th><th>平台</th><th>下单时间</th></tr></thead><tbody>';
         d.items.forEach(o => {
             const tagClass = o.platform_type === 'APP' ? 'tag-app' : o.platform_type.includes('微信') || o.platform_type.includes('公众号') ? 'tag-wx' : o.platform_type.includes('web') || o.platform_type.includes('网站') ? 'tag-web' : '';
-            html += `<tr><td style="font-family:monospace;font-size:12px">${o.order_no}</td><td style="font-family:monospace">${o.product_id}</td><td>${formatMoney(o.payment_amount)}</td><td><span class="tag ${tagClass}">${o.platform_type}</span></td><td>${o.order_time.substring(0, 16).replace('T', ' ')}</td></tr>`;
+            const timeStr = o.order_time ? o.order_time.substring(0, 16).replace('T', ' ') : '--';
+            html += `<tr><td style="font-family:monospace;font-size:12px">${o.order_no || '--'}</td><td style="font-family:monospace">${o.product_id || '--'}</td><td>${formatMoney(o.payment_amount)}</td><td><span class="tag ${tagClass}">${o.platform_type || '--'}</span></td><td>${timeStr}</td></tr>`;
         });
         html += '</tbody></table>';
         html += `<div style="margin-top:10px;color:#64748b;font-size:12px;">共 ${formatNum(d.total)} 条记录</div>`;
         document.getElementById('orders_content').innerHTML = html;
     } catch(e) {
         setStatus('s5_status', false);
-        document.getElementById('orders_content').innerHTML = '<div class="error-text">加载失败</div>';
+        document.getElementById('orders_content').innerHTML = '<div class="error-text">加载失败: ' + e.message + '</div>';
     }
 }
 
