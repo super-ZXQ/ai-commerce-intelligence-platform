@@ -38,8 +38,8 @@ docker exec ea-nginx nginx -s reload
 
 | 路径 | 后端 | 说明 |
 |------|------|------|
-| `/` | streamlit:8501 | BI 看板（默认入口） |
-| `/nav` | backend:8000 | 统一导航页 |
+| `/` | backend:8000 | 统一导航页（默认入口） |
+| `/BI` | streamlit:8501 | BI 看板 |
 | `/ai/` | ai-assistant:8502 | AI 助手（baseUrlPath=/ai） |
 | `/api/*` | backend:8000 | RESTful API |
 | `/docs` | backend:8000 | Swagger 文档 |

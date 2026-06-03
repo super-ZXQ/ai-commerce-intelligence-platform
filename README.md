@@ -28,7 +28,8 @@
 | 应用 | 链接 | 说明 |
 |------|------|------|
 | **BI 数据看板** | [Streamlit Cloud](https://ecommerce-analysis-system-cqd8tpywoxneg8n3wqexfm.streamlit.app) | 在线部署 |
-| **Docker 统一入口** | `http://localhost/` | Nginx 反向代理网关 |
+| **Docker 统一入口** | `http://localhost/` | 导航页（默认入口） |
+| **BI 数据看板** | `http://localhost/BI` | 交互式数据大屏 |
 | **AI 分析助手** | `http://localhost/ai/` | 自然语言查数 |
 | **API 文档** | `http://localhost/docs` | Swagger UI |
 | **API 体验页** | `http://localhost/demo` | 可视化大屏 + AI 查询 |
@@ -66,7 +67,8 @@ docker compose up -d
 
 | 路径 | 转发服务 | 说明 |
 |------|----------|------|
-| `/` | `streamlit:8501` | BI 数据看板默认入口 |
+| `/` | `backend:8000` | 统一导航页（默认入口） |
+| `/BI` | `streamlit:8501` | BI 数据看板 |
 | `/api/*` | `backend:8000` | FastAPI REST API |
 | `/docs` / `/redoc` / `/openapi.json` | `backend:8000` | API 文档 |
 | `/demo` / `/monitor` / `/health-panel` | `backend:8000` | 后端演示、监控和健康页面 |
@@ -140,7 +142,7 @@ DEBUG=false
 | **数据分析** | 5 | 销售总览、趋势、热销商品、用户行为、平台分析 | JWT |
 | **AI 助手** | 1 | 自然语言 → SQL → 结果 | JWT |
 | **数据导出** | 2 | CSV / Excel 导出（分批查询防 OOM） | JWT |
-| **监控** | 3 | 实时指标、健康检查、外部服务状态 | JWT |
+| **监控** | 3 | 实时指标、健康检查、外部服务状态 | 部分公开 |
 | **RFM 用户画像** | 4 | 总览 / 分群 / 分群详情 / TOP 用户 | JWT |
 
 ### 使用示例
