@@ -1,9 +1,9 @@
 # 电商数据分析系统
 
-![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-v1.4-green?logo=fastapi)
-![Streamlit](https://img.shields.io/badge/Streamlit-BI看板-red?logo=streamlit)
-![LangChain](https://img.shields.io/badge/LangChain-AI助手-orange?logo=langchain)
+![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?logo=fastapi)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.41-red?logo=streamlit)
+![LangChain](https://img.shields.io/badge/LangChain-0.3-orange?logo=langchain)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-orange?logo=mysql)
 ![Redis](https://img.shields.io/badge/Redis-7-red?logo=redis)
 ![Docker](https://img.shields.io/badge/Docker--Compose-blue?logo=docker)
@@ -135,13 +135,13 @@ DEBUG=false
 |------|--------|------|------|
 | **认证系统** | 3 | 登录 / 刷新Token / 当前用户 | 公开 |
 | **系统接口** | 7 | 首页 / 健康检查 / 体验页 / 监控 / 健康面板 / 文档 | 公开 |
-| **订单查询** | 3 | 列表（分页+排序）、详情、多条件筛选 | 公开 |
-| **商品与用户** | 2 | 商品销售排名、用户消费排名 | 公开 |
-| **数据分析** | 5 | 销售总览、趋势、热销商品、用户行为、平台分析 | 公开 |
+| **订单查询** | 3 | 列表（分页+排序）、详情、多条件筛选 | JWT |
+| **商品与用户** | 2 | 商品销售排名、用户消费排名 | JWT |
+| **数据分析** | 5 | 销售总览、趋势、热销商品、用户行为、平台分析 | JWT |
 | **AI 助手** | 1 | 自然语言 → SQL → 结果 | JWT |
-| **数据导出** | 2 | CSV / Excel 导出（分批查询防 OOM） | 公开 |
-| **监控** | 3 | 实时指标、健康检查、外部服务状态 | 公开 |
-| **RFM 用户画像** | 4 | 总览 / 分群 / 分群详情 / TOP 用户 | 公开 |
+| **数据导出** | 2 | CSV / Excel 导出（分批查询防 OOM） | JWT |
+| **监控** | 3 | 实时指标、健康检查、外部服务状态 | JWT |
+| **RFM 用户画像** | 4 | 总览 / 分群 / 分群详情 / TOP 用户 | JWT |
 
 ### 使用示例
 
@@ -157,38 +157,39 @@ curl -X POST http://localhost:8000/api/ai/query \
   -H "Content-Type: application/json" \
   -d '{"query": "销售额最高的3个商品"}'
 
-# 公开接口
-curl http://localhost:8000/api/analytics/sales-overview
-curl http://localhost:8000/api/rfm/overview
+# 数据分析（需认证）
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/analytics/sales-overview
+
+# RFM 用户画像（需认证）
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/rfm/overview
 ```
 
 ## 技术架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              FastAPI Application (v1.4)              │
-├──────────┬──────────┬──────────┬──────────┬──────────┤
-│  auth/   │ orders/  │products  │analytics │   ai/    │
-│  routes  │  routes  │  routes  │  routes  │ export/  │
-│          │          │          │          │ monitor/ │
-│          │          │          │          │   rfm/   │
-├──────────┴──────────┴──────────┴──────────┴──────────┤
-│              Services Layer                           │
-│  order_service │ analytics_service │ ai_service       │
-│  rfm_service (RFM量化分群引擎)                        │
-├───────────────────────────────────────────────────────┤
-│         SQLAlchemy Async (aiomysql)                 │
-│              MySQL Connection Pool (10+20)           │
-├─────────────────────────────────────────────────────┤
-│  JWT Auth  │ Rate Limit │ Redis Cache │ Monitor     │
-│  (bcrypt)  │ (TTL清理)  │ (双层降级)  │             │
-└─────────────────────────────────────────────────────┘
-                    ↕
-            ┌───────────────┐
-            │  LangChain    │
-            │  SQL Agent    │
-            │  (DeepSeek)   │
-            └───────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   Nginx (:80)                           │
+│          WebSocket 透传 + 路由分流 + Gzip              │
+└──────┬──────────┬──────────┬──────────┬─────────────────┘
+       │          │          │          │
+       ▼          ▼          ▼          ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Streamlit │ │ FastAPI  │ │ AI 助手  │ │ Swagger  │
+│  BI 看板  │ │  后端    │ │ LangChain│ │   Docs   │
+└──────────┘ └────┬─────┘ └────┬─────┘ └──────────┘
+                  │            │
+       ┌──────────┴────────────┴──────────┐
+       │         业务逻辑层                │
+       │  order_service │ analytics_service│
+       │  ai_service    │ rfm_service     │
+       ├───────────────────────────────────┤
+       │         数据访问层                │
+       │  SQLAlchemy Async (aiomysql)     │
+       │  MySQL 连接池 (10+20)            │
+       ├───────────────────────────────────┤
+       │  JWT Auth │ Rate Limit │ Redis   │
+       │ (bcrypt)  │ (TTL清理)  │ (双层)  │
+       └───────────────────────────────────┘
 ```
 
 ## RFM 用户画像
@@ -218,12 +219,17 @@ R<4 F≥4 M<4 → 一般发展客户    R<4 F<4 M<4 → 一般挽留客户
 
 | 特性 | 说明 |
 |------|------|
-| JWT 认证 | bcrypt 密码哈希(rounds=12) + HS256 签名，24h 有效期 |
+| JWT 认证 | bcrypt 密码哈希(rounds=12) + HS256 签名，24h 有效期，含 iat 签发时间 |
+| 全端点认证 | 所有数据端点（订单/分析/RFM/商品/监控/导出）均需 JWT |
+| LLM SQL 只读 | AI 生成的 SQL 执行前拦截 DROP/DELETE/UPDATE/INSERT/ALTER/TRUNCATE/CREATE |
 | 请求限流 | 按路径差异化限流 + TTL 自动清理 + 线程安全 |
+| 输入校验 | 日期参数 regex 校验（YYYY-MM-DD）、导出格式白名单（csv/excel） |
 | SQL 注入防护 | LIKE 查询自动转义特殊字符 |
 | 敏感过滤 | AI 查询自动拦截隐私问题 |
-| Redis 缓存 | 双层架构（Redis + 内存降级） |
+| Redis 缓存 | 双层架构（Redis + 内存降级），内存缓存上限 1000 条 |
+| 缓存防击穿 | `@cached` 基于 asyncio.Lock 的 double-check lock，过期时异步重建 |
 | CORS 控制 | 白名单模式 |
+| X-Forwarded-For | 取最右端 IP 防止伪造 |
 
 ## 性能优化
 
@@ -232,19 +238,21 @@ R<4 F≥4 M<4 → 一般发展客户    R<4 F<4 M<4 → 一般挽留客户
 | 异步全链路 | async/await 从路由到数据库（aiomysql） |
 | 连接池 | 10 核心 + 20 溢出，3600s 自动回收 |
 | 缓存加速 | 销售总览 2min / 用户行为 3min / RFM 10min |
+| 缓存防击穿 | asyncio.Lock double-check lock，防止并发重建 |
+| 内存缓存上限 | max_size=1000，满时先清过期再驱逐最旧 |
 | 分批导出 | 每批 5000 条，防止 OOM |
-| 数据库索引 | 7 个关键索引 |
+| 数据库索引 | 7 个关键索引（含 order_date） |
 
 ## 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| 后端 | Python 3.11, FastAPI, SQLAlchemy (async), aiomysql |
+| 后端 | Python 3.12, FastAPI, SQLAlchemy (async), aiomysql |
 | 数据库 | MySQL 8.0, Redis 7 |
 | AI | LangChain, DeepSeek V4 Flash |
 | 前端 | Streamlit, Plotly, GSAP 3 |
 | 认证 | python-jose, bcrypt |
-| 部署 | Docker Compose |
+| 部署 | Docker Compose, Nginx |
 | 测试 | pytest, pytest-asyncio, httpx |
 
 ## 项目结构
@@ -252,17 +260,28 @@ R<4 F≥4 M<4 → 一般发展客户    R<4 F<4 M<4 → 一般挽留客户
 ```
 ecommerce_analysis/
 ├── backend/                    # FastAPI 后端
-│   ├── main.py                 # 应用入口
-│   ├── config.py               # 配置管理
-│   ├── database.py             # 异步连接池
+│   ├── main.py                 # 应用入口 + 生命周期
+│   ├── config.py               # Pydantic Settings 配置
+│   ├── database.py             # AsyncSession 连接池
 │   ├── routes/                 # 路由层（8 个模块）
+│   │   ├── auth.py             # JWT 认证
+│   │   ├── orders.py           # 订单查询
+│   │   ├── analytics.py        # 数据分析
+│   │   ├── ai.py               # AI 助手
+│   │   ├── export.py           # 数据导出
+│   │   ├── monitor.py          # 系统监控
+│   │   ├── rfm.py              # RFM 用户画像
+│   │   └── products.py         # 商品/用户排名
 │   ├── services/               # 业务逻辑层
+│   ├── models/                 # SQLAlchemy 模型
 │   ├── utils/                  # 工具（auth/cache/rate_limiter）
 │   ├── static/                 # HTML 页面（GSAP 动画）
-│   ├── tests/                  # 27 个单元测试
-│   └── sql/                    # 索引优化脚本
+│   └── tests/                  # 单元测试
 ├── ai-ecommerce-assistant/     # AI Streamlit 助手
 ├── streamlit_app.py            # BI 看板主程序
+├── deploy/                     # Nginx + Docker 部署配置
+│   ├── nginx.conf              # 反向代理配置
+│   └── .env.example            # 环境变量模板
 ├── docker-compose.yml          # Docker 编排
 ├── data/                       # 清洗后数据
 ├── notebook/                   # 分析 Notebook
@@ -286,12 +305,26 @@ ecommerce_analysis/
 ## 运行测试
 
 ```bash
-cd backend
-python -m pytest tests/test_api.py -v
+# 激活虚拟环境
+.venv\Scripts\activate
+
+# 运行全部测试
+python -m pytest backend/tests/ -v
 ```
 
 ## 更新日志
 
+- **v1.6** — 全面安全加固 + 代码质量修复
+  - 所有数据端点加 JWT 认证（orders/analytics/rfm/products/monitor）
+  - LLM SQL 执行前加只读拦截（防止 DROP/DELETE/UPDATE/INSERT）
+  - AI 错误响应不再泄露原始异常信息
+  - 日期参数加 regex 校验（非法格式返回 422）
+  - 导出格式白名单校验（仅允许 csv/excel）
+  - 缓存防击穿（asyncio.Lock double-check lock）
+  - 内存缓存上限 1000 条 + LRU 驱逐
+  - RFM 冗余计算消除（全量缓存 all_users，查询减半）
+  - X-Forwarded-For 取最右端 IP 防伪造
+  - JWT 加 iat 签发时间 claim
 - **v1.5** — 代码质量全面审查：修复12项问题（连接池优化、Agent缓存重建、RFM分页查询、导出OOM防护、Redis SCAN替代KEYS、Plotly颜色格式修复等）
 - **v1.4** — GSAP 动画增强 + RFM 评分算法修复 + 缓存机制优化
 - **v1.3** — DeepSeek V4 Flash + RFM 可视化大屏 + 图表美化
