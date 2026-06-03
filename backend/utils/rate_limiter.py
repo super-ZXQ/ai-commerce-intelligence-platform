@@ -59,7 +59,9 @@ def _ensure_cleanup_thread():
 def _get_client_id(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        ips = [ip.strip() for ip in forwarded.split(",")]
+        if ips:
+            return ips[-1]
     return request.client.host if request.client else "unknown"
 
 

@@ -11,6 +11,7 @@ from backend.models.schemas import (
     OrderResponse,
     OrderFilterParams,
 )
+from backend.routes.auth import get_current_user
 from backend.services import order_service
 from backend.services.order_service import SORT_COLUMN_MAP
 
@@ -28,6 +29,7 @@ async def list_orders(
     sort_by: str = Query("order_time", description="排序字段"),
     sort_order: str = Query("desc", description="排序方向 asc/desc"),
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     获取所有订单列表，支持分页和排序。
@@ -47,8 +49,8 @@ async def list_orders(
 
 @router.get("/filter", response_model=PaginatedResponse, summary="条件筛选订单")
 async def filter_orders(
-    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
+    start_date: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="开始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="结束日期 YYYY-MM-DD"),
     platform_type: Optional[str] = Query(None, description="平台类型"),
     user_name: Optional[str] = Query(None, description="用户名(模糊匹配)"),
     product_id: Optional[str] = Query(None, description="商品编号"),
@@ -60,6 +62,7 @@ async def filter_orders(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     条件筛选订单，支持多维度过滤。

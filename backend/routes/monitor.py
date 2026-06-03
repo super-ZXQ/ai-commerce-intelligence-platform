@@ -4,9 +4,10 @@ import os
 import httpx
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from backend.database import check_db_connection
+from backend.routes.auth import get_current_user
 from backend.utils.cache import check_redis_health, stats as cache_stats
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ def record_request(endpoint: str, status_code: int, duration_ms: float):
 
 
 @router.get("/metrics", summary="监控指标")
-async def get_metrics():
+async def get_metrics(user: dict = Depends(get_current_user)):
     uptime_sec = int(time.time() - _start_time)
     top_endpoints = sorted(
         _request_stats["by_endpoint"].items(),
@@ -76,7 +77,7 @@ async def get_metrics():
 
 
 @router.get("/health/detailed", summary="详细健康检查")
-async def detailed_health():
+async def detailed_health(user: dict = Depends(get_current_user)):
     checks = {}
     try:
         checks["database"] = {"status": "ok" if await check_db_connection() else "error"}
@@ -108,7 +109,7 @@ _EXTERNAL_SERVICES = {
 
 
 @router.get("/services-status", summary="外部服务状态")
-async def get_services_status():
+async def get_services_status(user: dict = Depends(get_current_user)):
     results = {}
     for name, url in _EXTERNAL_SERVICES.items():
         try:

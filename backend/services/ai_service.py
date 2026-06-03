@@ -120,6 +120,20 @@ def _build_visualization(columns: list[str], rows: list) -> Optional[dict]:
     }
 
 
+_SQL_DESTRUCTIVE_KEYWORDS = (
+    "DROP ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "TRUNCATE ",
+    "CREATE ", "GRANT ", "REVOKE ", "RENAME ",
+)
+
+
+def _is_read_only_sql(sql: str) -> bool:
+    upper = sql.upper().strip()
+    for kw in _SQL_DESTRUCTIVE_KEYWORDS:
+        if kw in upper:
+            return False
+    return True
+
+
 @lru_cache(maxsize=1)
 def _get_sync_db() -> SQLDatabase:
     db_url = (
@@ -248,6 +262,14 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
 
         if extracted_sql:
             try:
+                if not _is_read_only_sql(extracted_sql):
+                    logger.warning(f"拦截危险SQL: {extracted_sql[:100]}")
+                    return AIQueryResponse(
+                        sql=None,
+                        result=[],
+                        answer="⚠️ 仅支持数据查询操作，不允许修改数据库",
+                        visualization=None,
+                    )
                 db = _get_sync_db()
                 raw_result = await asyncio.to_thread(db.run, extracted_sql)
                 if isinstance(raw_result, str):
@@ -276,6 +298,6 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
         return AIQueryResponse(
             sql=None,
             result=[],
-            answer=f"⚠️ 查询处理失败: {str(e)}",
+            answer="⚠️ 查询处理失败，请稍后重试",
             visualization=None,
         )

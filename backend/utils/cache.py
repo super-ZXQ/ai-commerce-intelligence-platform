@@ -2,6 +2,7 @@ import json
 import logging
 import hashlib
 import time
+import asyncio
 from typing import Any, Optional, Callable, Awaitable
 from functools import wraps
 
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_TTL = 300
 
 _memory_cache: dict[str, dict] = {}
+_cache_locks: dict[str, asyncio.Lock] = {}
 
 _redis_client = None
 _redis_available = False
@@ -123,10 +125,16 @@ def cached(ttl: int = DEFAULT_TTL):
             if cached_result is not None:
                 logger.debug(f"缓存命中: {cache_key}")
                 return cached_result
-            result = await func(*args, **kwargs)
-            set(cache_key, result, ttl=ttl)
-            logger.debug(f"已缓存: {cache_key} (TTL={ttl}s)")
-            return result
+            if cache_key not in _cache_locks:
+                _cache_locks[cache_key] = asyncio.Lock()
+            async with _cache_locks[cache_key]:
+                cached_result = get(cache_key)
+                if cached_result is not None:
+                    return cached_result
+                result = await func(*args, **kwargs)
+                set(cache_key, result, ttl=ttl)
+                logger.debug(f"已缓存: {cache_key} (TTL={ttl}s)")
+                return result
         return wrapper
     return decorator
 

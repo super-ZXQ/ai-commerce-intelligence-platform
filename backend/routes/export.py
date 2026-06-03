@@ -22,7 +22,7 @@ _EXPORT_CHUNK_SIZE = 5000
 
 @router.get("/orders", summary="导出订单数据")
 async def export_orders(
-    export_format: str = Query("csv", description="导出格式: csv/excel"),
+    export_format: str = Query("csv", pattern="^(csv|excel)$", description="导出格式: csv/excel"),
     start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
     platform_type: Optional[str] = Query(None, description="平台类型"),
@@ -48,7 +48,11 @@ async def export_orders(
     count_stmt = select(func.count(Order.id)).where(*conditions)
     total = (await db.execute(count_stmt)).scalar() or 0
     if total == 0:
-        raise HTTPException(status_code=404, detail="没有符合条件的订单数据")
+        return {
+            "total": 0,
+            "items": [],
+            "message": "没有符合条件的订单数据",
+        }
 
     all_data: list[dict] = []
     offset = 0
@@ -106,7 +110,7 @@ async def export_orders(
 
 @router.get("/analytics", summary="导出分析报告")
 async def export_analytics(
-    export_format: str = Query("csv", description="导出格式: csv/excel"),
+    export_format: str = Query("csv", pattern="^(csv|excel)$", description="导出格式: csv/excel"),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):

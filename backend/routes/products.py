@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
+from backend.routes.auth import get_current_user
 from backend.models.schemas import (
     ProductSalesResponse,
     UserSpendingResponse,
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api", tags=["商品与用户"])
 async def list_products(
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     获取商品销售排名列表，按销售额降序排列。
@@ -32,6 +34,7 @@ async def list_products(
 async def list_users(
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     获取用户消费排名列表，按消费总额降序排列。

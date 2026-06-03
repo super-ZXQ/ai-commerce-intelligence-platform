@@ -4,11 +4,13 @@
 
 电商订单数据分析系统，基于 10 万+ 真实订单，提供 BI 看板、AI 分析、RFM 用户画像、RESTful API。
 
-**技术栈**：Python 3.12, FastAPI, SQLAlchemy (async), Streamlit, Plotly, LangChain, MySQL 8, Redis 7, Docker Compose
+**技术栈**：Python 3.12, FastAPI, SQLAlchemy (async), Streamlit, Plotly, LangChain, MySQL 8, Redis 7, Docker Compose, Nginx
 
 **虚拟环境**：`.venv\Scripts\`
 
 ## 启动服务
+
+### 本地开发（直连模式，三端口）
 
 ```powershell
 # 1. FastAPI 后端 (:8000)
@@ -18,6 +20,30 @@ Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -Argum
 # 3. AI 助手 (:8505)
 Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run ai-ecommerce-assistant/app.py --server.port 8505"
 ```
+
+### Docker 部署（Nginx 统一入口 :80）
+
+```powershell
+# 启动全部服务
+docker-compose up -d
+# 停止
+docker-compose down
+# 重建某服务（代码改动后）
+docker-compose up -d --build backend
+# 重载 Nginx 配置
+docker exec ea-nginx nginx -s reload
+```
+
+**Nginx 反向代理路由表：**
+
+| 路径 | 后端 | 说明 |
+|------|------|------|
+| `/` | streamlit:8501 | BI 看板（默认入口） |
+| `/nav` | backend:8000 | 统一导航页 |
+| `/ai/` | ai-assistant:8502 | AI 助手（baseUrlPath=/ai） |
+| `/api/*` | backend:8000 | RESTful API |
+| `/docs` | backend:8000 | Swagger 文档 |
+| `/health` `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
 
 主数据文件：`data/cleaned_orders.csv`
 
@@ -58,6 +84,14 @@ ENTERPRISE_COLORS_FULL = {
 - Streamlit 报错 → 看终端输出 / 检查 `columns()` 和 `reindex` 参数
 - FastAPI 端口占用 → `netstat -ano | Select-String ":8000"` 找 PID 后 `Stop-Process`
 - 数据文件 → `data/cleaned_orders.csv`
+- Docker 启动卡住 → 重启 Docker Desktop / `wsl --shutdown`
+- Docker 拉取失败 → 检查 `~/.docker/daemon.json` 镜像加速配置
+
+## 测试
+
+```powershell
+.venv\Scripts\python.exe -m pytest backend/tests/ -v
+```
 
 ## 深入文档
 

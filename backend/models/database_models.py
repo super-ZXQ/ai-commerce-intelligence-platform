@@ -18,6 +18,6 @@ class Order(Base):
     is_refunded = Column("is_refund", String(10))
     discount_amount = Column("discount_amount", Numeric(10, 2))
     payment_duration_sec = Column("payment_duration_sec", Integer)
-    order_date = Column("order_date", Date)
+    order_date = Column("order_date", Date, index=True)
     order_hour = Column("order_hour", Integer)
     weekday = Column("weekday", String(20))

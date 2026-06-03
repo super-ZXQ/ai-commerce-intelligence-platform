@@ -46,7 +46,7 @@ async def get_sales_overview(db: AsyncSession) -> SalesOverviewResponse:
         avg_order_value=avg_order_value,
         total_users=row.total_users,
         refund_rate=refund_rate,
-        total_refund_amount=round(row.total_refund_amount, 2),
+        total_refund_amount=round(row.total_refund_amount or 0, 2),
     )
 
 
