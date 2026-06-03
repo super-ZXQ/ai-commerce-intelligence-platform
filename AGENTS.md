@@ -42,7 +42,8 @@ docker exec ea-nginx nginx -s reload
 | `/BI` | streamlit:8501 | BI 看板 |
 | `/ai/` | ai-assistant:8502 | AI 助手（baseUrlPath=/ai） |
 | `/api/*` | backend:8000 | RESTful API |
-| `/docs` | backend:8000 | Swagger 文档 |
+| `/nav` | backend:8000 | 导航页（备用路由） |
+| `/docs` `/redoc` `/openapi.json` | backend:8000 | Swagger / ReDoc 文档 |
 | `/health` `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
 
 主数据文件：`data/cleaned_orders.csv`
@@ -81,6 +82,7 @@ ENTERPRISE_COLORS_FULL = {
 - **LLM SQL 必须只读** — `ai_service._is_read_only_sql()` 拦截 DROP/DELETE/UPDATE/INSERT/ALTER/TRUNCATE/CREATE
 - **`@cached` 防击穿** — 基于 `asyncio.Lock` 的 double-check lock，过期时异步重建
 - **内存缓存上限 1000 条** — 满时先清理过期条目再驱逐最旧条目；`cleanup_memory_cache()` 同步清理 `_cache_locks`
+- **公开监控端点** — `/api/monitor/services-status`、`/health/detailed`、`/metrics` 无需 JWT（导航页/监控面板/健康面板调用）
 
 ## 排查路径
 
