@@ -41,7 +41,7 @@ def record_request(endpoint: str, status_code: int, duration_ms: float):
 
 
 @router.get("/metrics", summary="监控指标")
-async def get_metrics(user: dict = Depends(get_current_user)):
+async def get_metrics():
     uptime_sec = int(time.time() - _start_time)
     top_endpoints = sorted(
         _request_stats["by_endpoint"].items(),
@@ -77,7 +77,7 @@ async def get_metrics(user: dict = Depends(get_current_user)):
 
 
 @router.get("/health/detailed", summary="详细健康检查")
-async def detailed_health(user: dict = Depends(get_current_user)):
+async def detailed_health():
     checks = {}
     try:
         checks["database"] = {"status": "ok" if await check_db_connection() else "error"}
