@@ -166,6 +166,7 @@ async def compute_rfm(
             "monetary": avg_monetary,
         },
         "segments": segments,
+        "all_users": users,
         "top_users": sorted_users[:20],
     }
 
@@ -179,32 +180,13 @@ async def get_rfm_segment_detail(
     reference_date: Optional[str] = None,
     n_bins: int = 5,
 ) -> dict:
-    # 优先复用 compute_rfm 的缓存结果
     rfm_data = await compute_rfm(db, reference_date=reference_date, n_bins=n_bins)
     if "error" in rfm_data:
         return rfm_data
 
-    all_users = rfm_data.get("top_users", [])
-    # top_users 仅包含前20名，需要全量数据时重新计算
-    # 通过 segment 过滤需要完整用户列表，因此从 compute_rfm 获取
-    # 但 compute_rfm 缓存中只有 top_users，需要独立计算完整列表
-    if not all_users:
+    users = rfm_data.get("all_users", [])
+    if not users:
         return {"error": "无有效付款订单数据", "total_users": 0}
-
-    # 如果缓存的 top_users 不够完整（仅20条），重新获取全量
-    if rfm_data["total_users"] > 20:
-        # 从数据库重新获取完整用户列表并评分
-        if reference_date:
-            ref_date = datetime.strptime(reference_date, "%Y-%m-%d").date()
-        else:
-            max_date_stmt = select(func.max(Order.order_date))
-            result = await db.execute(max_date_stmt)
-            ref_date = result.scalar()
-
-        users = await _fetch_rfm_raw(db, ref_date)
-        users = _score_users(users, n_bins)
-    else:
-        users = all_users
 
     filtered = [u for u in users if u["segment"] == segment]
 

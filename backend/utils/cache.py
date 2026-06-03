@@ -9,6 +9,7 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 DEFAULT_TTL = 300
+_MEMORY_CACHE_MAX_SIZE = 1000
 
 _memory_cache: dict[str, dict] = {}
 _cache_locks: dict[str, asyncio.Lock] = {}
@@ -79,6 +80,14 @@ def set(key: str, value: Any, ttl: int = DEFAULT_TTL) -> None:
             return
         except Exception as e:
             logger.warning(f"Redis SET 失败，降级内存: {e}")
+    if len(_memory_cache) >= _MEMORY_CACHE_MAX_SIZE:
+        now = time.time()
+        expired = [k for k, v in _memory_cache.items() if v["expires_at"] < now]
+        for k in expired:
+            del _memory_cache[k]
+        if len(_memory_cache) >= _MEMORY_CACHE_MAX_SIZE:
+            oldest_key = next(iter(_memory_cache))
+            del _memory_cache[oldest_key]
     _memory_cache[key] = {"data": value, "expires_at": time.time() + ttl}
 
 
@@ -164,4 +173,5 @@ def cleanup_memory_cache() -> int:
     expired = [k for k, v in _memory_cache.items() if v["expires_at"] < now]
     for k in expired:
         del _memory_cache[k]
+        _cache_locks.pop(k, None)
     return len(expired)
