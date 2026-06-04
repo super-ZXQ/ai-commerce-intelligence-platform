@@ -1,8 +1,8 @@
-# 电商数据分析系统 — Agent 规则手册
+# AI Commerce Intelligence Platform — Agent 规则手册
 
 ## 项目概览
 
-电商订单数据分析系统，基于 10 万+ 真实订单，提供 BI 看板、AI 分析、RFM 用户画像、RESTful API。
+AI 商业智能分析平台，基于 10 万+ 真实电商订单，提供 BI 看板、AI 分析、RFM 用户画像、RESTful API。
 
 **技术栈**：Python 3.12, FastAPI, SQLAlchemy (async), Streamlit, Plotly, LangChain, MySQL 8, Redis 7, Docker Compose, Nginx
 

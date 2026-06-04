@@ -42,7 +42,7 @@ async def _cache_cleanup_task():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 电商数据分析API v%s 启动中...", settings.app_version)
+    logger.info("🚀 AI Commerce Intelligence Platform v%s 启动中...", settings.app_version)
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -73,7 +73,7 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="""
-## 电商数据分析系统 API v1.2
+## AI Commerce Intelligence Platform API v1.7.0
 
 基于10万+电商订单数据，提供数据查询、分析、AI智能查询和数据导出功能。
 

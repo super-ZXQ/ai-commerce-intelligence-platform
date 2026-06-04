@@ -10,15 +10,15 @@ logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
-    app_name: str = "电商数据分析API"
-    app_version: str = "1.2.0"
+    app_name: str = "AI Commerce Intelligence Platform"
+    app_version: str = "1.7.0"
     debug: bool = False
 
     db_host: str = "localhost"
     db_port: int = 3306
     db_user: str = "root"
     db_password: str = ""
-    db_name: str = "ecommerce_analysis"
+    db_name: str = "ai_commerce_intelligence_platform"
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_pool_recycle: int = 3600

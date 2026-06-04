@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123456}
-      MYSQL_DATABASE: ${DB_NAME:-ecommerce_analysis}
+      MYSQL_DATABASE: ${DB_NAME:-ai_commerce_intelligence_platform}
       MYSQL_CHARSET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
     expose:
@@ -54,7 +54,7 @@ services:
       DB_PORT: 3306
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-123456}
-      DB_NAME: ${DB_NAME:-ecommerce_analysis}
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -112,7 +112,7 @@ services:
       DB_PORT: 3306
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-123456}
-      DB_NAME: ${DB_NAME:-ecommerce_analysis}
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
     command:
       - streamlit
       - run

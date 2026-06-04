@@ -3,7 +3,9 @@ import re
 import json
 import ast
 import time
+import datetime
 import hashlib
+import decimal
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,6 +14,8 @@ from dotenv import load_dotenv
 from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_openai import ChatOpenAI
 from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 
 load_dotenv()
 
@@ -23,7 +27,7 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "3306")
-DB_NAME = os.getenv("DB_NAME", "ecommerce_analysis")
+DB_NAME = os.getenv("DB_NAME", "ai_commerce_intelligence_platform")
 
 USE_MYSQL = bool(DB_USER and DB_PASSWORD)
 
@@ -76,7 +80,7 @@ def get_cache_key(question: str) -> str:
     return hashlib.md5(question.encode()).hexdigest()
 
 
-st.set_page_config(page_title="AI 电商分析助手", page_icon="🤖", layout="wide",
+st.set_page_config(page_title="AI Commerce Intelligence Platform", page_icon="🤖", layout="wide",
                    initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -119,7 +123,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 AI 电商数据分析助手")
+st.title("🤖 AI 智能商业分析平台")
 st.caption("基于 LangChain + DeepSeek V4 Flash 的 Text-to-SQL 智能查询 | 自然语言提问 → 自动生成 SQL → 数据可视化")
 
 if "messages" not in st.session_state:
@@ -159,6 +163,18 @@ def init_db():
 
 
 @st.cache_resource
+def init_engine() -> Engine | None:
+    """独立于 langchain 的 SQLAlchemy Engine，直接执行 SQL。
+    避免 db.run(sql, fetch="cursor") 在部分方言（如 KingbaseES）上抛
+    NotImplementedError 后 fallback 到 ast.literal_eval 的 'malformed node or string' 错误。"""
+    try:
+        return create_engine(get_db_uri(), pool_pre_ping=True)
+    except Exception as e:
+        st.warning(f"⚠️ SQLAlchemy engine 初始化失败：{e}")
+        return None
+
+
+@st.cache_resource
 def init_agent(_db):
     llm = ChatOpenAI(
         api_key=API_KEY,
@@ -168,7 +184,7 @@ def init_agent(_db):
     )
     toolkit = SQLDatabaseToolkit(db=_db, llm=llm)
 
-    prefix = f"""你是一个专业的电商数据分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
+    prefix = f"""你是一个专业的 AI 智能商业分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
 
 {BUSINESS_CONTEXT}
 
@@ -272,18 +288,20 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
 
     elif chart_type in ["bar_h", "bar"]:
         df_plot = df.copy()
-        
+
         try:
             df_plot[y_col] = pd.to_numeric(df_plot[y_col], errors='coerce')
         except Exception:
             pass
-        
-        if len(df_plot) > 5:
-            df_plot = df_plot.nlargest(5, columns=y_col).reset_index(drop=True)
-        
+
+        if len(df_plot) > 8:
+            df_plot = df_plot.nlargest(8, columns=y_col).reset_index(drop=True)
+
         n_items = len(df_plot)
-        bar_colors = ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEF2F2']
-        
+        # 企业级配色：渐变红色系（高→低）
+        bar_colors = ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEF2F2',
+                      '#FEE2E2', '#FEF5F7', '#FFF1F2']
+
         def format_y_label(val):
             val_str = str(val).strip()
             if val_str.isdigit():
@@ -293,7 +311,10 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                 elif hour_val >= 1 and hour_val <= 31:
                     return f"{hour_val}日"
             return val_str
-        
+
+        # 计算合适的图表高度：每项至少 85px + 标题区 + 边距，让条形更显著
+        dynamic_height = max(550, 140 + n_items * 85)
+
         if chart_type == "bar_h":
             fig = go.Figure()
             for i in range(n_items):
@@ -306,7 +327,7 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                 except (ValueError, TypeError):
                     y_num = 0
                     y_text = str(y_val)
-                
+
                 fig.add_trace(go.Bar(
                     x=[y_num],
                     y=[x_label],
@@ -314,17 +335,17 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                     name=x_label,
                     marker=dict(
                         color=bar_colors[i % len(bar_colors)],
-                        line=dict(width=0.5, color='rgba(255,255,255,0.3)'),
+                        line=dict(width=0, color='rgba(255,255,255,0)'),
+                        cornerradius=4,
                     ),
                     text=y_text,
                     textposition='outside',
-                    textfont=dict(size=12, color='#E4E4E7', family='monospace'),
+                    textfont=dict(size=14, color='#E4E4E7', family='monospace'),
                     hovertemplate=f'<b>{x_label}</b><br>%{{x:,.0f}}<extra></extra>',
                 ))
-            
-            dynamic_height = 300 + max(n_items * 35, 100)
+
             fig.update_layout(height=dynamic_height, barmode='group')
-            
+
         else:
             df_sorted = df_plot.sort_values(by=y_col, ascending=True).reset_index(drop=True)
             fig = go.Figure()
@@ -338,7 +359,7 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                 except (ValueError, TypeError):
                     y_num = 0
                     y_text = str(y_val)
-                
+
                 fig.add_trace(go.Bar(
                     x=[y_num],
                     y=[x_label],
@@ -346,24 +367,26 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                     name=x_label,
                     marker=dict(
                         color=bar_colors[(n_items - 1 - i) % len(bar_colors)],
-                        line=dict(width=0.5, color='rgba(255,255,255,0.3)'),
+                        line=dict(width=0, color='rgba(255,255,255,0)'),
+                        cornerradius=4,
                     ),
                     text=y_text,
                     textposition='outside',
-                    textfont=dict(size=12, color='#E4E4E7', family='monospace'),
+                    textfont=dict(size=14, color='#E4E4E7', family='monospace'),
                     hovertemplate=f'<b>{x_label}</b><br>%{{x:,.0f}}<extra></extra>',
                 ))
-            
-            dynamic_height = 300 + max(n_items * 35, 100)
+
             fig.update_layout(height=dynamic_height, barmode='group')
 
     else:
         fig = go.Figure()
 
     fig.update_layout(
-        margin=dict(l=80 if chart_type in ["bar_h", "bar"] else 30, 
+        title=dict(text=title, x=0.02, xanchor='left', y=0.97, yanchor='top',
+                   font=dict(size=18, color='#818CF8')),
+        margin=dict(l=80 if chart_type in ["bar_h", "bar"] else 30,
                     r=100 if chart_type in ["bar_h", "bar"] else 30,
-                    t=50, b=50),
+                    t=70, b=50),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(15,17,23,0.8)',
         font=dict(color='#E4E4E7', size=13),
@@ -407,7 +430,9 @@ def extract_sql_from_intermediate(response: dict) -> str | None:
                     return clean_sql(tool_input)
             
             if isinstance(observation, str):
-                sql_match = re.search(r'SELECT\s+[\s\S]+?(?:;|$)', observation, re.IGNORECASE)
+                # 观测文本可能含 HTML 高亮标签，先剥再抽
+                clean_obs = re.sub(r'<[^>]+>', '', observation)
+                sql_match = re.search(r'SELECT\s+[\s\S]+?(?:;|$)', clean_obs, re.IGNORECASE)
                 if sql_match:
                     return clean_sql(sql_match.group(0))
     
@@ -429,7 +454,22 @@ def extract_sql_from_intermediate(response: dict) -> str | None:
 def extract_sql_from_answer(answer: str) -> str | None:
     if not answer or not isinstance(answer, str):
         return None
-    
+
+    # 保护 markdown 代码块：避免后续 HTML 标签清理破坏 ``` 标记
+    codeblocks: dict[str, str] = {}
+    def _stash(m):
+        key = f"\x00SQLCB{len(codeblocks)}ENDSQLCB\x00"
+        codeblocks[key] = m.group(0)
+        return key
+    stripped = re.sub(r'```[\s\S]*?```', _stash, answer)
+
+    # 剥离非代码块中的 HTML 高亮标签（LLM 可能把上一轮带高亮的 SQL 又回显了）
+    stripped = re.sub(r'<[^>]+>', '', stripped)
+
+    # 还原代码块
+    for k, v in codeblocks.items():
+        stripped = stripped.replace(k, v)
+
     patterns = [
         r'```sql\s*(.*?)```',
         r'```(SELECT[\s\S]*?)```',
@@ -437,7 +477,7 @@ def extract_sql_from_answer(answer: str) -> str | None:
         r'SELECT\s+[\w\s,\(\)\*]+\s+FROM\s+\w+[\s\S]*?(?:;|```|$)',
     ]
     for pattern in patterns:
-        match = re.search(pattern, answer, re.IGNORECASE | re.DOTALL)
+        match = re.search(pattern, stripped, re.IGNORECASE | re.DOTALL)
         if match:
             return clean_sql(match.group(1))
     return None
@@ -446,62 +486,235 @@ def extract_sql_from_answer(answer: str) -> str | None:
 def parse_data_from_answer(answer: str) -> pd.DataFrame | None:
     if not answer or not isinstance(answer, str):
         return None
-    
+
     rows = []
-    
+
+    # 模式1：商品编号/平台 + 数值（最精确，优先匹配）
+    # 匹配 "商品编号: PR000385 销售额: 481182" 或 "APP: 201单" 等
     patterns = [
-        r'(?:商品编号|PR\d+|platform_type|APP|微信公众号|order_date|order_hour)[^\d]*([\w]+)\s*[：:]\s*([￥¥$]?\s*[\d,]+\.?\d*)\s*(?:元|单|%|)?',
-        r'[-•]\s*(.+?)[：:]\s*([￥¥$]?\s*[\d,]+\.?\d*)',
+        # 商品编号 PRxxxxx + 金额
+        r'(?:^|\n|[-•|])\s*(PR\d{4,})[^\d]*(\d[\d,]*\.?\d*)',
+        # 商品编号: xxx 格式
+        r'(?:商品编号|产品编号|product_id)[^\w]*(PR\d+)[^\d]*(\d[\d,]*\.?\d*)',
+        # 平台类型 + 数值
+        r'(APP|微信公众号|网站|web|小程序|公众号)[^\d]{0,10}(\d[\d,]*\.?\d*)',
+        # 中文键名: 值
+        r'[-•|]\s*([^\d:：\n]{2,20}?)[：:]\s*([￥¥$]?\s*[\d,]+\.?\d*)',
+        # 纯 key: value
         r'(\w+)\s*[：:]\s*([￥¥$]?\s*[\d,]+\.?\d*)\s*(?:元|单|%|)?',
-        r'(APP|微信公众号)[^0-9]*(\d[\d,]*)\s*(?:单)?',
-        r'(PR\d{6})[^\d]*(\d[\d,]*\.?\d*)',
     ]
-    
+
     for pattern in patterns:
-        matches = re.findall(pattern, answer, re.IGNORECASE)
+        matches = re.findall(pattern, answer, re.IGNORECASE | re.MULTILINE)
         if matches and len(matches) >= 2:
             for match in matches:
                 key = match[0].strip()
                 value_str = re.sub(r'[^\d.]', '', match[1])
                 try:
                     value = float(value_str) if value_str else None
-                    if value is not None and value > 0:
+                    if value is not None and value > 0 and not _is_garbled_key(key):
                         rows.append({'name': key, 'value': value})
                 except (ValueError, TypeError):
                     continue
             if len(rows) >= 2:
-                return pd.DataFrame(rows)
-    
-    if len(rows) == 1:
-        return None
-    
+                rows = _filter_outlier_rows(rows)
+                if len(rows) >= 2:
+                    return pd.DataFrame(rows)
+
+    # 模式2：从上下文中提取（带关键词的数值）
     number_pattern = r'([\d,]+\.?\d*)\s*(?:元|单|%|)'
     all_numbers = re.findall(number_pattern, answer)
-    
+
     if len(all_numbers) >= 3:
         keywords = ['PR', 'APP', '微信', '商品', '平台']
         for kw in keywords:
             if kw in answer:
-                context_matches = re.findall(rf'({kw}[^0-9\n]*?)[:：]?\s*({number_pattern})', answer, re.IGNORECASE)
+                context_matches = re.findall(rf'({kw}[^0-9\n]*?)(?:[:：]?\s*)?({number_pattern})', answer, re.IGNORECASE)
                 if context_matches and len(context_matches) >= 2:
                     for cm in context_matches:
                         try:
                             val = float(re.sub(r'[^\d.]', '', cm[1]))
-                            rows.append({'name': cm[0].strip()[:30], 'value': val})
+                            label = cm[0].strip()
+                            # 清理标签：去掉无意义的修饰词
+                            label = re.sub(r'^(及|对应|的|为|是|有|共)\s*', '', label)
+                            label = label[:30] if len(label) > 30 else label
+                            if label and val > 0:
+                                rows.append({'name': label, 'value': val})
                         except (ValueError, TypeError):
                             continue
                     if len(rows) >= 2:
-                        return pd.DataFrame(rows)
-    
+                        rows = _filter_outlier_rows(rows)
+                        if len(rows) >= 2:
+                            return pd.DataFrame(rows)
+
     return None if not rows else pd.DataFrame(rows)
+
+
+def _filter_outlier_rows(rows: list[dict]) -> list[dict]:
+    """过滤远小于其他数值的离群小值（例如从"3个"中误抓到的"1"），避免
+    图表上出现毫无意义的单像素柱和误导性的"1"标签。"""
+    if len(rows) < 2:
+        return rows
+    values = [r['value'] for r in rows]
+    max_val = max(values)
+    if max_val <= 0:
+        return rows
+    threshold = max_val * 0.05
+    return [r for r in rows if r['value'] >= threshold]
+
+
+def _is_garbled_key(key: str) -> bool:
+    """判断解析到的 key 是否是乱码（Java 对象引用、Python repr、driver 内部类型等），
+    避免这些内容被当成图表标签或表格列名展示给用户。"""
+    if not key:
+        return True
+    if re.search(r'[a-zA-Z_][\w.]*@[0-9a-f]{6,8}', key):
+        return True
+    if re.search(r'\b(?:com|org|net|io|java)\.[a-zA-Z][\w.]*', key):
+        return True
+    if re.search(r"<class\s+['\"]", key):
+        return True
+    if re.search(r"^[\[\{]|[\]\}]$", key):
+        return True
+    # 纯 driver 内部类型名/对象引用（区分于合法列名 orders/users/sales）
+    if re.search(r'\b(?:KBObjectField|JDBC|ResultSet)\b', key):
+        return True
+    if re.search(r'^\d+\s*rows?(?:\s|$)', key, re.IGNORECASE):
+        return True
+    return False
 
 
 def clean_sql(sql: str) -> str:
     if not sql:
         return ""
+    # 先剥离 HTML 高亮标签（防止 render_answer_with_highlights 污染 SQL）
+    sql = re.sub(r'<[^>]+>', '', sql)
     sql = re.sub(r'```(?:sql)?\s*', '', sql)
     sql = re.sub(r'```\s*$', '', sql)
     return sql.strip()
+
+
+def strip_markdown_tables(text: str) -> str:
+    """剥离 markdown 表格（含表头分隔线 |---|），避免 LLM 生成的预填充表格
+    （如带"待查询结果填充"占位符的表格）与系统真实数据表格重复显示。"""
+    if not text:
+        return text
+    # 匹配以 | 开头的连续多行表格（含对齐分隔行 |---|、|:---:| 等）
+    text = re.sub(
+        r'(?:^|\n)[ \t]*\|[^\n]*\|(?:[ \t]*\n[ \t]*\|[-:\s|]+\|)?'
+        r'(?:[ \t]*\n[ \t]*\|[^\n]*\|)*',
+        '\n',
+        text,
+    )
+    # 清理可能残留的多余空行
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+# 不可读的"乱码"内容特征：Java 对象引用、Python repr 调试输出、driver 内部类型名
+GARBLED_PATTERNS = [
+    # Java toString 输出：com.kingbase8.util.KBObjectField@7c0a2f2b
+    r'[a-zA-Z_][\w.]*@[0-9a-f]{6,8}',
+    # Java/Kotlin 类的全限定名（含包路径）
+    r'(?:^|\s)(?:com|org|net|io|java)\.[a-zA-Z][\w.]*(?:\s|$|[,;:|])',
+    # Python repr：<class 'list'>、<sqlalchemy...>
+    r"<class\s+['\"][\w.]+['\"]>",
+    r"<sqlalchemy\.[\w.]+(\.[\w]+)?\s+object",
+    # Python 列表/字典 repr：['orders']、{'key': 'value'}
+    r"\[\s*'[^']*'\s*\]",
+    r"\{\s*'[^']*'\s*:\s*'[^']*'\s*\}",
+    # 内部 driver 错误/类型提示
+    r"\d+\s*rows?\s*(?:affected|returned)?",
+    r"KBObjectField|JDBC|ResultSet",
+    # 行内"占位符"型描述
+    r"待查询结果填充|查询结果填充|待补充|待填充",
+]
+
+
+def strip_garbled_content(text: str) -> str:
+    """剥离 LLM 回答中误带的数据库对象引用、Python repr 调试输出等不可读内容。
+    这些通常是 LLM 直接复制 SQL 工具 observation（如 KingbaseES JDBC 返回的
+    Java 对象 toString、SQLAlchemy 内部 repr）导致的，需要在渲染前清除。"""
+    if not text:
+        return text
+
+    # 1. 按行扫描：包含乱码特征词的整行直接删除
+    cleaned_lines = []
+    for line in text.splitlines():
+        if any(re.search(pat, line) for pat in GARBLED_PATTERNS):
+            continue
+        cleaned_lines.append(line)
+    text = '\n'.join(cleaned_lines)
+
+    # 2. 清理行内的乱码片段（保留行，去掉乱码）
+    for pat in GARBLED_PATTERNS:
+        text = re.sub(pat, '', text)
+
+    # 3. 清理可能残留的多余空行
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def clean_sqlalchemy_result(result: str) -> str:
+    """将 SQLAlchemy 返回的字符串结果中的特殊类型（Decimal、datetime、UUID 等）
+    转换为 ast.literal_eval 可解析的字面量。
+
+    SQLAlchemy 通过 str()/repr() 序列化结果时，会保留类型名：
+        Decimal('123.45')          -> '123.45'
+        datetime.date(2025,12,31)  -> '2025-12-31'
+        datetime.datetime(...)     -> '2025-12-31 10:30:00'
+        datetime.time(...)         -> '10:30:00'
+        UUID('...')                -> '...'
+    """
+    if not result:
+        return result
+
+    # Decimal('123.45') 或 Decimal("123.45") -> 字符串字面量
+    result = re.sub(r"Decimal\(\s*'(.*?)'\s*\)", r"'\1'", result)
+    result = re.sub(r'Decimal\(\s*"(.*?)"\s*\)', r'"\1"', result)
+    # Decimal(123.45) 纯数字 -> 数字字面量
+    result = re.sub(r"Decimal\(\s*([+-]?[\d.eE]+)\s*\)", r"\1", result)
+
+    # datetime.date(YYYY, M, D) -> 'YYYY-MM-DD'
+    def _fmt_date(m):
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        return f"'{y:04d}-{mo:02d}-{d:02d}'"
+
+    result = re.sub(
+        r"datetime\.date\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)",
+        _fmt_date, result
+    )
+
+    # datetime.datetime(YYYY, M, D, h, m, s) -> 'YYYY-MM-DD HH:MM:SS'
+    def _fmt_datetime(m):
+        nums = [int(g) if g else 0 for g in m.groups()]
+        while len(nums) < 6:
+            nums.append(0)
+        return f"'{nums[0]:04d}-{nums[1]:02d}-{nums[2]:02d} {nums[3]:02d}:{nums[4]:02d}:{nums[5]:02d}'"
+
+    result = re.sub(
+        r"datetime\.datetime\(\s*(\d+)?\s*(?:,\s*(\d+))?\s*(?:,\s*(\d+))?"
+        r"(?:\s*,\s*(\d+))?(?:\s*,\s*(\d+))?(?:\s*,\s*(\d+))?\s*\)",
+        _fmt_datetime, result
+    )
+
+    # datetime.time(h, m, s) -> 'HH:MM:SS'
+    def _fmt_time(m):
+        nums = [int(g) if g else 0 for g in m.groups() if g is not None]
+        while len(nums) < 3:
+            nums.append(0)
+        return f"'{nums[0]:02d}:{nums[1]:02d}:{nums[2]:02d}'"
+
+    result = re.sub(
+        r"datetime\.time\(\s*(\d+)?\s*(?:,\s*(\d+))?\s*(?:,\s*(\d+))?\s*\)",
+        _fmt_time, result
+    )
+
+    # UUID('...') / UUID("...") -> '...'
+    result = re.sub(r"UUID\(\s*'([^']*)'\s*\)", r"'\1'", result)
+    result = re.sub(r'UUID\(\s*"([^"]*)"\s*\)', r'"\1"', result)
+
+    return result
 
 
 def extract_column_names(sql: str) -> list[str]:
@@ -527,62 +740,127 @@ def extract_column_names(sql: str) -> list[str]:
     return columns if columns else None
 
 
+def _convert_value(val):
+    """将 SQLAlchemy 返回的原始值转换为 DataFrame 友好的 Python 原生类型。
+    处理 datetime/Decimal/bytes/UUID 等特殊类型，避免后续处理时类型不一致。"""
+    if val is None:
+        return None
+    if isinstance(val, datetime.datetime):
+        return val.strftime('%Y-%m-%d %H:%M:%S')
+    if isinstance(val, datetime.date):
+        return val.strftime('%Y-%m-%d')
+    if isinstance(val, datetime.time):
+        return val.strftime('%H:%M:%S')
+    if isinstance(val, datetime.timedelta):
+        return val.total_seconds()
+    if isinstance(val, decimal.Decimal):
+        return float(val)
+    if isinstance(val, bytes):
+        try:
+            return val.decode('utf-8')
+        except UnicodeDecodeError:
+            return val.hex()
+    if isinstance(val, (set, frozenset)):
+        return list(val)
+    return val
+
+
 def run_sql_query(sql: str) -> pd.DataFrame | None:
     try:
+        sql = clean_sql(sql)
+
+        # 路径 0（首选）：直接用 SQLAlchemy Engine 执行，绕开 langchain wrapper。
+        # 不依赖 db.run(fetch="cursor") 的方言实现，对 KingbaseES/MySQL/SQLite 都能
+        # 拿到原生 SQLAlchemy Result 对象，类型转换更稳定。
+        engine = init_engine()
+        if engine is not None:
+            try:
+                with engine.connect() as conn:
+                    raw_result = conn.execute(text(sql))
+                    cols = list(raw_result.keys())
+                    raw_rows = raw_result.fetchall()
+                if not raw_rows:
+                    return pd.DataFrame(columns=cols)
+                converted = [
+                    tuple(_convert_value(v) for v in row) for row in raw_rows
+                ]
+                return pd.DataFrame(converted, columns=cols)
+            except Exception as e:
+                st.warning(f"⚠️ 引擎直连执行失败，回退到 langchain：{e}")
+
+        # 路径 1：langchain SQLDatabase.run(fetch="cursor")
         db = init_db()
         if db is None:
             return None
-        sql = clean_sql(sql)
-        
-        result = db.run(sql)
-        
+
+        result = None
+        try:
+            result = db.run(sql, fetch="cursor")
+        except (TypeError, ValueError, NotImplementedError):
+            result = db.run(sql)
+
+        if hasattr(result, "keys") and hasattr(result, "fetchall"):
+            try:
+                cols = list(result.keys())
+                raw_rows = result.fetchall()
+            except Exception as e:
+                st.warning(f"读取数据库结果失败：{e}")
+                return None
+
+            if not raw_rows:
+                return pd.DataFrame(columns=cols)
+
+            converted = [
+                tuple(_convert_value(v) for v in row) for row in raw_rows
+            ]
+            return pd.DataFrame(converted, columns=cols)
+
+        # 路径 2：字符串结果（fallback，旧版 langchain）
         if isinstance(result, str):
             try:
                 rows = json.loads(result)
-                df = pd.DataFrame(rows)
-                return df
+                return pd.DataFrame(rows)
             except json.JSONDecodeError:
                 try:
-                    result_cleaned = re.sub(r"Decimal\(([^)]+)\)", r"\1", result)
+                    result_cleaned = clean_sqlalchemy_result(result)
                     data = ast.literal_eval(result_cleaned)
                     if isinstance(data, list) and len(data) > 0 and isinstance(data[0], tuple):
                         cols = extract_column_names(sql)
                         if cols and len(cols) == len(data[0]):
-                            df = pd.DataFrame(data, columns=cols)
-                        else:
-                            df = pd.DataFrame(data)
-                        return df
-                    elif isinstance(data, list):
+                            return pd.DataFrame(data, columns=cols)
+                        return pd.DataFrame(data)
+                    if isinstance(data, list):
                         return pd.DataFrame(data)
                     return None
                 except Exception as e:
                     st.warning(f"解析数据库结果失败：{e}")
                     return None
-        
+
+        # 路径 3：已经是 list[dict] / list[tuple] / (cols, data) / 标量
         if isinstance(result, list):
             if len(result) == 0:
                 return pd.DataFrame()
             if isinstance(result[0], dict):
                 return pd.DataFrame(result)
-            elif isinstance(result[0], tuple):
+            if isinstance(result[0], tuple):
                 cols = extract_column_names(sql)
                 if cols and len(cols) == len(result[0]):
                     return pd.DataFrame(result, columns=cols)
                 return pd.DataFrame(result)
             return pd.DataFrame(result)
-        
+
         if isinstance(result, tuple) and len(result) == 2:
             cols, data = result
             return pd.DataFrame(data, columns=cols)
-        
+
         if isinstance(result, (int, float, str)):
             cols = extract_column_names(sql)
             if not cols:
                 cols = ['value']
             return pd.DataFrame([{cols[0]: result}])
-        
+
         return None
-        
+
     except Exception as e:
         return None
 
@@ -627,8 +905,42 @@ def render_sql_block(sql: str, query_time: float | None = None):
 
 
 def render_answer_with_highlights(answer: str):
+    # 1. 剥离 LLM 回答中的乱码内容（Java 对象引用、Python repr 调试输出等）
+    answer = strip_garbled_content(answer)
+
+    # 2. 剥离 LLM 生成的预填充 markdown 表格（避免与系统真实数据表格重复显示）
+    answer = strip_markdown_tables(answer)
+
+    # 3. 保护 markdown 代码块（```...```），避免数字高亮污染 SQL/代码
+    # 注意：占位符不能包含数字或百分号，否则会被下面的高亮正则误匹配
+    placeholders: dict[str, str] = {}
+    _idx = 0
+
+    def _protect(match):
+        nonlocal _idx
+        # 26 进制字母编码 (A, B, ..., Z, AA, AB, ...) 避免数字
+        n, chars = _idx, []
+        _idx += 1
+        while True:
+            chars.append(chr(ord('A') + n % 26))
+            n = n // 26 - 1
+            if n < 0:
+                break
+        idx_str = ''.join(reversed(chars))
+        key = f"\x00CODEBLOCKSLOT{idx_str}ENDSLOT\x00"
+        placeholders[key] = match.group(0)
+        return key
+
+    answer = re.sub(r'```[\s\S]*?```', _protect, answer)
+
+    # 4. 对非代码部分应用高亮
     answer = re.sub(r'(\d+\.?\d*%?)', r'<span class="highlight-num">\1</span>', answer)
     answer = re.sub(r'【⚠️ 异常预警】(.*?)(?=\n|$)', r'<div class="warning-box">⚠️ 异常预警\1</div>', answer)
+
+    # 5. 还原代码块
+    for key, original in placeholders.items():
+        answer = answer.replace(key, original)
+
     st.markdown(answer, unsafe_allow_html=True)
 
 
@@ -716,7 +1028,7 @@ with st.sidebar:
 
     st.divider()
     db_type = "MySQL" if USE_MYSQL else "SQLite"
-    db_label = "MySQL (ecommerce_analysis)" if USE_MYSQL else "SQLite (本地)"
+    db_label = "MySQL (ai_commerce_intelligence_platform)" if USE_MYSQL else "SQLite (本地)"
     st.caption(f"🗄️ 数据库：{db_label}")
     st.caption(f"🧠 模型：{MODEL_NAME}")
 

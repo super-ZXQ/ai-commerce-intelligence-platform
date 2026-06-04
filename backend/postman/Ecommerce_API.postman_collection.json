@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "ecommerce-api-v1",
-    "name": "电商数据分析 API v1.1",
+    "name": "AI Commerce Intelligence Platform API v1.7.0",
     "description": "基于10万+电商订单数据的 RESTful API，支持查询/分析/AI/导出，含 JWT 认证和限流",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

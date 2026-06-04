@@ -1,9 +1,9 @@
 -- ============================================
--- 电商数据分析系统 - 数据库索引优化
--- 执行前请确保已连接到 ecommerce_analysis 数据库
+-- AI Commerce Intelligence Platform - 数据库索引优化
+-- 执行前请确保已连接到 ai_commerce_intelligence_platform 数据库
 -- ============================================
 
-USE ecommerce_analysis;
+USE ai_commerce_intelligence_platform;
 
 -- 1. 查看当前索引
 SHOW INDEX FROM orders;
@@ -52,4 +52,4 @@ SELECT
     ROUND(data_length/1024/1024, 2) AS data_mb,
     ROUND(index_length/1024/1024, 2) AS index_mb
 FROM information_schema.tables 
-WHERE table_schema = 'ecommerce_analysis' AND table_name = 'orders';
+WHERE table_schema = 'ai_commerce_intelligence_platform' AND table_name = 'orders';

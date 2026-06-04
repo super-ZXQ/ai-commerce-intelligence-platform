@@ -172,7 +172,7 @@ def _get_agent():
     )
     toolkit = SQLDatabaseToolkit(db=db, llm=llm)
 
-    prefix = f"""你是一个专业的电商数据分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
+    prefix = f"""你是一个专业的 AI 智能商业分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
 
 {BUSINESS_CONTEXT}
 
