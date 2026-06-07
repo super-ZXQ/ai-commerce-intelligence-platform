@@ -12,6 +12,7 @@ from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseTool
 
 from backend.config import get_settings
 from backend.models.schemas import AIQueryResponse
+from backend.utils.text_cleaner import clean_sql as _clean_sql
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +51,6 @@ def _is_sensitive(query: str) -> bool:
         if re.search(pattern, query, re.IGNORECASE):
             return True
     return False
-
-
-def _clean_sql(sql: str) -> str:
-    if not sql:
-        return ""
-    sql = re.sub(r'```(?:sql)?\s*', '', sql)
-    sql = re.sub(r'```\s*$', '', sql)
-    return sql.strip()
 
 
 def _extract_sql_from_intermediate(response: dict) -> Optional[str]:
@@ -125,11 +118,33 @@ _SQL_DESTRUCTIVE_KEYWORDS = (
     "CREATE ", "GRANT ", "REVOKE ", "RENAME ",
 )
 
+# 用于剥除 SQL 注释与字符串字面量，避免 `/*DROP*/` 这类绕过
+_SQL_LINE_COMMENT = re.compile(r"--[^\n]*")
+_SQL_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_SQL_STRING_LITERAL = re.compile(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"")
+
+
+def _strip_sql_noise(sql: str) -> str:
+    """移除 SQL 注释与字符串字面量，避免子串匹配被绕过。"""
+    sql = _SQL_BLOCK_COMMENT.sub(" ", sql)
+    sql = _SQL_LINE_COMMENT.sub(" ", sql)
+    sql = _SQL_STRING_LITERAL.sub("''", sql)
+    return sql
+
 
 def _is_read_only_sql(sql: str) -> bool:
-    upper = sql.upper().strip()
+    """粗粒度只读检查：移除注释/字符串后判断是否含破坏性关键字。
+
+    说明：这是 best-effort 防御层，真正的安全应：
+      1) 数据库账号只授予 SELECT 权限；
+      2) 上游 langchain SQLDatabaseToolkit 默认只暴露 sql_db_query 工具；
+      3) 生产环境接入 SQL 解析器（sqlparse/sqlglot）做 AST 级别校验。
+    """
+    if not sql or not sql.strip():
+        return False
+    cleaned = _strip_sql_noise(sql).upper().strip()
     for kw in _SQL_DESTRUCTIVE_KEYWORDS:
-        if kw in upper:
+        if kw in cleaned:
             return False
     return True
 

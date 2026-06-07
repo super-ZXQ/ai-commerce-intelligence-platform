@@ -89,6 +89,7 @@ async def filter_orders(
 async def get_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     根据订单ID获取单个订单详情。

@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 _rate_store: dict[str, list[float]] = defaultdict(list)
 _rate_lock = threading.Lock()
+# 守护清理线程一次性启动，避免多线程并发首次调用时启动多个 daemon
+_init_lock = threading.Lock()
 
 RATE_LIMITS = {
     "/api/auth/login": {"requests": 5, "window": 60},
@@ -50,7 +52,11 @@ _cleanup_thread_started = False
 
 def _ensure_cleanup_thread():
     global _cleanup_thread_started
-    if not _cleanup_thread_started:
+    if _cleanup_thread_started:
+        return
+    with _init_lock:
+        if _cleanup_thread_started:
+            return
         _cleanup_thread_started = True
         t = threading.Thread(target=_periodic_cleanup, daemon=True)
         t.start()

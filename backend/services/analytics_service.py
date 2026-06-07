@@ -192,14 +192,17 @@ async def get_category_analysis(db: AsyncSession) -> CategoryAnalysisResponse:
     )
     total_sales = total_sales_result.scalar() or 1
 
+    # 显式 .label() 命名，避免下游 row[i] 位置索引脆性
     stmt = select(
-        Order.platform_type,
+        Order.platform_type.label("platform_type"),
         func.count(Order.id).label("order_count"),
         func.sum(Order.payment_amount).label("total_sales"),
-        func.sum(Order.payment_amount) / func.count(Order.id),
-        func.sum(case((Order.is_refunded == "是", 1), else_=0))
-        / func.count(Order.id)
-        * 100,
+        (func.sum(Order.payment_amount) / func.count(Order.id)).label("avg_order_value"),
+        (
+            func.sum(case((Order.is_refunded == "是", 1), else_=0))
+            / func.count(Order.id)
+            * 100
+        ).label("refund_rate"),
     ).group_by(Order.platform_type)
 
     result = await db.execute(stmt)
@@ -208,12 +211,12 @@ async def get_category_analysis(db: AsyncSession) -> CategoryAnalysisResponse:
     return CategoryAnalysisResponse(
         categories=[
             CategoryAnalysisItem(
-                platform_type=row[0],
-                order_count=row[1],
-                total_sales=round(row[2], 2),
-                sales_ratio=round(row[2] / total_sales * 100, 2),
-                avg_order_value=round(row[3], 2),
-                refund_rate=round(row[4], 2),
+                platform_type=row.platform_type,
+                order_count=row.order_count,
+                total_sales=round(float(row.total_sales), 2),
+                sales_ratio=round(float(row.total_sales) / total_sales * 100, 2),
+                avg_order_value=round(float(row.avg_order_value), 2),
+                refund_rate=round(float(row.refund_rate), 2),
             )
             for row in rows
         ]

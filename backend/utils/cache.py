@@ -1,6 +1,7 @@
 import json
 import logging
 import hashlib
+import inspect
 import time
 import asyncio
 from typing import Any, Optional, Callable, Awaitable
@@ -126,10 +127,33 @@ def stats() -> dict:
 
 
 def cached(ttl: int = DEFAULT_TTL):
+    """缓存装饰器：自动识别并跳过 SQLAlchemy Session 等不可哈希参数。
+
+    约定：被装饰函数的形参名以 "_" 开头的（如 db / session / conn）会被排除在
+    缓存 key 之外，避免每次新建 session 都会 cache miss。
+    """
     def decorator(func: Callable[..., Awaitable[Any]]):
+        sig = inspect.signature(func)
+        param_names = list(sig.parameters.keys())
+
+        def _cache_key_args(args: tuple, kwargs: dict) -> tuple:
+            bound = sig.bind_partial(*args, **kwargs)
+            bound.apply_defaults()
+            cache_args = []
+            cache_kwargs = {}
+            for name, value in bound.arguments.items():
+                if name.startswith("_") or name in ("db", "session", "conn"):
+                    continue
+                if name in param_names[: len(args)]:
+                    cache_args.append(value)
+                else:
+                    cache_kwargs[name] = value
+            return tuple(cache_args), cache_kwargs
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            cache_key = f"{func.__module__}.{func.__name__}:{_make_key(*args[1:], **kwargs)}"
+            cache_args, cache_kwargs = _cache_key_args(args, kwargs)
+            cache_key = f"{func.__module__}.{func.__name__}:{_make_key(*cache_args, **cache_kwargs)}"
             cached_result = get(cache_key)
             if cached_result is not None:
                 logger.debug(f"缓存命中: {cache_key}")

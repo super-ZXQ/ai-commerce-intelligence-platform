@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import json
 import ast
 import time
@@ -16,6 +17,12 @@ from langchain_openai import ChatOpenAI
 from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+
+# 复用 backend 的共享工具（clean_sql），保证两处实现一致
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+from backend.utils.text_cleaner import clean_sql  # noqa: E402
 
 load_dotenv()
 
@@ -425,17 +432,17 @@ def extract_sql_from_intermediate(response: dict) -> str | None:
                 if isinstance(tool_input, dict):
                     sql = tool_input.get("sql") or tool_input.get("query")
                     if sql and isinstance(sql, str) and "SELECT" in sql.upper():
-                        return clean_sql(sql)
+                        return clean_sql_local(sql)
                 elif isinstance(tool_input, str) and "SELECT" in tool_input.upper():
-                    return clean_sql(tool_input)
-            
+                    return clean_sql_local(tool_input)
+
             if isinstance(observation, str):
                 # 观测文本可能含 HTML 高亮标签，先剥再抽
                 clean_obs = re.sub(r'<[^>]+>', '', observation)
                 sql_match = re.search(r'SELECT\s+[\s\S]+?(?:;|$)', clean_obs, re.IGNORECASE)
                 if sql_match:
-                    return clean_sql(sql_match.group(0))
-    
+                    return clean_sql_local(sql_match.group(0))
+
     output = response.get("output", "")
     if isinstance(output, str):
         patterns = [
@@ -446,8 +453,8 @@ def extract_sql_from_intermediate(response: dict) -> str | None:
         for pattern in patterns:
             match = re.search(pattern, output, re.IGNORECASE | re.DOTALL)
             if match:
-                return clean_sql(match.group(1))
-    
+                return clean_sql_local(match.group(1))
+
     return None
 
 
@@ -479,7 +486,7 @@ def extract_sql_from_answer(answer: str) -> str | None:
     for pattern in patterns:
         match = re.search(pattern, stripped, re.IGNORECASE | re.DOTALL)
         if match:
-            return clean_sql(match.group(1))
+            return clean_sql_local(match.group(1))
     return None
 
 
@@ -584,14 +591,9 @@ def _is_garbled_key(key: str) -> bool:
     return False
 
 
-def clean_sql(sql: str) -> str:
-    if not sql:
-        return ""
-    # 先剥离 HTML 高亮标签（防止 render_answer_with_highlights 污染 SQL）
-    sql = re.sub(r'<[^>]+>', '', sql)
-    sql = re.sub(r'```(?:sql)?\s*', '', sql)
-    sql = re.sub(r'```\s*$', '', sql)
-    return sql.strip()
+def clean_sql_local(sql: str) -> str:
+    """兼容旧调用：自动剥除 HTML 标签。"""
+    return clean_sql(sql, strip_html=True)
 
 
 def strip_markdown_tables(text: str) -> str:
@@ -767,7 +769,7 @@ def _convert_value(val):
 
 def run_sql_query(sql: str) -> pd.DataFrame | None:
     try:
-        sql = clean_sql(sql)
+        sql = clean_sql_local(sql)
 
         # 路径 0（首选）：直接用 SQLAlchemy Engine 执行，绕开 langchain wrapper。
         # 不依赖 db.run(fetch="cursor") 的方言实现，对 KingbaseES/MySQL/SQLite 都能

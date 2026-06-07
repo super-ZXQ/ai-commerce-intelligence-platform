@@ -103,10 +103,17 @@ if page == "📊 销售总览":
     total_users = filtered_df['用户名'].nunique()
     avg_order_value = total_sales / total_orders if total_orders > 0 else 0
 
-    col1.metric(label="💰 总销售额", value=f"{total_sales:,.2f} 元", delta=f"{total_sales/len(filtered_df['下单时间'].dt.date.unique()):,.0f} 元/天")
+    # 提前计算各派生量，添加空数据保护
+    unique_days = filtered_df['下单时间'].dt.date.unique()
+    n_unique_days = len(unique_days)
+    daily_avg_sales = total_sales / n_unique_days if n_unique_days > 0 else 0
+    overall_unique_users = df['用户名'].nunique()
+    overall_avg = df['付款金额'].mean() if len(df) > 0 else 0
+
+    col1.metric(label="💰 总销售额", value=f"{total_sales:,.2f} 元", delta=f"{daily_avg_sales:,.0f} 元/天")
     col2.metric(label="📦 总订单数", value=f"{total_orders:,}", delta=f"平均每用户 {total_orders/total_users:.1f} 单" if total_users > 0 else "0")
-    col3.metric(label="👥 活跃用户", value=f"{total_users:,}", delta=f"占比 {total_users/df['用户名'].nunique()*100:.1f}%" if df['用户名'].nunique() > 0 else "0%")
-    col4.metric(label="💵 客单价", value=f"{avg_order_value:.2f} 元", delta="较总体" + ("↑" if avg_order_value > df['付款金额'].mean() else "↓"))
+    col3.metric(label="👥 活跃用户", value=f"{total_users:,}", delta=f"占比 {total_users/overall_unique_users*100:.1f}%" if overall_unique_users > 0 else "0%")
+    col4.metric(label="💵 客单价", value=f"{avg_order_value:.2f} 元", delta="较总体" + ("↑" if avg_order_value > overall_avg else "↓"))
 
     st.markdown("---")
     st.subheader("📈 每日销售趋势")
@@ -172,8 +179,13 @@ elif page == "👥 RFM 客户分层":
         st.stop()
 
     @st.cache_data(show_spinner="正在计算RFM指标...")
-    def compute_rfm_data(_data_hash, ref_date, n_bins_val):
-        rfm = paid_df.groupby('用户名').agg(
+    def _score_rfm_frame(_paid_df, ref_date, n_bins_val):
+        """对已过滤的付款订单 DataFrame 计算 R/F/M 评分。
+
+        _paid_df 加下划线前缀使 st.cache_data 跳过其哈希（DataFrame 不可哈希，
+        但 _cache_key 哈希已在上层计算并作为本函数输入之一）。
+        """
+        rfm = _paid_df.groupby('用户名').agg(
             last_order_date=('下单时间', 'max'),
             frequency=('订单号', 'nunique'),
             monetary=('付款金额', 'sum')
@@ -223,7 +235,7 @@ elif page == "👥 RFM 客户分层":
         tuple(_user_stats['order_count'].values),
         tuple(_user_stats['total_amount'].round(2).values),
     ))
-    rfm = compute_rfm_data(_cache_key, ref_date_input, n_bins)
+    rfm = _score_rfm_frame(paid_df, ref_date_input, n_bins)
 
     if '平台类型' in paid_df.columns:
         user_platform = paid_df.groupby('用户名')['平台类型'].agg(
@@ -278,7 +290,10 @@ elif page == "👥 RFM 客户分层":
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     with tab1:
         # ── KPI 指标卡 ──
-        high_value_mask = rfm['客户分层'].astype(str).isin(["重要保持客户", "重要挽留客户"])
+        # 业务定义：高价值客户 = 全部"重要"前缀的 4 个分层（近期活跃 + 任一F/M高）
+        # 与 RFM 标准术语对齐：包括 重要价值/发展/保持/挽留 客户
+        high_value_segments = ["重要价值客户", "重要发展客户", "重要保持客户", "重要挽留客户"]
+        high_value_mask = rfm['客户分层'].astype(str).isin(high_value_segments)
         high_value_count = int(high_value_mask.sum())
         high_value_pct = high_value_count / total_users * 100 if total_users > 0 else 0
 
@@ -296,7 +311,7 @@ elif page == "👥 RFM 客户分层":
                 f"{high_value_pct:.1f}%",
                 delta=f"目标 ≥30%  {'达标' if high_value_pct >= 30 else '未达标'}",
             )
-            st.caption("重要保持 + 重要挽留客户")
+            st.caption("重要价值 + 重要发展 + 重要保持 + 重要挽留")
         with k2:
             st.metric(
                 "⚠️ 流失风险客户",
@@ -546,7 +561,7 @@ elif page == "👥 RFM 客户分层":
                     seg = row['主要分层']
                     # 仅在符合分层条件的格子标注
                     should_label = False
-                    if seg == "重要保持客户" and f_v >= f_threshold and m_v >= m_threshold and f_v >= f_threshold:
+                    if seg == "重要保持客户" and f_v < f_threshold and m_v >= m_threshold:
                         should_label = True
                     elif seg == "重要挽留客户" and f_v < f_threshold and m_v < m_threshold:
                         should_label = True
