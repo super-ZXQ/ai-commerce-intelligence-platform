@@ -1,0 +1,20 @@
+{"id": "k01", "category": "knowledge", "expected_doc": "glossary", "question": "什么是复购率？怎么计算？", "expected_keywords": ["复购率", "2次", "用户"]}
+{"id": "k02", "category": "knowledge", "expected_doc": "kpi", "question": "客单价的标准计算公式是什么？", "expected_keywords": ["客单价", "总付款金额", "总订单数"]}
+{"id": "k03", "category": "knowledge", "expected_doc": "kpi", "question": "退款率多少算正常？行业基准是多少？", "expected_keywords": ["退款率", "基准", "%"]}
+{"id": "k04", "category": "knowledge", "expected_doc": "data_dict", "question": "orders 表里的 payment_amount 字段是什么意思？", "expected_keywords": ["payment_amount", "付款金额", "实际"]}
+{"id": "k05", "category": "knowledge", "expected_doc": "data_dict", "question": "is_refunded 字段的枚举值有哪些？", "expected_keywords": ["is_refunded", "是", "否"]}
+{"id": "k06", "category": "knowledge", "expected_doc": "data_dict", "question": "order_date 和 order_hour 字段有什么区别？", "expected_keywords": ["order_date", "order_hour", "日期", "小时"]}
+{"id": "k07", "category": "knowledge", "expected_doc": "business_rule", "question": "RFM 模型中 Recency≤多少算活跃用户？", "expected_keywords": ["Recency", "30", "活跃"]}
+{"id": "k08", "category": "knowledge", "expected_doc": "glossary", "question": "GMV 是什么意思？跟销售额有什么区别？", "expected_keywords": ["GMV", "销售额"]}
+{"id": "k09", "category": "knowledge", "expected_doc": "api_doc", "question": "平台的 API 文档在哪里？怎么访问 Swagger？", "expected_keywords": ["Swagger", "docs", "API"]}
+{"id": "k10", "category": "knowledge", "expected_doc": "gold_query", "question": "怎么查最近 7 天每天的订单量？给我个 SQL 模板", "expected_keywords": ["SELECT", "order_date", "最近"]}
+{"id": "d01", "category": "data", "expected_doc": null, "question": "最近 7 天的总销售额是多少？", "expected_keywords": ["销售额"], "expected_sql_keywords": ["SUM(payment_amount)", "order_date"]}
+{"id": "d02", "category": "data", "expected_doc": null, "question": "APP 平台的订单数比微信公众号多多少？", "expected_keywords": ["APP", "微信", "订单"], "expected_sql_keywords": ["platform", "COUNT", "ORDER BY"]}
+{"id": "d03", "category": "data", "expected_doc": null, "question": "退款率最高的前 3 个商品是哪些？", "expected_keywords": ["退款率", "商品"], "expected_sql_keywords": ["is_refunded", "GROUP BY", "LIMIT 3"]}
+{"id": "d04", "category": "data", "expected_doc": null, "question": "哪个时间段的订单量最多？", "expected_keywords": ["时间段", "订单"], "expected_sql_keywords": ["order_hour", "GROUP BY"]}
+{"id": "d05", "category": "data", "expected_doc": null, "question": "客单价最高的前 5 个用户是谁？", "expected_keywords": ["客单价", "用户"], "expected_sql_keywords": ["AVG(payment_amount)", "GROUP BY", "LIMIT 5"]}
+{"id": "d06", "category": "data", "expected_doc": null, "question": "复购率是多少？", "expected_keywords": ["复购率"], "expected_sql_keywords": ["COUNT(DISTINCT", "user_id"]}
+{"id": "d07", "category": "data", "expected_doc": null, "question": "各平台的销售额占比", "expected_keywords": ["平台", "占比"], "expected_sql_keywords": ["platform", "SUM(payment_amount)"]}
+{"id": "d08", "category": "data", "expected_doc": null, "question": "最近 30 天的日均订单量", "expected_keywords": ["日均", "订单"], "expected_sql_keywords": ["COUNT", "AVG", "order_date"]}
+{"id": "d09", "category": "data", "expected_doc": null, "question": "周末和工作日的订单对比", "expected_keywords": ["周末", "工作日", "对比"], "expected_sql_keywords": ["weekday", "GROUP BY"]}
+{"id": "d10", "category": "data", "expected_doc": null, "question": "高价值用户的特征", "expected_keywords": ["高价值", "用户"], "expected_sql_keywords": ["Monetary", "RFM"]}

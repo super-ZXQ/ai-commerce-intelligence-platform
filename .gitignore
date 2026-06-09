@@ -33,3 +33,10 @@ PROJECT_INTRODUCTION.md
 
 # 本地产出物
 output/
+
+# RAG 向量库持久化（Chroma，每个环境独立）
+ai-ecommerce-assistant/data/
+
+# 评估报告产物（保留 gold_qa.jsonl + run_eval.py 即可）
+ai-ecommerce-assistant/eval/report.md
+ai-ecommerce-assistant/eval/report.json

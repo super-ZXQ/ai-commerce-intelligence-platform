@@ -8,3 +8,7 @@ pandas>=2.0.0
 plotly>=5.15.0
 python-dotenv>=1.0.0
 pymysql>=1.1.0
+# RAG 依赖（P1+P2）
+chromadb>=0.4.24
+langchain-huggingface>=0.0.3
+sentence-transformers>=2.6.0

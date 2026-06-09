@@ -24,6 +24,9 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 from backend.utils.text_cleaner import clean_sql  # noqa: E402
 
+# 业务知识来源抽取（无 streamlit 依赖，便于单元测试）
+from rag import extract_rag_sources  # noqa: E402
+
 load_dotenv()
 
 API_KEY = os.getenv("LLM_API_KEY")
@@ -182,7 +185,33 @@ def init_engine() -> Engine | None:
 
 
 @st.cache_resource
-def init_agent(_db):
+def init_retriever():
+    """初始化 RAG 检索器（懒加载，第一次调用时下载 BGE 模型 ~93MB）。
+
+    Returns:
+        (retriever, status_dict) 元组。status_dict 包含 ok / error / count。
+    """
+    try:
+        from rag import VectorStore, Retriever, get_embeddings
+        embed = get_embeddings()
+        store = VectorStore(embedding=embed)
+        retriever = Retriever(store, k=3, score_threshold=0.4)
+        return retriever, {
+            "ok": True,
+            "error": None,
+            "count": store.count(),
+        }
+    except Exception as e:
+        logger.error("RAG 初始化失败: %s", e)
+        return None, {
+            "ok": False,
+            "error": str(e),
+            "count": 0,
+        }
+
+
+@st.cache_resource
+def init_agent(_db, _retriever):
     llm = ChatOpenAI(
         api_key=API_KEY,
         base_url=BASE_URL,
@@ -191,7 +220,8 @@ def init_agent(_db):
     )
     toolkit = SQLDatabaseToolkit(db=_db, llm=llm)
 
-    prefix = f"""你是一个专业的 AI 智能商业分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
+    # 默认 prefix（向后兼容，无 RAG 时使用）
+    default_prefix = f"""你是一个专业的 AI 智能商业分析助手。你可以访问一个名为 `orders` 的电商订单数据库表。
 
 {BUSINESS_CONTEXT}
 
@@ -204,10 +234,27 @@ def init_agent(_db):
 
 请始终用中文回答。"""
 
+    # 尝试用 RAG 增强版 prefix + 业务知识工具
+    try:
+        from rag import build_augmented_prefix
+        from rag.tools import build_knowledge_tool
+
+        extra_tools = []
+        if _retriever is not None:
+            extra_tools.append(build_knowledge_tool(_retriever))
+            prefix = build_augmented_prefix(BUSINESS_CONTEXT)
+        else:
+            prefix = default_prefix
+    except Exception as e:
+        logger.error("RAG 增强初始化失败，使用默认 prefix: %s", e)
+        prefix = default_prefix
+        extra_tools = []
+
     return create_sql_agent(
         llm=llm,
         toolkit=toolkit,
         prefix=prefix,
+        extra_tools=extra_tools,
         verbose=True,
         agent_type="zero-shot-react-description",
     )
@@ -458,6 +505,8 @@ def extract_sql_from_intermediate(response: dict) -> str | None:
     return None
 
 
+# 业务知识来源抽取：从 RAG 工具的 sentinel observation 还原元数据列表。
+# 函数实现见 rag.extractor，单独成模块以便无 streamlit 依赖的单元测试。
 def extract_sql_from_answer(answer: str) -> str | None:
     if not answer or not isinstance(answer, str):
         return None
@@ -469,7 +518,6 @@ def extract_sql_from_answer(answer: str) -> str | None:
         codeblocks[key] = m.group(0)
         return key
     stripped = re.sub(r'```[\s\S]*?```', _stash, answer)
-
     # 剥离非代码块中的 HTML 高亮标签（LLM 可能把上一轮带高亮的 SQL 又回显了）
     stripped = re.sub(r'<[^>]+>', '', stripped)
 
@@ -947,9 +995,25 @@ def render_answer_with_highlights(answer: str):
 
 
 db = init_db()
-agent = init_agent(db) if db else None
+retriever, rag_status = init_retriever()
+agent = init_agent(db, retriever) if db else None
 
 with st.sidebar:
+    st.divider()
+    with st.expander("📚 RAG 知识库", expanded=False):
+        if rag_status.get("ok"):
+            st.success("✅ RAG 已启用")
+            st.metric("向量库", f"{rag_status['count']} chunks", label_visibility="visible")
+            if retriever:
+                stats = retriever.get_stats()
+                k1, k2 = st.columns(2)
+                k1.metric("命中率", f"{stats['hit_rate_pct']:.0f}%")
+                k2.metric("平均延迟", f"{stats['avg_latency_ms']:.0f}ms")
+                st.caption(f"缓存: {stats['cache_size']} 条")
+        else:
+            st.error(f"❌ RAG 未启用: {rag_status.get('error', '未知错误')[:80]}")
+            st.caption("将降级为纯 SQL 查询模式")
+
     st.header("📜 查询历史")
     if st.session_state.query_history:
         for i, item in enumerate(reversed(st.session_state.query_history[-5:])):
@@ -993,7 +1057,8 @@ with st.sidebar:
     if st.button("🗑️ 清空对话", use_container_width=True):
         st.session_state.messages = [
             {"role": "assistant", "content": "对话已清空，继续提问吧！",
-             "chart_data": None, "chart_title": "", "csv_data": None, "sql": None, "query_time": None}
+             "chart_data": None, "chart_title": "", "csv_data": None, "sql": None, "query_time": None,
+             "rag_sources": []}
         ]
         st.session_state.query_cache = {}
         st.rerun()
@@ -1058,6 +1123,17 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                     st.info("我们会持续优化，谢谢反馈！")
         
         render_answer_with_highlights(msg["content"])
+
+        # 显示本次回答引用的业务知识（参考来源）
+        if msg.get("rag_sources"):
+            with st.expander(f"📚 参考知识 ({len(msg['rag_sources'])} 条)", expanded=False):
+                for src in msg["rag_sources"]:
+                    st.markdown(
+                        f"**[{src['rank']}] {src['filename']}** > {src['section']} "
+                        f"`相关度 {src['score']:.2f}`"
+                    )
+                    st.caption(src["preview"])
+
         if msg.get("csv_data"):
             try:
                 csv_df = pd.DataFrame(msg["csv_data"])
@@ -1167,6 +1243,7 @@ if prompt:
             "sql": cached.get("sql"),
             "query_time": cached.get("query_time"),
             "question": prompt,
+            "rag_sources": cached.get("rag_sources") or [],
         })
         st.stop()
 
@@ -1206,8 +1283,12 @@ if prompt:
                     "content": "执行失败，请检查数据表结构或重试。",
                     "chart_data": None, "chart_title": "", "csv_data": None,
                     "sql": None, "query_time": None,
+                    "rag_sources": [],
                 })
                 st.stop()
+
+        # 抽取本次回答引用的业务知识来源，供"📚 参考知识"面板展示
+        rag_sources = extract_rag_sources(response)
 
         step_placeholder.markdown(show_step_progress(3), unsafe_allow_html=True)
         time.sleep(0.2)
@@ -1315,6 +1396,7 @@ if prompt:
             "sql": extracted_sql,
             "query_time": query_time,
             "question": prompt,
+            "rag_sources": rag_sources,
         }
         st.session_state.messages.append(msg_data)
 
@@ -1325,6 +1407,7 @@ if prompt:
             "csv_data": csv_data,
             "sql": extracted_sql,
             "query_time": query_time,
+            "rag_sources": rag_sources,
         }
 
         st.session_state.query_history.append({
