@@ -1,0 +1,225 @@
+# GitHub Actions：Docker 镜像自动构建 + 推送到 ghcr.io
+# 触发：
+#   - push main → 构建 3 个镜像并打 latest + commit-sha tag
+#   - push tag v*.*.* → 构建并打 vX.Y.Z + latest
+#   - pull_request → 只构建不推送（验证 Dockerfile 可用）
+name: Release Docker Images
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # 支持手动触发
+
+# 防止多个 tag 触发时重复构建
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: super-zxq  # ghcr.io 用户名（小写）
+
+jobs:
+  # ─────────── 共享：buildx 准备 ───────────
+  prepare:
+    name: 准备镜像元数据
+    runs-on: ubuntu-latest
+    outputs:
+      backend_tags: ${{ steps.meta-backend.outputs.tags }}
+      backend_labels: ${{ steps.meta-backend.outputs.labels }}
+      streamlit_tags: ${{ steps.meta-streamlit.outputs.tags }}
+      streamlit_labels: ${{ steps.meta-streamlit.outputs.labels }}
+      assistant_tags: ${{ steps.meta-assistant.outputs.tags }}
+      assistant_labels: ${{ steps.meta-assistant.outputs.labels }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 生成 backend 镜像 tag
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ai-commerce-intelligence-platform-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+          flavor: latest=auto
+
+      - name: 生成 streamlit 镜像 tag
+        id: meta-streamlit
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ai-commerce-intelligence-platform-streamlit
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+          flavor: latest=auto
+
+      - name: 生成 ai-assistant 镜像 tag
+        id: meta-assistant
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ai-commerce-intelligence-platform-ai-assistant
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+          flavor: latest=auto
+
+  # ─────────── 1. Backend 镜像 ───────────
+  backend:
+    name: 构建 backend 镜像
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 缓存 Docker 层
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-backend-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-backend-
+
+      - name: 构建并推送 backend 镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ needs.prepare.outputs.backend_tags }}
+          labels: ${{ needs.prepare.outputs.backend_labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          provenance: false
+          sbom: false
+
+  # ─────────── 2. Streamlit 镜像 ───────────
+  streamlit:
+    name: 构建 streamlit 镜像
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 缓存 Docker 层
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-streamlit
+          key: ${{ runner.os }}-buildx-streamlit-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-streamlit-
+
+      - name: 构建并推送 streamlit 镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.streamlit
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ needs.prepare.outputs.streamlit_tags }}
+          labels: ${{ needs.prepare.outputs.streamlit_labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache-streamlit
+          cache-to: type=local,dest=/tmp/.buildx-cache-streamlit-new,mode=max
+          provenance: false
+          sbom: false
+
+  # ─────────── 3. AI 助手镜像 ───────────
+  ai-assistant:
+    name: 构建 ai-assistant 镜像
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 缓存 Docker 层
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-assistant
+          key: ${{ runner.os }}-buildx-assistant-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-assistant-
+
+      - name: 构建并推送 ai-assistant 镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ai-ecommerce-assistant
+          file: ./ai-ecommerce-assistant/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ needs.prepare.outputs.assistant_tags }}
+          labels: ${{ needs.prepare.outputs.assistant_labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache-assistant
+          cache-to: type=local,dest=/tmp/.buildx-cache-assistant-new,mode=max
+          provenance: false
+          sbom: false

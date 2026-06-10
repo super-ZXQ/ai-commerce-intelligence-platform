@@ -288,6 +288,103 @@ rag_tool_call_total 18
 - **缓存命中率**：超过 80% 说明缓存命中良好；持续 0% 说明缓存键设计有误或 TTL 过期。
 - **结构化事件 logger 独立通道**（`rag.events`，propagate=False），便于 ELK / Loki 聚合；本仓库内置的 JSONL 落盘是兜底方案。
 
+## 运维与 CI/CD
+
+### 1. GitHub Actions
+
+| Workflow | 触发 | 职责 |
+|----------|------|------|
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 107 个测试（Python 3.12 + 3.13 矩阵）+ 后端测试（带 MySQL service container）+ 语法检查 |
+| `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
+
+**Tag 策略**（由 `docker/metadata-action` 自动管理）：
+
+| 触发 | tag 示例 |
+|------|----------|
+| push main | `:latest`、`:main-<short-sha>` |
+| push tag `v1.7.0` | `:v1.7.0`、`:v1.7`、`:latest` |
+| pull request | `:pr-123`（不推送） |
+| workflow_dispatch | `:latest`、`:main-<short-sha>` |
+
+**使用预构建镜像**（替换 docker-compose 中 build）：
+
+```yaml
+services:
+  backend:
+    image: ghcr.io/super-zxq/ai-commerce-intelligence-platform-backend:v1.7.0
+    # ... 其余配置不变
+```
+
+### 2. 全栈健康检查脚本
+
+`scripts/health_check.py` —— 单文件脚本，本地和 CI 都可调用。
+
+```bash
+# 默认检查全栈（localhost 各端口）
+python scripts/health_check.py
+
+# CI 用：失败时非零退出
+python scripts/health_check.py --fail-on-error --output report.json
+
+# 自定义目标
+python scripts/health_check.py \
+  --backend http://api.example.com \
+  --bi https://bi.example.com \
+  --ai https://ai.example.com \
+  --db "mysql+pymysql://user:pass@host:3306/db" \
+  --redis redis://host:6379/0
+
+# 只跑部分检查
+python scripts/health_check.py --checks backend,db --fail-on-error
+```
+
+**检查项**（每项独立输出 latency_ms + status + error）：
+
+| 名称 | 检查方式 | 期望 |
+|------|----------|------|
+| `backend:/health` | GET | status 字段存在 |
+| `backend:/health/detailed` | GET | 200 |
+| `backend:/api/monitor/services-status` | GET | 200 |
+| `backend:/api/monitor/rag-stats` | GET | 200（503 = AI 助手未启动） |
+| `bi:streamlit` | GET `/_stcore/health` | 200 |
+| `ai:streamlit` | GET `/_stcore/health` | 200 |
+| `mysql:select_1` | pymysql `SELECT 1` | 连接成功 |
+| `redis:ping` | redis-py `PING` | 返回 True |
+
+**JSON 报告示例**：
+
+```json
+{
+  "status": "ok",
+  "checked_at": "2026-06-10T07:00:00+00:00",
+  "total": 8, "ok": 8, "warn": 0, "error": 0, "skipped": 0,
+  "results": [
+    {"name": "backend:/health", "target": "http://localhost:8000/health",
+     "status": "ok", "latency_ms": 12.3, "timestamp": "..."}
+  ]
+}
+```
+
+### 3. 升级流程
+
+```bash
+# 1. 本地通过所有测试
+cd ai-ecommerce-assistant && python -m pytest tests/ -v
+cd ../backend && python -m pytest tests/ -v
+
+# 2. 提交 + 推送（触发 CI）
+git add -A
+git commit -m "feat: xxxxx"
+git push origin main
+
+# 3. CI 通过后打 tag（触发镜像构建 + 推送 ghcr.io）
+git tag v1.7.1
+git push origin v1.7.1
+
+# 4. 生产拉新镜像
+docker compose pull && docker compose up -d
+```
+
 ## 测试与评估
 
 ### 单元测试（107 个用例）
@@ -371,12 +468,18 @@ ai-commerce-intelligence-platform/
 │   │   ├── retriever.py          # 缓存/超时/格式化/埋点
 │   │   ├── prompts.py            # 提示词 + 工具说明
 │   │   ├── tools.py              # LangChain Tool 工厂
-│   │   └── extractor.py          # 来源还原（无 streamlit 依赖）
-│   ├── tests/                    # 76 个 RAG 单元测试
+│   │   ├── extractor.py          # 来源还原（无 streamlit 依赖）
+│   │   └── metrics.py            # 跨进程 stats 共享 + Prometheus 渲染 + JSONL 事件
+│   ├── tests/                    # 107 个 RAG 单元测试
 │   ├── eval/                     # 评估集 + 评估脚本
 │   ├── data/chroma/              # Chroma 持久化目录
 │   ├── pytest.ini                # pytest 配置
 │   └── requirements.txt
+├── .github/workflows/            # GitHub Actions CI/CD
+│   ├── ci.yml                    # 测试流水线（PR 触发）
+│   └── release.yml               # Docker 镜像构建（push main / tag 触发）
+├── scripts/
+│   └── health_check.py           # 全栈健康检查脚本（本地 + CI）
 ├── deploy/                       # 部署配置
 │   ├── nginx.conf                # Nginx 反向代理
 │   ├── redis.conf                # Redis 持久化配置
