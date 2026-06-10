@@ -1042,7 +1042,11 @@ def render_answer_with_highlights(answer: str):
 
 
 db = init_db()
-retriever, rag_status = init_retriever()
+try:
+    retriever, rag_status = init_retriever()
+except Exception as e:
+    logger.error("RAG 初始化异常: %s", e)
+    retriever, rag_status = None, {"ok": False, "error": str(e), "count": 0}
 agent = init_agent(db, retriever) if db else None
 
 with st.sidebar:

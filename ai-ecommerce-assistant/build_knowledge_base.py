@@ -217,7 +217,10 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
     deleted_ids = existing_ids - new_ids
     if deleted_ids:
         logger.info("🗑️  清理 %d 个废弃 doc", len(deleted_ids))
-        # 实际清理在 store.add_documents 内部完成（仅新写入）
+        try:
+            store._store.delete(ids=list(deleted_ids))
+        except Exception as e:
+            logger.warning("废弃 doc 清理失败（可忽略）: %s", e)
 
     if to_write:
         logger.info("✏️  写入 %d 个新 chunk...", len(to_write))
@@ -226,6 +229,7 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
         logger.info("✅ 无变更，跳过写入")
 
     elapsed = time.time() - t0
+    final_count = store.count()
     report = {
         "status": "ok",
         "kb_dir": kb_dir,
@@ -234,7 +238,7 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
         "chunks_total": len(documents),
         "chunks_new": len(to_write),
         "chunks_removed": len(deleted_ids),
-        "vector_count": store.count(),
+        "vector_count": final_count,
         "elapsed_s": round(elapsed, 2),
     }
     return report

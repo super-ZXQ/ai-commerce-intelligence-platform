@@ -69,12 +69,11 @@ class Retriever:
         self._last_dump_ts = 0.0
         # 统计
         self.stats = {
-            "hits": 0,
-            "misses": 0,
-            "cache_hits": 0,
-            "timeouts": 0,
-            "total_ms": 0.0,
-            "no_results": 0,  # 实际检索但无命中
+            "cache_hits": 0,     # 命中本地缓存的次数
+            "misses": 0,         # 实际调用向量库的次数
+            "timeouts": 0,       # 单次检索超时次数
+            "total_ms": 0.0,     # 累计检索耗时（毫秒）
+            "no_results": 0,     # 实际检索但无命中
             # Top1 score 桶分布（每次 store 命中时按 top1 累加）
             "score_buckets": {b: 0 for b in (
                 "[0,0.2)", "[0.2,0.4)", "[0.4,0.6)", "[0.6,0.8)", "[0.8,1.0]"
@@ -114,7 +113,6 @@ class Retriever:
                 ts, cached = self._cache[cache_key]
                 if time.time() - ts < self._cache_ttl:
                     self._cache.move_to_end(cache_key)
-                    self.stats["hits"] += 1
                     self.stats["cache_hits"] += 1
                     logger.debug("RAG 缓存命中: %s", query[:30])
                     metrics.log_event(
@@ -231,8 +229,8 @@ class Retriever:
         """
         with self._lock:
             cache_size = len(self._cache)
-        total = self.stats["hits"] + self.stats["misses"]
-        hit_rate = self.stats["hits"] / total * 100 if total > 0 else 0
+        total = self.stats["cache_hits"] + self.stats["misses"]
+        hit_rate = self.stats["cache_hits"] / total * 100 if total > 0 else 0
         # store_hits 语义：实际访问向量库的次数，即 misses
         store_hits = self.stats["misses"]
         avg_ms = self.stats["total_ms"] / store_hits if store_hits > 0 else 0

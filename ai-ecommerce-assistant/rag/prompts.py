@@ -35,9 +35,26 @@ TOOL_USAGE_RULES = """## 工具使用规则（重要）
 2. **SQL 工具** `sql_db_query` / `sql_db_schema` / `sql_db_list_tables` / `sql_db_query_checker`：查实际数据
 
 ### 决策树
-- 用户问"X 怎么算"、"X 是什么"、"X 多少算正常" → 先 `query_business_knowledge` 拿到定义
-- 用户问"X 是多少"（带"是多少"）、"X 销量"、"X 趋势" → 直接走 SQL 工具
-- 不确定 → 先 `query_business_knowledge` 拿知识，再决定是否需要 SQL
+
+**第一步：判断是否需要业务知识（公式/定义/规则）**
+- "X 怎么算"、"X 是什么"、"X 的定义" → 调 `query_business_knowledge`
+- "X 多少算正常"、"X 的基准/阈值" → 调 `query_business_knowledge`
+- "X 的公式"、"X 的 SQL 模板" → 调 `query_business_knowledge`
+- 不确定 → 调 `query_business_knowledge`（宁可多查一次，不要写错 SQL）
+
+**第二步：判断是否需要查数据**
+- 调完 `query_business_knowledge` 拿到公式后，用 SQL 查实际数据
+- "X 销量"、"X 趋势"、"X 对比"（不需要公式）→ 直接走 SQL
+- "X 是多少"（已通过知识库确认公式）→ 走 SQL
+
+### 常见场景示例
+| 用户问题 | 工具选择 | 原因 |
+|---------|---------|------|
+| 复购率是多少 | 先 RAG 再 SQL | 需要知道公式（消费2次及以上/总用户数）再查数据 |
+| 退款率多少算正常 | 仅 RAG | 只需基准值，不查数据 |
+| APP销售额 | 仅 SQL | 明确查数据，无需公式 |
+| 最近7天趋势 | 仅 SQL | 明确查时序数据 |
+| 客单价怎么算 | 仅 RAG | 只需定义，不查数据 |
 
 ### 注意事项
 - 一次工具调用可以拿到知识，不需要重复调用同一工具

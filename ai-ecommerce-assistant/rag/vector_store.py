@@ -102,15 +102,11 @@ class VectorStore:
         """
         if self.count() == 0:
             return []
-        kwargs = {"k": k}
-        if filter:
-            kwargs["filter"] = filter
-        # 使用 similarity_search_with_score 获取分数
+        # 优先用 relevance_scores（Chroma 内部做 1/(1+distance) 归一化，结果 0-1）。
+        # 旧版 fallback 用 1.0 - distance 归一化，在 L2 距离 >1 时产生负数，已废弃。
         scored = self._store.similarity_search_with_relevance_scores(
             query, k=k, filter=filter
-        ) if hasattr(self._store, "similarity_search_with_relevance_scores") else \
-            [(d, 1.0 - s) for d, s in self._store.similarity_search_with_score(
-                query, k=k, filter=filter)]
+        )
 
         results = []
         for doc, score in scored:
