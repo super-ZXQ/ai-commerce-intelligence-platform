@@ -1,14 +1,6 @@
 # 基于大模型的智能电商数据决策平台
 
-![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?logo=fastapi)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.41-red?logo=streamlit)
-![LangChain](https://img.shields.io/badge/LangChain-0.3-orange?logo=langchain)
-![Chroma](https://img.shields.io/badge/Chroma-Vector_DB-blueviolet?logo=databricks)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-orange?logo=mysql)
-![Redis](https://img.shields.io/badge/Redis-7-red?logo=redis)
-![Docker](https://img.shields.io/badge/Docker--Compose-blue?logo=docker)
-![License](https://img.shields.io/badge/License-MIT-green)
+🐍 **Python 3.12** · 🚀 **FastAPI** · 📊 **Streamlit** · 🦜 **LangChain** · 🧠 **Chroma** · 🐬 **MySQL 8** · 🔴 **Redis 7** · 🐳 **Docker** · 📄 **MIT License**
 
 ## 简介
 
@@ -226,6 +218,7 @@ python ai-ecommerce-assistant/build_knowledge_base.py --kb-dir ./my_kb
 | `prompts.py` | 工具描述、决策树规则、Agent prefix 增强 |
 | `tools.py` | `build_knowledge_tool()` LangChain Tool 工厂 |
 | `extractor.py` | 从 Agent `intermediate_steps` 还原 RAG 来源（无 streamlit 依赖） |
+| `metrics.py` | 跨进程 stats 共享：原子写入 JSON、综合 Prometheus 渲染、结构化事件日志（JSONL 可选） |
 
 ### 决策树
 
@@ -235,9 +228,69 @@ python ai-ecommerce-assistant/build_knowledge_base.py --kb-dir ./my_kb
 
 回答时引用业务知识，**UI 自动折叠展示**"📚 参考知识"面板（来源、章节、相关度、200 字预览），不污染主回答。
 
+## 检索监控与指标埋点
+
+RAG 模块内置轻量级监控层，把"检索质量 + 性能 + 用户反馈"三类信号汇总到 JSON / JSONL 文件，FastAPI 再以 Prometheus 格式暴露给监控系统。**不依赖 Redis / Kafka，本地开发 + Docker 双环境统一**。
+
+### 1. 三类指标
+
+| 维度 | 来源 | 字段 |
+|------|------|------|
+| 检索器（retriever） | `Retriever.get_stats()` | `cache_hits` / `store_hits` / `timeouts` / `no_results` / `avg_latency_ms` / `hit_rate_pct` / `score_buckets` / `total_queries` |
+| 工具调用（tool） | `metrics.record_tool_call()` | `tool_call_count` / `tool_no_hit_count` / `tool_error_count` |
+| 结构化事件 | `metrics.log_event()` | `ts` / `event` / `query` / `top1_score` / `hits` / `ms` / `cache_hit` / `source` |
+
+### 2. 端点（无需鉴权）
+
+| 路径 | 格式 | 说明 |
+|------|------|------|
+| `GET /api/monitor/rag-stats` | JSON | RAG 综合快照；未启动 AI 助手时返回 503 |
+| `GET /api/monitor/rag-stats.prom` | Prometheus text | 11 个指标（counter + gauge） |
+| `GET /metrics` | Prometheus text | 后端 / 业务指标（与 RAG 并列） |
+
+示例：
+
+```bash
+# JSON 快照
+curl http://localhost:8000/api/monitor/rag-stats
+
+# Prometheus 抓取（可直接配 scrape config）
+curl http://localhost:8000/api/monitor/rag-stats.prom
+```
+
+返回示例（节选）：
+
+```
+# HELP rag_query_total Total RAG queries (cache + store)
+# TYPE rag_query_total counter
+rag_query_total 42
+
+# HELP rag_score_bucket Top1 retrieval score distribution
+# TYPE rag_score_bucket counter
+rag_score_bucket{range="[0.4,0.6)"} 5
+rag_score_bucket{range="[0.8,1.0]"} 12
+
+# HELP rag_tool_call_total Agent invoked query_business_knowledge
+# TYPE rag_tool_call_total counter
+rag_tool_call_total 18
+```
+
+### 3. 落盘策略
+
+- **综合 stats（JSON）**：`retriever` 在每次检索后节流（5s）调用 `dump_stats()`，把 retriever stats + tool stats 合并后**原子写入**（tmp + `os.replace`）`ai-ecommerce-assistant/data/rag_stats.json`。FastAPI 端点直接读这个文件。
+- **事件流（JSONL，可选）**：默认关闭，避免拖慢。设置环境变量 `RAG_EVENTS_LOG=1` 即开启 `data/rag_events.jsonl` 追加写入；每行一条结构化 JSON 事件，可直接被 Vector / Filebeat / Promtail 采集。
+- **用户反馈（JSONL，append-only）**：聊天界面的 👍/👎 按钮触发 `record_feedback()`，追加写入 `ai-ecommerce-assistant/eval/feedback.jsonl`；用于线下分析"检索误召回率"。
+
+### 4. 关键设计点
+
+- **节流 + 原子写入**：避免每次检索都 IO；用 `tmp + os.replace` 保证读到一致快照（不会读到半截 JSON）。
+- **Top1 score 桶分布**（5 桶：`[0,0.2)` / `[0.2,0.4)` / `[0.4,0.6)` / `[0.6,0.8)` / `[0.8,1.0]`）：监控阈值 `score_threshold=0.4` 是否合理。若 `[0,0.2)` 占比飙升 → 阈值过低；若 `[0.8,1.0]` 极少 → 检索质量退化。
+- **缓存命中率**：超过 80% 说明缓存命中良好；持续 0% 说明缓存键设计有误或 TTL 过期。
+- **结构化事件 logger 独立通道**（`rag.events`，propagate=False），便于 ELK / Loki 聚合；本仓库内置的 JSONL 落盘是兜底方案。
+
 ## 测试与评估
 
-### 单元测试（76 个用例）
+### 单元测试（107 个用例）
 
 ```bash
 # RAG + build_knowledge_base 全量测试
@@ -254,6 +307,7 @@ python -m pytest tests/test_retriever.py -v
 - `test_rag_extractor.py` — 从 `intermediate_steps` 还原来源（多步聚合、类型防御）
 - `test_vector_store.py` — Chroma 增删查改（fake embedder，不依赖真实模型）
 - `test_retriever.py` — 缓存/TTL/LRU/阈值/超时/格式化/stats
+- `test_rag_metrics.py` — score_buckets / tool_call 计数 / 原子写入 / JSON 加载 / Prometheus 渲染 / 结构化事件 / JSONL 落盘 / 反馈写文件
 - `test_build_kb.py` — 文档切分函数（doc_type、doc_id、滑动窗口）
 
 测试不依赖真实 BGE 模型（首次下载 93MB），用 `tests/conftest.py` 里的 `FakeEmbeddings`（确定性 hash → 384 维归一化向量）。

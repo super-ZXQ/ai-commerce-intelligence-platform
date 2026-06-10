@@ -1,10 +1,13 @@
 import logging
 import time
 import os
+import sys
 import httpx
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import PlainTextResponse, JSONResponse
 
 from backend.database import check_db_connection
 from backend.routes.auth import get_current_user
@@ -119,3 +122,70 @@ async def get_services_status():
         except Exception as e:
             results[name] = {"status": "error", "detail": str(e)}
     return results
+
+
+# ─────────────────── RAG 业务知识检索监控 ───────────────────
+# ai-ecommerce-assistant 进程内的 Retriever 会把 stats 原子写入 JSON 文件，
+# FastAPI 端负责读取与渲染（无 JWT，便于导航页/监控面板调用）。
+# 默认路径：ai-ecommerce-assistant/data/rag_stats.json
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_RAG_STATS_PATH = os.environ.get(
+    "RAG_STATS_PATH",
+    str(_PROJECT_ROOT / "ai-ecommerce-assistant" / "data" / "rag_stats.json"),
+)
+
+
+def _load_rag_stats() -> dict | None:
+    """从 AI 助手进程写入的 JSON 文件读 stats。"""
+    try:
+        # 通过 sys.path 引入 metrics 模块（避免重复实现 render）
+        ai_root = _PROJECT_ROOT / "ai-ecommerce-assistant"
+        if str(ai_root) not in sys.path:
+            sys.path.insert(0, str(ai_root))
+        from rag import metrics as rag_metrics  # noqa: E402
+        return rag_metrics.load_stats(_RAG_STATS_PATH)
+    except Exception as e:
+        logger.warning("RAG stats 加载失败: %s", e)
+        return None
+
+
+@router.get("/rag-stats", summary="RAG 检索统计")
+async def get_rag_stats():
+    """RAG 业务知识检索的实时统计（命中率、延迟、TopK 分布、工具调用）。
+
+    数据源：ai-ecommerce-assistant 进程内的 Retriever，每 5 秒落盘一次。
+    公开端点，便于监控面板 / 导航页直接调用。
+    """
+    stats = _load_rag_stats()
+    if stats is None:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unavailable",
+                "detail": "RAG stats 文件尚未生成（AI 助手可能未启动或未发生检索）",
+                "path": _RAG_STATS_PATH,
+            },
+        )
+    return {"status": "ok", "stats": stats}
+
+
+@router.get("/rag-stats.prom", response_class=PlainTextResponse, summary="RAG 指标 Prometheus 格式")
+async def get_rag_stats_prom():
+    """把 RAG stats 渲染为 Prometheus exposition 格式，便于 Grafana / 监控系统抓取。"""
+    stats = _load_rag_stats()
+    try:
+        ai_root = _PROJECT_ROOT / "ai-ecommerce-assistant"
+        if str(ai_root) not in sys.path:
+            sys.path.insert(0, str(ai_root))
+        from rag import metrics as rag_metrics  # noqa: E402
+        return PlainTextResponse(
+            content=rag_metrics.render_prometheus(stats or {}),
+            media_type="text/plain; version=0.0.4",
+        )
+    except Exception as e:
+        logger.warning("RAG Prometheus 渲染失败: %s", e)
+        return PlainTextResponse(
+            content=f"# render error: {e}\n",
+            media_type="text/plain; version=0.0.4",
+            status_code=500,
+        )

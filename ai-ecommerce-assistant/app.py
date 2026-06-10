@@ -7,6 +7,8 @@ import time
 import datetime
 import hashlib
 import decimal
+import logging
+from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -26,8 +28,53 @@ from backend.utils.text_cleaner import clean_sql  # noqa: E402
 
 # 业务知识来源抽取（无 streamlit 依赖，便于单元测试）
 from rag import extract_rag_sources  # noqa: E402
+from rag import metrics as rag_metrics  # noqa: E402
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# 用户反馈落盘路径（jsonl，append-only）
+FEEDBACK_LOG_PATH = os.environ.get(
+    "RAG_FEEDBACK_PATH",
+    str(Path(__file__).resolve().parent / "eval" / "feedback.jsonl"),
+)
+
+# 启用 RAG 事件 JSONL 落盘（默认关闭磁盘 IO，避免拖慢；可由环境变量开启）
+if os.environ.get("RAG_EVENTS_LOG", "0") == "1":
+    rag_metrics.enable_event_file_logging()
+
+
+def record_feedback(question: str, answer: str, rating: str,
+                    rag_sources: list[dict] | None = None) -> bool:
+    """把用户 👍/👎 反馈追加到 jsonl 文件，供离线分析检索质量。
+
+    Args:
+        question: 用户问题。
+        answer: AI 回答（前 500 字符，避免文件膨胀）。
+        rating: "up" 或 "down"。
+        rag_sources: 本次回答引用的业务知识来源（用于线下分析"误检索"）。
+
+    Returns:
+        是否落盘成功。
+    """
+    payload = {
+        "ts": int(time.time() * 1000),
+        "question": question[:300],
+        "answer_preview": answer[:500],
+        "rating": rating,
+        "rag_sources_count": len(rag_sources or []),
+        "rag_filenames": [s.get("filename", "") for s in (rag_sources or [])],
+    }
+    try:
+        p = Path(FEEDBACK_LOG_PATH)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        return True
+    except Exception as e:
+        logger.warning("反馈落盘失败: %s", e)
+        return False
 
 API_KEY = os.getenv("LLM_API_KEY")
 BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
@@ -1104,6 +1151,31 @@ for msg_idx, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and msg.get("question"):
             col1, col2, col3 = st.columns([1, 1, 3])
             with col1:
+                thumbs_up = st.button("👍", key=f"up_{msg_idx}")
+            with col2:
+                thumbs_down = st.button("👎", key=f"down_{msg_idx}")
+            feedback_key = f"fb_{msg_idx}"
+            if "feedbacks" not in st.session_state:
+                st.session_state.feedbacks = {}
+            # 落盘：仅在本次按钮被点击时记录（避免重复触发）
+            if thumbs_up:
+                st.session_state.feedbacks[feedback_key] = "👍 有帮助"
+                record_feedback(
+                    question=msg["question"],
+                    answer=msg.get("content", ""),
+                    rating="up",
+                    rag_sources=msg.get("rag_sources", []),
+                )
+                st.success("感谢反馈！")
+            elif thumbs_down:
+                st.session_state.feedbacks[feedback_key] = "👎 需改进"
+                record_feedback(
+                    question=msg["question"],
+                    answer=msg.get("content", ""),
+                    rating="down",
+                    rag_sources=msg.get("rag_sources", []),
+                )
+                st.info("我们会持续优化，谢谢反馈！")
                 if st.button("🔄 重新生成", key=f"regen_{msg_idx}", use_container_width=True):
                     st.session_state.pending_question = msg["question"]
                     if f"msg_{msg_idx}" in st.session_state.messages:

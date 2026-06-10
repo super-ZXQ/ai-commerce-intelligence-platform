@@ -2,7 +2,7 @@
 - LRU + TTL 缓存（减少重复检索）
 - 超时保护
 - 上下文格式化
-- 可观测埋点
+- 可观测埋点（counters + score 桶分布 + 文件级 stats 共享）
 """
 from __future__ import annotations
 
@@ -11,8 +11,10 @@ import logging
 import threading
 import time
 from collections import OrderedDict
+from pathlib import Path
 from typing import Optional
 
+from . import metrics
 from .vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,20 @@ DEFAULT_K = 3
 DEFAULT_SCORE_THRESHOLD = 0.4  # 相似度归一化后 0-1，0.4 ≈ 较相关
 DEFAULT_CACHE_MAX = 128
 DEFAULT_CACHE_TTL = 300  # 5 分钟
+
+# Top1 score 桶分布，用于监控检索质量与阈值合理性
+SCORE_BUCKETS = [0.2, 0.4, 0.6, 0.8, 1.0001]  # 末位 +ε 包含 1.0
+
+
+def _bucketize(score: float) -> str:
+    """把 score 映射到 bucket 标签。"""
+    for i, edge in enumerate(SCORE_BUCKETS):
+        if score < edge:
+            return f"[0,{SCORE_BUCKETS[0]:.1f})" if i == 0 else (
+                f"[{SCORE_BUCKETS[i-1]:.1f},{edge:.1f})" if i < len(SCORE_BUCKETS) - 1
+                else f"[{SCORE_BUCKETS[i-1]:.1f},1.0]"
+            )
+    return "[0.8,1.0]"
 
 
 class Retriever:
@@ -37,7 +53,9 @@ class Retriever:
                  k: int = DEFAULT_K,
                  score_threshold: float = DEFAULT_SCORE_THRESHOLD,
                  cache_max: int = DEFAULT_CACHE_MAX,
-                 cache_ttl: int = DEFAULT_CACHE_TTL):
+                 cache_ttl: int = DEFAULT_CACHE_TTL,
+                 stats_path: str = metrics.DEFAULT_STATS_PATH,
+                 dump_interval_s: float = 5.0):
         self._store = vector_store
         self.k = k
         self.score_threshold = score_threshold
@@ -45,6 +63,10 @@ class Retriever:
         self._cache_ttl = cache_ttl
         self._cache: OrderedDict[str, tuple[float, list[dict]]] = OrderedDict()
         self._lock = threading.Lock()
+        # 跨进程 stats 文件路径
+        self._stats_path = stats_path
+        self._dump_interval_s = dump_interval_s
+        self._last_dump_ts = 0.0
         # 统计
         self.stats = {
             "hits": 0,
@@ -52,6 +74,11 @@ class Retriever:
             "cache_hits": 0,
             "timeouts": 0,
             "total_ms": 0.0,
+            "no_results": 0,  # 实际检索但无命中
+            # Top1 score 桶分布（每次 store 命中时按 top1 累加）
+            "score_buckets": {b: 0 for b in (
+                "[0,0.2)", "[0.2,0.4)", "[0.4,0.6)", "[0.6,0.8)", "[0.8,1.0]"
+            )},
         }
 
     @staticmethod
@@ -90,6 +117,15 @@ class Retriever:
                     self.stats["hits"] += 1
                     self.stats["cache_hits"] += 1
                     logger.debug("RAG 缓存命中: %s", query[:30])
+                    metrics.log_event(
+                        "retrieval",
+                        query=query[:100],
+                        top1_score=cached[0].get("score", 0.0) if cached else 0.0,
+                        hits=len(cached),
+                        ms=0.0,
+                        cache_hit=True,
+                        source="cache",
+                    )
                     return cached
                 # 过期
                 del self._cache[cache_key]
@@ -115,11 +151,31 @@ class Retriever:
                 self._cache.popitem(last=False)  # LRU 淘汰
             self._cache[cache_key] = (time.time(), results)
 
-        logger.debug("RAG 检索: q=%r hits=%d score_range=[%.2f~%.2f] ms=%.1f",
+        # 4. 更新 Top1 score 桶
+        if results:
+            top1 = results[0].get("score", 0.0)
+            self.stats["score_buckets"][_bucketize(top1)] += 1
+        else:
+            self.stats["no_results"] += 1
+
+        # 5. 节流落盘（多进程可见）
+        self._maybe_dump()
+
+        # 6. 结构化事件日志
+        top1 = results[0].get("score", 0.0) if results else 0.0
+        metrics.log_event(
+            "retrieval",
+            query=query[:100],  # 截断避免超长日志
+            top1_score=round(top1, 4),
+            hits=len(results),
+            ms=round(elapsed_ms, 1),
+            cache_hit=False,
+            source="store",
+        )
+
+        logger.debug("RAG 检索: q=%r hits=%d top1=%.2f ms=%.1f",
                      query[:30], len(results),
-                     results[-1]["score"] if results else 0,
-                     results[0]["score"] if results else 0,
-                     elapsed_ms)
+                     results[0]["score"] if results else 0, elapsed_ms)
         return results
 
     @staticmethod
@@ -169,6 +225,9 @@ class Retriever:
         - cache_size: 当前缓存条目数
         - hit_rate_pct: 缓存命中率（0-100）
         - avg_latency_ms: 平均单次实际检索耗时（毫秒）
+        - no_results: 实际检索但无命中的次数
+        - score_buckets: Top1 score 分布
+        - total_queries: 总查询次数
         """
         with self._lock:
             cache_size = len(self._cache)
@@ -181,11 +240,30 @@ class Retriever:
             "cache_hits": self.stats["cache_hits"],
             "store_hits": store_hits,
             "timeouts": self.stats["timeouts"],
+            "no_results": self.stats["no_results"],
             "cache_size": cache_size,
             "hit_rate_pct": round(hit_rate, 1),
             "avg_latency_ms": round(avg_ms, 1),
+            "score_buckets": dict(self.stats["score_buckets"]),
+            "total_queries": total,
         }
 
+    # ─────────── 跨进程 stats 共享（atomic JSON 文件） ───────────
 
-# 延迟导入避免循环
-from pathlib import Path  # noqa: E402
+    def _maybe_dump(self) -> None:
+        """节流写入：避免每次检索都 IO。"""
+        now = time.time()
+        if now - self._last_dump_ts < self._dump_interval_s:
+            return
+        try:
+            self.dump_stats(self._stats_path)
+            self._last_dump_ts = now
+        except Exception as e:
+            # 监控落盘失败不应影响主流程
+            logger.warning("RAG stats 落盘失败: %s", e)
+
+    def dump_stats(self, path: str | None = None) -> None:
+        """把当前 stats（含 tools 端统计）原子写入 JSON 文件。"""
+        target = path or self._stats_path
+        metrics.dump_combined_stats(self.get_stats(), path=target)
+

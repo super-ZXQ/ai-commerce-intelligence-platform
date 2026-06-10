@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from langchain_core.tools import Tool
 
+from . import metrics
 from .prompts import KNOWLEDGE_TOOL_DESCRIPTION
 
 if TYPE_CHECKING:
@@ -64,11 +65,19 @@ def build_knowledge_tool(retriever: "Retriever") -> Tool:
 
     def _query(query: str) -> str:
         """供 LLM 调用的实现。"""
+        error: Exception | None = None
+        hit = False
         try:
             docs = retriever.retrieve(query, k=3, score_threshold=0.4)
+            hit = bool(docs)
         except Exception as e:
             logger.error("RAG 工具检索失败: %s", e)
-            return f"⚠️ 业务知识库查询失败：{e}"
+            error = e
+            docs = []
+        # 埋点（无论命中 / 异常 / 空结果都记录）
+        metrics.record_tool_call(hit=hit, error=error is not None)
+        if error is not None:
+            return f"⚠️ 业务知识库查询失败：{error}"
         if not docs:
             return (
                 "未找到相关业务知识。"
