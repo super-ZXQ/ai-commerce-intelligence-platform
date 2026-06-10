@@ -63,29 +63,44 @@ def _extract_sql_from_intermediate(response: dict) -> Optional[str]:
                 if isinstance(tool_input, dict):
                     sql = tool_input.get("sql") or tool_input.get("query")
                     if sql and isinstance(sql, str) and "SELECT" in sql.upper():
-                        return _clean_sql(sql)
+                        return _clean_sql(sql, strip_html=True)
                 elif isinstance(tool_input, str) and "SELECT" in tool_input.upper():
-                    return _clean_sql(tool_input)
+                    return _clean_sql(tool_input, strip_html=True)
+            if isinstance(observation, str):
+                clean_obs = re.sub(r'<[^>]+>', '', observation)
+                sql_match = re.search(r'SELECT\s+[\s\S]+?(?:;|$)', clean_obs, re.IGNORECASE)
+                if sql_match:
+                    return _clean_sql(sql_match.group(0), strip_html=True)
     output = response.get("output", "")
     if isinstance(output, str):
         match = re.search(r'```sql\s*(.*?)```', output, re.IGNORECASE | re.DOTALL)
         if match:
-            return _clean_sql(match.group(1))
+            return _clean_sql(match.group(1), strip_html=True)
     return None
 
 
 def _extract_sql_from_answer(answer: str) -> Optional[str]:
     if not answer or not isinstance(answer, str):
         return None
+    # 保护代码块后再剥离 HTML 高亮标签（LLM 可能回显带 span 的 SQL）
+    codeblocks: dict[str, str] = {}
+    def _stash(m):
+        key = f"\x00SQLCB{len(codeblocks)}ENDSQLCB\x00"
+        codeblocks[key] = m.group(0)
+        return key
+    stripped = re.sub(r'```[\s\S]*?```', _stash, answer)
+    stripped = re.sub(r'<[^>]+>', '', stripped)
+    for k, v in codeblocks.items():
+        stripped = stripped.replace(k, v)
     patterns = [
         r'```sql\s*(.*?)```',
         r'```(SELECT[\s\S]*?)```',
         r'(SELECT\s+[\s\S]*?;)',
     ]
     for pattern in patterns:
-        match = re.search(pattern, answer, re.IGNORECASE | re.DOTALL)
+        match = re.search(pattern, stripped, re.IGNORECASE | re.DOTALL)
         if match:
-            return _clean_sql(match.group(1))
+            return _clean_sql(match.group(1), strip_html=True)
     return None
 
 

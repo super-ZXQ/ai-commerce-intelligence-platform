@@ -1181,18 +1181,7 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                     if f"msg_{msg_idx}" in st.session_state.messages:
                         st.session_state.messages.pop(msg_idx)
                     st.rerun()
-            with col2:
-                feedback_key = f"feedback_{msg_idx}"
-                if "feedbacks" not in st.session_state:
-                    st.session_state.feedbacks = {}
-                thumbs_up = st.button("👍", key=f"up_{msg_idx}")
-                thumbs_down = st.button("👎", key=f"down_{msg_idx}")
-                if thumbs_up:
-                    st.session_state.feedbacks[feedback_key] = "👍 有帮助"
-                    st.success("感谢反馈！")
-                elif thumbs_down:
-                    st.session_state.feedbacks[feedback_key] = "👎 需改进"
-                    st.info("我们会持续优化，谢谢反馈！")
+
         
         render_answer_with_highlights(msg["content"])
 
@@ -1210,6 +1199,13 @@ for msg_idx, msg in enumerate(st.session_state.messages):
             try:
                 csv_df = pd.DataFrame(msg["csv_data"])
                 st.dataframe(csv_df, use_container_width=True, hide_index=True)
+                st.download_button(
+                    "📥 导出 CSV",
+                    csv_df.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="query_result.csv",
+                    mime="text/csv",
+                    key=f"dl_{hashlib.md5(str(msg['content'][:80]).encode()).hexdigest()}",
+                )
             except Exception:
                 pass
         if msg.get("chart_data"):
@@ -1224,18 +1220,6 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                         })
             except Exception as e:
                 st.caption(f"⚠️ 图表加载失败: {str(e)[:50]}")
-        if msg.get("csv_data"):
-            try:
-                csv_df = pd.DataFrame(msg["csv_data"])
-                st.download_button(
-                    "📥 导出 CSV",
-                    csv_df.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="query_result.csv",
-                    mime="text/csv",
-                    key=f"dl_{hashlib.md5(str(msg['content'][:80]).encode()).hexdigest()}",
-                )
-            except Exception:
-                pass
         if msg.get("sql"):
             render_sql_block(msg["sql"], msg.get("query_time"))
 
@@ -1380,8 +1364,7 @@ if prompt:
         render_answer_with_highlights(answer)
 
         result_df = None
-        full_data_query = False
-        
+
         if extracted_sql:
             result_df = run_sql_query(extracted_sql)
             
@@ -1403,7 +1386,6 @@ if prompt:
                     full_sql = extracted_sql
                 
                 if full_sql != extracted_sql:
-                    full_data_query = True
                     full_df = run_sql_query(full_sql)
                     if full_df is not None and len(full_df) > len(result_df):
                         result_df = full_df
@@ -1436,8 +1418,6 @@ if prompt:
                 st.metric(label="查询结果", value=f"{single_val:.2f}" if isinstance(single_val, (int, float)) else str(single_val))
                 chart_data = None
             else:
-                chart_type = detect_chart_type(result_df, prompt)
-                
                 fig = create_chart(result_df, chart_title, prompt)
                 if fig:
                     st.plotly_chart(fig, width='stretch', key=f"live_chart_{cache_key}", config={
