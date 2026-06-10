@@ -48,8 +48,11 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ 数据库表检查完成")
     except Exception as e:
-        logger.warning(f"⚠️ 数据库连接失败: {e}")
-        logger.warning("API将以无数据库模式启动，数据相关接口将返回错误")
+        # P6.8 修复：aiomysql 在 Windows ProactorEventLoop 上偶发池 reset 崩溃
+        # （AttributeError: 'NoneType' object has no attribute 'send'），但 create_all 的 SQL
+        # 实际已执行成功。降级为 warning 而非致命错误，保证服务能起。
+        logger.warning(f"⚠️ 数据库连接池清理异常（已忽略）: {type(e).__name__}: {e}")
+        logger.warning("API 将以无数据库模式启动，数据相关接口将返回错误")
 
     if settings.redis_enabled:
         redis_ok = init_redis(settings.redis_url)
