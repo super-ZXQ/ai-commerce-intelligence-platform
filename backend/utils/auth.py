@@ -64,8 +64,10 @@ def decode_token(token: str) -> Optional[TokenData]:
 
 
 DEFAULT_USERS: dict[str, str] = {
-    "admin": "$2b$12$Xq5inXxXtfU6.hqkK6sDveN7hkur1KxNDkW4/IFcADscx4wgGWZw6",
-    "analyst": "$2b$12$WQWnIBiiUtfIHJwm1X.RaOdTaA3ZszhRQXHQLVVxrHzhaGzye5sdu",
+    # P6.10 修复：原 hash 是占位字符串，bcrypt.checkpw 会报 Invalid salt，
+    # 导致 admin / analyst 永远登录失败。下面是 admin/admin123 和 analyst/analyst123 的真实 bcrypt 哈希。
+    "admin": "$2b$12$Vpo/SiCdZ86UqoEb5xad1OqWTL0A2VDz1r8UZVECQHcqFHXPYyMDy",
+    "analyst": "$2b$12$k1FZZJiYActq4Qux4iRwlucY99Ce5Ow4XIlvvB4bd4ZmkfgfmA0ta",
 }
 
 

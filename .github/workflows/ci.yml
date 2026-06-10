@@ -60,9 +60,7 @@ jobs:
   backend-tests:
     name: 后端测试 (Python 3.12)
     runs-on: ubuntu-latest
-    # 注：当前后端测试需要 MySQL 已初始化数据；本地存在 16 个认证失败
-    # 标记 continue-on-error 暂不阻塞 PR，便于先行建立 CI 流水线
-    continue-on-error: true
+    # P6.10 修复：test_api.py 改用 authed_client（自动注入 JWT），原 client 调需鉴权接口会 401
     services:
       mysql:
         image: mysql:8.0
