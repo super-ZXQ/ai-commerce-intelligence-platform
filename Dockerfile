@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends gcc default-libmysqlclient-dev && rm -rf /var/lib/apt/lists/*
+RUN for i in 1 2 3; do apt-get update && apt-get install -y --no-install-recommends --fix-missing gcc default-libmysqlclient-dev && break || sleep 5; done && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r ./backend/requirements.txt
