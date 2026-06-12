@@ -90,17 +90,21 @@ def test_search_returns_score_and_metadata(store):
 
 
 def test_search_score_threshold_filter(fake_embeddings, tmp_chroma_dir):
-    """阈值过滤：低于阈值的结果被过滤。"""
+    """阈值过滤：score < 阈值的结果被过滤。
+
+    归一化方案：search() 用 Chroma similarity_search_with_relevance_scores，
+    score 范围 0-1（1=完全相同）。fake embedder 命中时 score≈1.0。
+    """
     s = VectorStore(persist_dir=tmp_chroma_dir, collection_name="threshold_test", embedding=fake_embeddings)
     s.add_documents(
         [Document(page_content="only doc", metadata={"doc_id": "d1"})],
         ids=["d1"],
     )
-    # 阈值设到 2.0：任何 score < 2.0 都被过滤
-    results = s.search("only doc", k=3, score_threshold=2.0)
+    # 阈值设到 1.5（>1.0）：fake embedder 命中时 score≈1.0 < 1.5 → 过滤
+    results = s.search("only doc", k=3, score_threshold=1.5)
     assert results == []
-    # 阈值设到 -1.0：所有结果都保留
-    results = s.search("only doc", k=3, score_threshold=-1.0)
+    # 阈值设到 0.5：score≈1.0 >= 0.5 → 保留
+    results = s.search("only doc", k=3, score_threshold=0.5)
     assert len(results) >= 1
 
 
