@@ -169,9 +169,16 @@ def _get_sync_db() -> SQLDatabase:
     db_url = (
         f"mysql+pymysql://{settings.db_user}:{settings.db_password}"
         f"@{settings.db_host}:{settings.db_port}/{settings.db_name}?charset=utf8mb4"
-        f"&pool_size=3&max_overflow=2&pool_recycle=3600"
     )
-    return SQLDatabase.from_uri(db_url, engine_args={"pool_pre_ping": True})
+    return SQLDatabase.from_uri(
+        db_url,
+        engine_args={
+            "pool_pre_ping": True,
+            "pool_size": 3,
+            "max_overflow": 2,
+            "pool_recycle": 3600,
+        },
+    )
 
 
 _agent_cache: dict = {"agent": None, "settings_hash": None}
@@ -206,13 +213,24 @@ def _get_agent():
 
 {BUSINESS_CONTEXT}
 
-当用户提问时，你需要：
-1. 理解用户意图
-2. 生成正确的 SQL 查询
-3. 执行查询获取数据
-4. 用中文总结结论
+重要：你必须严格按照以下 ReAct 格式回答，每一步都要以 "Thought:" 开头：
 
-请始终用中文回答。"""
+Thought: 我需要查看表结构
+Action: sql_db_schema
+Action Input: orders
+
+Thought: 根据表结构，我需要查询...
+Action: sql_db_query
+Action Input: SELECT ... FROM orders WHERE ...
+
+Thought: 查询完成，总结结果
+Final Answer: 根据查询结果...
+
+注意：
+- Action Input 必须是纯文本，不是 JSON
+- sql_db_query 的 Action Input 必须是完整的 SELECT 语句
+- 不要创建表，直接查询 orders 表
+- 使用 payment_amount 表示付款金额（实际销售额）"""
 
     agent = create_sql_agent(
         llm=llm,
@@ -278,11 +296,82 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
                 extracted_sql = _extract_sql_from_answer(answer)
             match = re.search(r'Could not parse LLM output:\s*`([^`]*)', answer, re.DOTALL)
             clean_answer = match.group(1).strip() if match else answer.split("Could not parse")[0].strip()
+
+            result_data = []
+            visualization = None
+            if extracted_sql:
+                try:
+                    if _is_read_only_sql(extracted_sql):
+                        db = _get_sync_db()
+                        raw_result = await asyncio.to_thread(db.run, extracted_sql)
+                        logger.info(f"SQL执行原始结果: {raw_result[:500] if isinstance(raw_result, str) else str(raw_result)[:500]}")
+                        if isinstance(raw_result, str):
+                            try:
+                                parsed = json.loads(raw_result)
+                                if isinstance(parsed, list):
+                                    result_data = parsed
+                            except json.JSONDecodeError:
+                                import ast
+                                from decimal import Decimal
+                                try:
+                                    import re as _re
+                                    cleaned = _re.sub(r"Decimal\('([^']+)'\)", r"\1", raw_result)
+                                    parsed = ast.literal_eval(cleaned)
+                                    if isinstance(parsed, list):
+                                        if parsed and isinstance(parsed[0], tuple):
+                                            col_match = re.search(r'SELECT\s+(.+?)\s+FROM', extracted_sql, re.IGNORECASE)
+                                            if col_match:
+                                                cols = [c.strip().split(' AS ')[-1].strip('`"\'') for c in col_match.group(1).split(',')]
+                                                result_data = [dict(zip(cols, row)) for row in parsed]
+                                            else:
+                                                result_data = [dict(enumerate(row)) for row in parsed]
+                                        elif parsed and isinstance(parsed[0], dict):
+                                            result_data = parsed
+                                except (ValueError, SyntaxError):
+                                    pass
+                        elif isinstance(raw_result, list):
+                            if raw_result and isinstance(raw_result[0], dict):
+                                result_data = raw_result
+                            elif raw_result and isinstance(raw_result[0], tuple):
+                                col_match = re.search(r'SELECT\s+(.+?)\s+FROM', extracted_sql, re.IGNORECASE)
+                                if col_match:
+                                    cols = [c.strip().split(' AS ')[-1].strip('`"\'') for c in col_match.group(1).split(',')]
+                                    result_data = [dict(zip(cols, row)) for row in raw_result]
+
+                        if result_data and isinstance(result_data[0], dict):
+                            columns = list(result_data[0].keys())
+                            rows = [list(item.values()) for item in result_data]
+                            visualization = _build_visualization(columns, rows)
+                except Exception as e:
+                    logger.warning(f"解析错误后SQL执行失败: {e}")
+
+            if not result_data:
+                steps = response.get("intermediate_steps", [])
+                for step in steps:
+                    if isinstance(step, tuple) and len(step) >= 2:
+                        _, observation = step
+                        if isinstance(observation, str):
+                            obs_match = re.search(r'\[?\{[^}]+\}?\]', observation)
+                            if obs_match:
+                                try:
+                                    parsed = json.loads(obs_match.group(0))
+                                    if isinstance(parsed, list):
+                                        result_data = parsed
+                                    elif isinstance(parsed, dict):
+                                        result_data = [parsed]
+                                    if result_data and isinstance(result_data[0], dict):
+                                        columns = list(result_data[0].keys())
+                                        rows = [list(item.values()) for item in result_data]
+                                        visualization = _build_visualization(columns, rows)
+                                    break
+                                except json.JSONDecodeError:
+                                    pass
+
             return AIQueryResponse(
                 sql=extracted_sql,
-                result=[],
+                result=result_data,
                 answer=clean_answer,
-                visualization=None,
+                visualization=visualization,
             )
 
         extracted_sql = _extract_sql_from_intermediate(response)
@@ -302,17 +391,53 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
                     )
                 db = _get_sync_db()
                 raw_result = await asyncio.to_thread(db.run, extracted_sql)
+                logger.info(f"SQL执行原始结果: {raw_result[:500] if isinstance(raw_result, str) else str(raw_result)[:500]}")
                 if isinstance(raw_result, str):
                     try:
                         parsed = json.loads(raw_result)
                         if isinstance(parsed, list):
                             result_data = parsed
-                            if parsed and isinstance(parsed[0], dict):
-                                columns = list(parsed[0].keys())
-                                rows = [list(item.values()) for item in parsed]
-                                visualization = _build_visualization(columns, rows)
                     except json.JSONDecodeError:
-                        pass
+                        import ast
+                        from decimal import Decimal
+                        try:
+                            # 替换 Decimal(...) 为直接数值
+                            import re as _re
+                            cleaned = _re.sub(r"Decimal\('([^']+)'\)", r"\1", raw_result)
+                            parsed = ast.literal_eval(cleaned)
+                            if isinstance(parsed, list):
+                                if parsed and isinstance(parsed[0], tuple):
+                                    col_match = re.search(r'SELECT\s+(.+?)\s+FROM', extracted_sql, re.IGNORECASE)
+                                    if col_match:
+                                        cols = [c.strip().split(' AS ')[-1].strip('`"\'') for c in col_match.group(1).split(',')]
+                                        result_data = [dict(zip(cols, row)) for row in parsed]
+                                    else:
+                                        result_data = [dict(enumerate(row)) for row in parsed]
+                                elif parsed and isinstance(parsed[0], dict):
+                                    result_data = parsed
+                            elif isinstance(parsed, dict):
+                                result_data = [parsed]
+                            elif isinstance(parsed, tuple):
+                                if parsed and isinstance(parsed[0], tuple):
+                                    col_match = re.search(r'SELECT\s+(.+?)\s+FROM', extracted_sql, re.IGNORECASE)
+                                    if col_match:
+                                        cols = [c.strip().split(' AS ')[-1].strip('`"\'') for c in col_match.group(1).split(',')]
+                                        result_data = [dict(zip(cols, parsed[0]))]
+                        except (ValueError, SyntaxError):
+                            pass
+                elif isinstance(raw_result, list):
+                    if raw_result and isinstance(raw_result[0], dict):
+                        result_data = raw_result
+                    elif raw_result and isinstance(raw_result[0], tuple):
+                        col_match = re.search(r'SELECT\s+(.+?)\s+FROM', extracted_sql, re.IGNORECASE)
+                        if col_match:
+                            cols = [c.strip().split(' AS ')[-1].strip('`"\'') for c in col_match.group(1).split(',')]
+                            result_data = [dict(zip(cols, row)) for row in raw_result]
+
+                if result_data and isinstance(result_data[0], dict):
+                    columns = list(result_data[0].keys())
+                    rows = [list(item.values()) for item in result_data]
+                    visualization = _build_visualization(columns, rows)
             except Exception as e:
                 logger.warning(f"SQL执行失败: {e}")
 

@@ -113,6 +113,9 @@ services:
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-123456}
       DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      HF_HOME: /root/.cache/huggingface
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     command:
       - streamlit
       - run
@@ -121,6 +124,9 @@ services:
       - --server.address=0.0.0.0
       - --server.headless=true
       - --server.baseUrlPath=/ai
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+      - chroma_data:/app/data/chroma
     expose:
       - "8502"
     depends_on:
@@ -151,6 +157,10 @@ volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  huggingface_cache:
+    driver: local
+  chroma_data:
     driver: local
 
 networks:
