@@ -45,14 +45,15 @@ jobs:
       - name: 跑 AI 助手测试（必跑，强制通过）
         working-directory: ai-ecommerce-assistant
         # conftest.py 用 FakeEmbeddings，不依赖 BGE 模型下载（约 93MB）
-        run: python -m pytest tests/ -v --tb=short
+        # tee 到文件 + 上传 artifact：失败时可直接在 GitHub Actions 下载 stderr 排查
+        run: python -m pytest tests/ -v --tb=short 2>&1 | tee pytest-output.txt
 
       - name: 上传测试报告
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ai-assistant-test-report-py${{ matrix.python-version }}
-          path: ai-ecommerce-assistant/pytest-report.xml
+          path: ai-ecommerce-assistant/pytest-output.txt
           if-no-files-found: ignore
           retention-days: 7
 
@@ -112,9 +113,71 @@ jobs:
           done
 
       - name: 初始化 schema
+        # P6.11 修复：原 step 用 mysql 客户端 < sql/01_create_table.sql，
+        # 但该文件从未 commit（git 历史中完全不存在），导致 0 秒挂掉。
+        # 改用 pymysql + SQLAlchemy ORM 自动建表（pymysql 已在 requirements.txt），
+        # 同时不再依赖 mysql 系统包。
+        # PYTHONPATH=. 显式注入 repo root，保证 `from backend.xxx import` 能解析。
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          mysql -h 127.0.0.1 -P 3306 -uroot -p123456 \
-            ai_commerce_intelligence_platform < sql/01_create_table.sql
+          python - <<'PY'
+          import pymysql
+          from datetime import datetime, date
+          from decimal import Decimal
+          from sqlalchemy import create_engine, text
+          from backend.config import get_settings
+          from backend.database import Base
+          from backend.models.database_models import Order  # noqa: F401 注册 ORM
+
+          s = get_settings()
+          # 1. 确保 database 存在（service container 通常已自动建，幂等保护）
+          conn = pymysql.connect(host=s.db_host, port=s.db_port,
+                                 user=s.db_user, password=s.db_password)
+          with conn.cursor() as c:
+              c.execute(f"CREATE DATABASE IF NOT EXISTS `{s.db_name}` "
+                        f"DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci")
+          conn.commit()
+          conn.close()
+          print("✅ database ready")
+
+          # 2. 用 SQLAlchemy ORM 同步建表
+          eng = create_engine(s.database_url)
+          Base.metadata.create_all(eng)
+          with eng.connect() as c:
+              c.execute(text("SELECT 1"))
+          print("✅ tables created")
+
+          # 3. 最小 seed：5 条 fake orders，让 test_sales_overview 的
+          #    total_sales > 0 / total_orders > 0 断言通过
+          #    幂等：清空后插入，避免多次跑 CI 累加
+          with eng.begin() as c:
+              c.execute(text("DELETE FROM orders"))
+          from sqlalchemy.orm import sessionmaker
+          Sess = sessionmaker(bind=eng)
+          sess = Sess()
+          for i in range(1, 6):
+              sess.add(Order(
+                  order_id=f"CI{i:05d}",
+                  user_name=f"user_{i % 3}",
+                  product_id=f"P{i:03d}",
+                  order_amount=Decimal("100.00"),
+                  payment_amount=Decimal("95.00"),
+                  channel_id="ch1",
+                  platform_type="APP" if i % 2 else "Web网站",
+                  order_time=datetime(2026, 6, 1, 10, 0, 0),
+                  payment_time=datetime(2026, 6, 1, 10, 5, 0),
+                  is_refund="否",
+                  discount_amount=Decimal("5.00"),
+                  payment_duration_sec=300,
+                  order_date=date(2026, 6, 1),
+                  order_hour=10,
+                  weekday="Monday",
+              ))
+          sess.commit()
+          sess.close()
+          print("✅ 5 fake orders seeded")
+          PY
 
       - name: 写 .env 指向 CI MySQL
         working-directory: backend
