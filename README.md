@@ -2,6 +2,9 @@
 
 🐍 **Python 3.12** · 🚀 **FastAPI** · 📊 **Streamlit** · 🦜 **LangChain** · 🧠 **Chroma** · 🐬 **MySQL 8** · 🔴 **Redis 7** · 🐳 **Docker** · 📄 **MIT License**
 
+[![CI](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/ci.yml)
+[![Release](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/release.yml/badge.svg)](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/release.yml)
+
 ## 简介
 
 基于 **10 万+ 条电商真实订单数据**，完成从数据清洗、特征工程到多维分析与可视化的完整链路。系统采用前后端分离架构，提供交互式 BI 看板、AI 智能查询（含 RAG 业务知识检索增强）、RESTful API 服务、RFM 用户画像和实时监控五大核心能力。
@@ -16,7 +19,7 @@
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 自研评估器 | 76 个 RAG 单元测试 + 20 条 gold_qa 评估集 |
+| **测试 & 评估** | pytest + 自研评估器 | 107 个 RAG 单元测试 + 20 条 gold_qa 评估集 |
 
 ## 在线演示
 
@@ -294,7 +297,7 @@ rag_tool_call_total 18
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 107 个测试（Python 3.12 + 3.13 矩阵）+ 后端测试（带 MySQL service container）+ 语法检查 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 107 个测试（Python 3.12 + 3.13 矩阵）+ 后端测试（带 MySQL service container + pymysql 同步建表 + 5 条 fake orders seed）+ 语法检查 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
 **Tag 策略**（由 `docker/metadata-action` 自动管理）：
@@ -314,6 +317,8 @@ services:
     image: ghcr.io/super-zxq/ai-commerce-intelligence-platform-backend:v1.7.0
     # ... 其余配置不变
 ```
+
+> **CI 状态：✅ 全绿（4/4 job success，run #9，commit 73d1599）。** 历史 P6.11 修复（[commit 73d1599](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/commit/73d1599)）解决了后端 step 8 引用未 commit 的 `sql/01_create_table.sql` 导致的 0 秒挂掉问题——改用独立脚本 [`backend/scripts/init_ci_schema.py`](backend/scripts/init_ci_schema.py)（pymysql + SQLAlchemy `Base.metadata.create_all` 同步建表 + 5 条 fake orders 最小 seed），脚本首行 `sys.path.insert(repo_root)` 不依赖 PYTHONPATH/working-directory，stderr 走 tee + artifact 落盘便于失败排查。
 
 ### 2. 全栈健康检查脚本
 
@@ -455,6 +460,8 @@ ai-commerce-intelligence-platform/
 │   ├── utils/                    # 工具（认证/缓存/限流）
 │   ├── static/                   # HTML 静态页
 │   ├── sql/                      # SQL 脚本
+│   ├── scripts/                  # CI / 工具脚本
+│   │   └── init_ci_schema.py     # CI 建表 + 5 条 fake orders seed
 │   ├── tests/                    # API 单元测试
 │   └── requirements.txt
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）
@@ -507,7 +514,7 @@ ai-commerce-intelligence-platform/
 | 缓存 | Redis 7 |
 | 反代 | Nginx |
 | 容器 | Docker + Docker Compose |
-| 测试 | pytest（76 个 RAG 用例 + 20 条 gold_qa 评估集） |
+| 测试 | pytest（107 个 RAG 用例 + 20 条 gold_qa 评估集） |
 
 ## License
 
