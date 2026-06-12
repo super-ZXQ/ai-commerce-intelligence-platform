@@ -30,7 +30,7 @@ from backend.utils.text_cleaner import clean_sql  # noqa: E402
 from rag import extract_rag_sources  # noqa: E402
 from rag import metrics as rag_metrics  # noqa: E402
 
-load_dotenv(_PROJECT_ROOT / ".env")
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 logger = logging.getLogger(__name__)
 
