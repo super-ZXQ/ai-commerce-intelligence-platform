@@ -1,15 +1,14 @@
 import logging
 from datetime import date as date_type
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.models.schemas import (
-    PaginatedResponse,
-    OrderResponse,
     OrderFilterParams,
+    OrderResponse,
+    PaginatedResponse,
 )
 from backend.routes.auth import get_current_user
 from backend.services import order_service
@@ -49,14 +48,14 @@ async def list_orders(
 
 @router.get("/filter", response_model=PaginatedResponse, summary="条件筛选订单")
 async def filter_orders(
-    start_date: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="结束日期 YYYY-MM-DD"),
-    platform_type: Optional[str] = Query(None, description="平台类型"),
-    user_name: Optional[str] = Query(None, description="用户名(模糊匹配)"),
-    product_id: Optional[str] = Query(None, description="商品编号"),
-    is_refunded: Optional[str] = Query(None, description="是否退款 是/否"),
-    min_amount: Optional[float] = Query(None, ge=0, description="最小付款金额"),
-    max_amount: Optional[float] = Query(None, ge=0, description="最大付款金额"),
+    start_date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="开始日期 YYYY-MM-DD"),
+    end_date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="结束日期 YYYY-MM-DD"),
+    platform_type: str | None = Query(None, description="平台类型"),
+    user_name: str | None = Query(None, description="用户名(模糊匹配)"),
+    product_id: str | None = Query(None, description="商品编号"),
+    is_refunded: str | None = Query(None, description="是否退款 是/否"),
+    min_amount: float | None = Query(None, ge=0, description="最小付款金额"),
+    max_amount: float | None = Query(None, ge=0, description="最大付款金额"),
     sort_by: str = Query("order_time", description="排序字段"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="排序方向"),
     page: int = Query(1, ge=1, description="页码"),

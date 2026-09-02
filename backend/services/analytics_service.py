@@ -1,20 +1,19 @@
 import logging
-from typing import Optional
 
-from sqlalchemy import select, func, case, text
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.utils.cache import cached
 
 from backend.models.database_models import Order
 from backend.models.schemas import (
+    CategoryAnalysisItem,
+    CategoryAnalysisResponse,
     SalesOverviewResponse,
-    SalesTrendResponse,
     SalesTrendItem,
+    SalesTrendResponse,
     TopProductResponse,
     UserBehaviorResponse,
-    CategoryAnalysisResponse,
-    CategoryAnalysisItem,
 )
+from backend.utils.cache import cached
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +53,8 @@ async def get_sales_overview(db: AsyncSession) -> SalesOverviewResponse:
 async def get_sales_trend(
     db: AsyncSession,
     granularity: str = "day",
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> SalesTrendResponse:
     """获取销售趋势（按日/周/月聚合）"""
     conditions = []

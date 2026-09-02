@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from typing import Optional, Any
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -23,29 +24,29 @@ class OrderResponse(BaseModel):
     product_id: str = Field(..., description="商品编号")
     order_amount: float = Field(..., description="订单金额")
     payment_amount: float = Field(..., description="付款金额")
-    channel_id: Optional[str] = Field(None, description="渠道编号")
+    channel_id: str | None = Field(None, description="渠道编号")
     platform_type: str = Field(..., description="平台类型")
     order_time: datetime = Field(..., description="下单时间")
-    payment_time: Optional[datetime] = Field(None, description="付款时间")
+    payment_time: datetime | None = Field(None, description="付款时间")
     is_refunded: str = Field("否", description="是否退款")
-    discount_amount: Optional[float] = Field(0.0, description="优惠金额")
-    payment_duration_sec: Optional[float] = Field(None, description="支付耗时(秒)")
-    order_date: Optional[date] = Field(None, description="下单日期")
-    order_hour: Optional[int] = Field(None, description="下单小时")
-    weekday: Optional[str] = Field(None, description="星期几")
+    discount_amount: float | None = Field(0.0, description="优惠金额")
+    payment_duration_sec: float | None = Field(None, description="支付耗时(秒)")
+    order_date: date | None = Field(None, description="下单日期")
+    order_hour: int | None = Field(None, description="下单小时")
+    weekday: str | None = Field(None, description="星期几")
 
     model_config = {"from_attributes": True}
 
 
 class OrderFilterParams(BaseModel):
-    start_date: Optional[date] = Field(None, description="开始日期")
-    end_date: Optional[date] = Field(None, description="结束日期")
-    platform_type: Optional[str] = Field(None, description="平台类型")
-    user_name: Optional[str] = Field(None, description="用户名")
-    product_id: Optional[str] = Field(None, description="商品编号")
-    is_refunded: Optional[str] = Field(None, description="是否退款")
-    min_amount: Optional[float] = Field(None, ge=0, description="最小金额")
-    max_amount: Optional[float] = Field(None, ge=0, description="最大金额")
+    start_date: date | None = Field(None, description="开始日期")
+    end_date: date | None = Field(None, description="结束日期")
+    platform_type: str | None = Field(None, description="平台类型")
+    user_name: str | None = Field(None, description="用户名")
+    product_id: str | None = Field(None, description="商品编号")
+    is_refunded: str | None = Field(None, description="是否退款")
+    min_amount: float | None = Field(None, ge=0, description="最小金额")
+    max_amount: float | None = Field(None, ge=0, description="最大金额")
     sort_by: str = Field("order_time", description="排序字段")
     sort_order: str = Field("desc", description="排序方向 asc/desc")
 
@@ -117,14 +118,14 @@ class AIQueryRequest(BaseModel):
 
 
 class AIQueryResponse(BaseModel):
-    sql: Optional[str] = Field(None, description="生成的SQL语句")
+    sql: str | None = Field(None, description="生成的SQL语句")
     result: list[dict[str, Any]] = Field(default_factory=list, description="查询结果")
     answer: str = Field(..., description="AI回答文本")
-    visualization: Optional[dict[str, Any]] = Field(None, description="可视化配置")
-    sql_error: Optional[str] = Field(None, description="SQL执行失败时的错误说明；为空表示执行成功或未执行")
+    visualization: dict[str, Any] | None = Field(None, description="可视化配置")
+    sql_error: str | None = Field(None, description="SQL执行失败时的错误说明；为空表示执行成功或未执行")
 
 
 class ErrorResponse(BaseModel):
     error_code: str = Field(..., description="错误码")
     message: str = Field(..., description="错误信息")
-    detail: Optional[str] = Field(None, description="详细错误信息")
+    detail: str | None = Field(None, description="详细错误信息")

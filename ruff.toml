@@ -1,0 +1,33 @@
+# Ruff 静态检查配置
+# 不显式声明规则集，沿用 ruff 默认规则（保持与 CI 解析到的规则一致）。
+# 主要用 per-file-ignores 处理框架惯用法 / 模块设计意图相关的误报。
+
+target-version = "py312"
+line-length = 120
+
+[lint]
+ignore = [
+    "G004",  # logging f-string（项目里 f-string 与 %-format 并存，不强制统一）
+]
+
+[lint.per-file-ignores]
+# FastAPI 路由层：`Depends()` / `Query()` 默认参数是官方推荐写法
+"backend/routes/**/*.py" = ["B008"]
+# 一次性脚本：宽 except 是常见的健壮性写法
+"backend/scripts/**/*.py" = ["BLE001"]
+"scripts/**/*.py" = ["BLE001"]
+# 测试代码：故意构造异常分支、try-except-pass 都允许
+"backend/tests/**/*.py" = ["B008", "S110", "BLE001", "DTZ005"]
+"ai-ecommerce-assistant/tests/**/*.py" = ["B008", "S110", "BLE001", "DTZ005", "PERF"]
+# RAG 层：best-effort 检索/缓存操作，主动吞异常保留可观测性（用 logger.exception 替代 pass）
+"ai-ecommerce-assistant/rag/**/*.py" = ["BLE001", "S110"]
+# 后端缓存：穿透/击穿保护需要 broad except
+"backend/utils/cache.py" = ["BLE001", "S110"]
+# 监控端点：构造失败检测，broad except 是设计意图
+"backend/routes/monitor.py" = ["BLE001"]
+# build_knowledge_base 是离线数据准备脚本
+"ai-ecommerce-assistant/build_knowledge_base.py" = ["BLE001", "S110"]
+# 数据库连接池：启动期吞 transient 错误合理
+"backend/database.py" = ["BLE001"]
+# Streamlit UI：顶层 try/except 兜底渲染异常
+"streamlit_app.py" = ["BLE001"]

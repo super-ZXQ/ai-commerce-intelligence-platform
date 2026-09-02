@@ -1,17 +1,18 @@
-import logging
-import time
-import os
 import asyncio
 import json
-import httpx
-from datetime import datetime, timezone
+import logging
+import os
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from backend.database import check_db_connection
-from backend.utils.cache import check_redis_health, stats as cache_stats
+from backend.utils.cache import check_redis_health
+from backend.utils.cache import stats as cache_stats
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ async def get_metrics():
         "server": {
             "status": "running",
             "uptime_seconds": uptime_sec,
-            "started_at": datetime.fromtimestamp(_start_time, tz=timezone.utc).isoformat(),
+            "started_at": datetime.fromtimestamp(_start_time, tz=UTC).isoformat(),
             "python_version": os.sys.version.split()[0],
             "process_id": os.getpid(),
         },
@@ -101,7 +102,7 @@ async def detailed_health():
     return {
         "status": "healthy" if all_ok else "degraded",
         "checks": checks,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 

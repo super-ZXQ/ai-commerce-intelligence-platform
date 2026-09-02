@@ -19,7 +19,6 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ _events_logger.propagate = False
 _events_logger.setLevel(logging.INFO)
 
 # 可选：JSONL 事件流文件 handler（按需挂载，避免对磁盘造成写放大）
-_events_file_handler: Optional[logging.Handler] = None
+_events_file_handler: logging.Handler | None = None
 _events_file_lock = threading.Lock()
 
 
@@ -150,7 +149,7 @@ def log_event(event_type: str, **fields) -> None:
 
 
 def dump_combined_stats(retriever_stats: dict,
-                        tool_stats: Optional[dict] = None,
+                        tool_stats: dict | None = None,
                         path: str = DEFAULT_STATS_PATH) -> None:
     """把 retriever stats + tool stats 原子写入 JSON。
 
@@ -174,7 +173,7 @@ def dump_combined_stats(retriever_stats: dict,
     os.replace(tmp, target)
 
 
-def load_stats(path: str = DEFAULT_STATS_PATH) -> Optional[dict]:
+def load_stats(path: str = DEFAULT_STATS_PATH) -> dict | None:
     """读取 stats JSON。文件不存在或解析失败返回 None。"""
     p = Path(path)
     if not p.exists():

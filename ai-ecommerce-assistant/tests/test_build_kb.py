@@ -5,15 +5,13 @@
 from __future__ import annotations
 
 import pytest
-
 from build_knowledge_base import (
     _doc_type,
     _make_doc_id,
+    _sliding_window,
     _split_by_sections,
     _split_long_section,
-    _sliding_window,
 )
-
 
 # ─────────────────── _doc_type ───────────────────
 

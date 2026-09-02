@@ -1,27 +1,28 @@
+import asyncio
 import logging
 import os
 import time
-import asyncio
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Callable, Awaitable
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
 from backend.config import get_settings
-from backend.database import engine, check_db_connection
-from backend.routes import orders, products, analytics, ai, export, auth, monitor, rfm
-from backend.routes.monitor import record_request
+from backend.database import check_db_connection, engine
+from backend.routes import ai, analytics, auth, export, monitor, orders, products, rfm
 from backend.routes.monitor import (
+    _load_rag_stats,
     detailed_health,
+    record_request,
     render_backend_prometheus,
     render_rag_prometheus,
-    _load_rag_stats,
 )
-from backend.utils.rate_limiter import check_rate_limit
-from backend.utils.cache import init_redis, cleanup_memory_cache, clear as clear_cache
 from backend.services.rfm_service import RfmDataUnavailableError
+from backend.utils.cache import cleanup_memory_cache, init_redis
+from backend.utils.cache import clear as clear_cache
+from backend.utils.rate_limiter import check_rate_limit
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,8 +43,8 @@ async def _cache_cleanup_task():
             removed = cleanup_memory_cache()
             if removed > 0:
                 logger.info(f"🧹 内存缓存清理: 移除 {removed} 个过期键")
-        except Exception as e:
-            logger.warning(f"缓存清理异常: {e}")
+        except Exception:
+            logger.exception("缓存清理循环发生未预期异常")
 
 
 @asynccontextmanager
@@ -177,7 +178,7 @@ async def logging_and_rate_limit_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"未处理异常: {exc}", exc_info=True)
+    logger.exception(f"未处理异常: {request.method} {request.url.path}")
     return JSONResponse(
         status_code=500,
         content={

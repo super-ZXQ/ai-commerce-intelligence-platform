@@ -6,7 +6,6 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
-
 from rag import metrics
 from rag.retriever import Retriever, _bucketize
 

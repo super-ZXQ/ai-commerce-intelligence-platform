@@ -1,11 +1,13 @@
-import json
-import logging
+import asyncio
 import hashlib
 import inspect
+import json
+import logging
 import time
-import asyncio
-from typing import Any, Optional, Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from functools import wraps
+from typing import Any
+
 from pydantic import BaseModel, TypeAdapter
 
 logger = logging.getLogger(__name__)
@@ -113,7 +115,7 @@ def _cache_contains(key: str) -> bool:
     return True
 
 
-def get(key: str) -> Optional[Any]:
+def get(key: str) -> Any | None:
     if _redis_available and _redis_client:
         try:
             raw = _redis_client.get(key)

@@ -3,10 +3,9 @@ import logging
 import math
 import time
 from collections import OrderedDict
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
-from sqlalchemy import select, func, and_, literal
+from sqlalchemy import and_, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database_models import Order
@@ -37,11 +36,11 @@ _SEGMENT_PRIORITY = {
 # Docker 当前使用单 Worker；若未来扩容为多 Worker，各进程会各自维护一份有界快照。
 _SNAPSHOT_TTL_SECONDS = 600
 _SNAPSHOT_MAX_ENTRIES = 8
-_snapshot_cache: OrderedDict[tuple[Optional[str], int], dict] = OrderedDict()
-_snapshot_locks: dict[tuple[Optional[str], int], asyncio.Lock] = {}
+_snapshot_cache: OrderedDict[tuple[str | None, int], dict] = OrderedDict()
+_snapshot_locks: dict[tuple[str | None, int], asyncio.Lock] = {}
 # 与 backend/utils/cache.py 同理：锁可能"已取用但还在等待队列中"，
 # 用引用计数保护，防止快照逐出时误回收正在使用的锁
-_snapshot_lock_refs: dict[tuple[Optional[str], int], int] = {}
+_snapshot_lock_refs: dict[tuple[str | None, int], int] = {}
 
 
 async def _fetch_rfm_raw(db: AsyncSession, ref_date) -> list[dict]:
@@ -137,12 +136,12 @@ def _build_segments(users: list[dict]) -> list[dict]:
 
 async def _build_rfm_snapshot(
     db: AsyncSession,
-    reference_date: Optional[str] = None,
+    reference_date: str | None = None,
     n_bins: int = 5,
 ) -> dict:
     """计算一份完整 RFM 快照，供汇总、分页和 TOP 用户共同复用。"""
     if reference_date:
-        ref_date = datetime.strptime(reference_date, "%Y-%m-%d").date()
+        ref_date = datetime.strptime(reference_date, "%Y-%m-%d").replace(tzinfo=UTC).date()
     else:
         max_date_stmt = select(func.max(Order.order_date))
         result = await db.execute(max_date_stmt)
@@ -190,7 +189,7 @@ async def _build_rfm_snapshot(
 
 async def _get_rfm_snapshot(
     db: AsyncSession,
-    reference_date: Optional[str] = None,
+    reference_date: str | None = None,
     n_bins: int = 5,
 ) -> dict:
     """获取有界、带 TTL 的进程内快照，防止并发请求重复执行重计算。"""
@@ -260,7 +259,7 @@ def _summary_from_snapshot(snapshot: dict) -> dict:
 @cached(ttl=600)
 async def compute_rfm(
     db: AsyncSession,
-    reference_date: Optional[str] = None,
+    reference_date: str | None = None,
     n_bins: int = 5,
 ) -> dict:
     """返回 RFM 汇总；Redis 中不再保存完整用户明细。"""
@@ -278,7 +277,7 @@ async def get_rfm_segment_detail(
     segment: str,
     page: int = 1,
     page_size: int = 20,
-    reference_date: Optional[str] = None,
+    reference_date: str | None = None,
     n_bins: int = 5,
 ) -> dict:
     snapshot = await _get_rfm_snapshot(
@@ -309,7 +308,7 @@ async def get_rfm_segment_detail(
 async def get_rfm_top_users(
     db: AsyncSession,
     limit: int = 20,
-    reference_date: Optional[str] = None,
+    reference_date: str | None = None,
     n_bins: int = 5,
 ) -> dict:
     """按 RFM 价值顺序返回指定数量用户，正确支持 1-100 条。"""

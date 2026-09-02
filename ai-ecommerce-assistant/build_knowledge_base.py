@@ -26,8 +26,8 @@ import logging
 import re
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -37,8 +37,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from langchain_core.documents import Document  # noqa: E402
-from rag import VectorStore, get_embeddings, DEFAULT_PERSIST_DIR, metrics  # noqa: E402
+from langchain_core.documents import Document
+from rag import DEFAULT_PERSIST_DIR, VectorStore, get_embeddings, metrics
 
 logging.basicConfig(
     level=logging.INFO,

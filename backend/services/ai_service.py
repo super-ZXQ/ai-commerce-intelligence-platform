@@ -1,22 +1,22 @@
-import logging
-import re
-import json
 import asyncio
 import hashlib
+import json
+import logging
+import re
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 from functools import lru_cache
 
+from langchain_community.agent_toolkits import SQLDatabaseToolkit, create_sql_agent
 from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_openai import ChatOpenAI
-from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.config import get_settings
 from backend.models.schemas import AIQueryResponse
-from backend.utils.text_cleaner import clean_sql as _clean_sql
 from backend.utils.sql_guard import guard_read_only_engine, is_read_only_sql
+from backend.utils.text_cleaner import clean_sql as _clean_sql
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def _is_sensitive(query: str) -> bool:
     return False
 
 
-def _extract_sql_from_intermediate(response: dict) -> Optional[str]:
+def _extract_sql_from_intermediate(response: dict) -> str | None:
     steps = response.get("intermediate_steps", [])
     for step in steps:
         if isinstance(step, tuple) and len(step) >= 2:
@@ -84,7 +84,7 @@ def _extract_sql_from_intermediate(response: dict) -> Optional[str]:
     return None
 
 
-def _extract_sql_from_answer(answer: str) -> Optional[str]:
+def _extract_sql_from_answer(answer: str) -> str | None:
     if not answer or not isinstance(answer, str):
         return None
     # 保护代码块后再剥离 HTML 高亮标签（LLM 可能回显带 span 的 SQL）
@@ -109,7 +109,7 @@ def _extract_sql_from_answer(answer: str) -> Optional[str]:
     return None
 
 
-def _detect_chart_type(columns: list[str], rows: list) -> Optional[str]:
+def _detect_chart_type(columns: list[str], rows: list) -> str | None:
     if not rows or len(columns) < 2:
         return None
     col1 = columns[0].lower()
@@ -121,7 +121,7 @@ def _detect_chart_type(columns: list[str], rows: list) -> Optional[str]:
     return "bar"
 
 
-def _build_visualization(columns: list[str], rows: list) -> Optional[dict]:
+def _build_visualization(columns: list[str], rows: list) -> dict | None:
     chart_type = _detect_chart_type(columns, rows)
     if not chart_type:
         return None
@@ -322,7 +322,7 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
                             columns = list(result_data[0].keys())
                             rows = [list(item.values()) for item in result_data]
                             visualization = _build_visualization(columns, rows)
-                except Exception as e:
+                except SQLAlchemyError as e:
                     # 记录并上抛执行错误，避免"SQL 挂了"被误判为"无数据"
                     logger.warning(f"解析错误后SQL执行失败: {e}")
                     sql_error = f"SQL 执行失败: {e}"
@@ -382,7 +382,7 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
                     columns = list(result_data[0].keys())
                     rows = [list(item.values()) for item in result_data]
                     visualization = _build_visualization(columns, rows)
-            except Exception as e:
+            except SQLAlchemyError as e:
                 # 记录并上抛执行错误，避免"SQL 挂了"被误判为"无数据"
                 logger.warning(f"SQL执行失败: {e}")
                 sql_error = f"SQL 执行失败: {e}"
@@ -395,8 +395,8 @@ async def process_natural_language_query(query: str) -> AIQueryResponse:
             sql_error=sql_error,
         )
 
-    except Exception as e:
-        logger.error(f"AI查询处理失败: {e}")
+    except Exception:  # noqa: BLE001 - 顶层兜底，AI 调用链可能抛任意异常
+        logger.exception("AI查询处理失败")
         return AIQueryResponse(
             sql=None,
             result=[],

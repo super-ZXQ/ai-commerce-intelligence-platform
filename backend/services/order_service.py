@@ -1,17 +1,16 @@
 import logging
 import math
-from typing import Optional
 
-from sqlalchemy import select, func, desc, asc
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database_models import Order
 from backend.models.schemas import (
-    OrderResponse,
     OrderFilterParams,
+    OrderResponse,
+    PaginatedResponse,
     ProductSalesResponse,
     UserSpendingResponse,
-    PaginatedResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,7 +55,7 @@ async def get_orders(
     )
 
 
-async def get_order_by_id(db: AsyncSession, order_id: int) -> Optional[OrderResponse]:
+async def get_order_by_id(db: AsyncSession, order_id: int) -> OrderResponse | None:
     """根据ID获取单个订单详情"""
     stmt = select(Order).where(Order.id == order_id)
     result = await db.execute(stmt)

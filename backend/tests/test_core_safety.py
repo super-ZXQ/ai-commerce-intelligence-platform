@@ -6,10 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 from backend.config import Settings
-from backend.scripts.sync_orders import build_import_sql
 from backend.models.schemas import SalesOverviewResponse
-from backend.services import rfm_service
-from backend.services import ai_service
+from backend.scripts.sync_orders import build_import_sql
+from backend.services import ai_service, rfm_service
 from backend.services.rfm_service import (
     _score_users,
     _summary_from_snapshot,

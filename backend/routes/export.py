@@ -2,18 +2,17 @@ import csv
 import io
 import logging
 from datetime import date
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.models.database_models import Order
-from backend.services import analytics_service
 from backend.routes.auth import get_current_user
+from backend.services import analytics_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +101,9 @@ async def _stream_orders_csv(
 @router.get("/orders", summary="导出订单数据")
 async def export_orders(
     export_format: str = Query("csv", pattern="^(csv|excel)$", description="导出格式: csv/excel"),
-    start_date: Optional[date] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[date] = Query(None, description="结束日期 YYYY-MM-DD"),
-    platform_type: Optional[str] = Query(None, description="平台类型"),
+    start_date: date | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: date | None = Query(None, description="结束日期 YYYY-MM-DD"),
+    platform_type: str | None = Query(None, description="平台类型"),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):

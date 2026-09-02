@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.routes.auth import get_current_user
 from backend.models.schemas import (
     ProductSalesResponse,
     UserSpendingResponse,
 )
+from backend.routes.auth import get_current_user
 from backend.services import order_service
 
 logger = logging.getLogger(__name__)

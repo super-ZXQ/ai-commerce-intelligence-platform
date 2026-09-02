@@ -1,24 +1,25 @@
+import ast
+import datetime
+import decimal
+import hashlib
+import html
+import json
+import logging
 import os
 import re
 import sys
-import json
-import ast
 import time
-import datetime
-import hashlib
-import decimal
-import logging
-import html
-from urllib.parse import quote_plus
 from pathlib import Path
+from urllib.parse import quote_plus
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from dotenv import load_dotenv
+from langchain_community.agent_toolkits import SQLDatabaseToolkit, create_sql_agent
 from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_openai import ChatOpenAI
-from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -26,15 +27,16 @@ from sqlalchemy.engine import Engine
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
-from backend.utils.text_cleaner import clean_sql, sanitize_error  # noqa: E402
-from backend.utils.sql_guard import (  # noqa: E402
+# 业务知识来源抽取（无 streamlit 依赖，便于单元测试）
+from agent_stream import stream_agent_response  # noqa: E402
+from rag import extract_rag_sources
+from rag import metrics as rag_metrics
+
+from backend.utils.sql_guard import (
     ensure_read_only_sql,
     guard_read_only_engine,
 )
-
-# 业务知识来源抽取（无 streamlit 依赖，便于单元测试）
-from rag import extract_rag_sources  # noqa: E402
-from rag import metrics as rag_metrics  # noqa: E402
+from backend.utils.text_cleaner import clean_sql, sanitize_error
 
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
@@ -254,7 +256,7 @@ def init_retriever():
         (retriever, status_dict) 元组。status_dict 包含 ok / error / count。
     """
     try:
-        from rag import VectorStore, Retriever, get_embeddings
+        from rag import Retriever, VectorStore, get_embeddings
         embed = get_embeddings()
         store = VectorStore(embedding=embed)
         retriever = Retriever(store, k=3, score_threshold=0.4)
@@ -395,13 +397,13 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
         fig.update_traces(line_width=3, marker_size=10,
                           fill='tozeroy', fillcolor='rgba(129,140,248,0.1)')
         fig.add_scatter(x=df[x_col], y=df[y_col], mode='markers',
-                        marker=dict(size=12, color="#FACC15", line=dict(width=2, color='#fff')), showlegend=False)
+                        marker={"size": 12, "color": "#FACC15", "line": {"width": 2, "color": '#fff'}}, showlegend=False)
 
     elif chart_type == "pie":
         fig = px.pie(df, names=x_col, values=y_col, template="plotly_dark", title=title,
                      hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
         fig.update_traces(textposition='inside', textinfo='percent+label',
-                          textfont=dict(size=13, color='white'),
+                          textfont={"size": 13, "color": 'white'},
                           hovertemplate='<b>%{label}</b><br>数值: %{value:,.2f}<br>占比: %{percent}<extra></extra>',
                           pull=[0.02] * len(df))
 
@@ -452,14 +454,14 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                     y=[x_label],
                     orientation='h',
                     name=x_label,
-                    marker=dict(
-                        color=bar_colors[i % len(bar_colors)],
-                        line=dict(width=0, color='rgba(255,255,255,0)'),
-                        cornerradius=4,
-                    ),
+                    marker={
+                        "color": bar_colors[i % len(bar_colors)],
+                        "line": {"width": 0, "color": 'rgba(255,255,255,0)'},
+                        "cornerradius": 4,
+                    },
                     text=y_text,
                     textposition='outside',
-                    textfont=dict(size=14, color='#E4E4E7', family='monospace'),
+                    textfont={"size": 14, "color": '#E4E4E7', "family": 'monospace'},
                     hovertemplate=f'<b>{x_label}</b><br>%{{x:,.0f}}<extra></extra>',
                 ))
 
@@ -484,14 +486,14 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
                     y=[x_label],
                     orientation='h',
                     name=x_label,
-                    marker=dict(
-                        color=bar_colors[(n_items - 1 - i) % len(bar_colors)],
-                        line=dict(width=0, color='rgba(255,255,255,0)'),
-                        cornerradius=4,
-                    ),
+                    marker={
+                        "color": bar_colors[(n_items - 1 - i) % len(bar_colors)],
+                        "line": {"width": 0, "color": 'rgba(255,255,255,0)'},
+                        "cornerradius": 4,
+                    },
                     text=y_text,
                     textposition='outside',
-                    textfont=dict(size=14, color='#E4E4E7', family='monospace'),
+                    textfont={"size": 14, "color": '#E4E4E7', "family": 'monospace'},
                     hovertemplate=f'<b>{x_label}</b><br>%{{x:,.0f}}<extra></extra>',
                 ))
 
@@ -501,30 +503,30 @@ def create_chart(df: pd.DataFrame, title: str = "", question: str = "") -> go.Fi
         fig = go.Figure()
 
     fig.update_layout(
-        title=dict(text=title, x=0.02, xanchor='left', y=0.97, yanchor='top',
-                   font=dict(size=18, color='#818CF8')),
-        margin=dict(l=80 if chart_type in ["bar_h", "bar"] else 30,
-                    r=100 if chart_type in ["bar_h", "bar"] else 30,
-                    t=70, b=50),
+        title={"text": title, "x": 0.02, "xanchor": 'left', "y": 0.97, "yanchor": 'top',
+                   "font": {"size": 18, "color": '#818CF8'}},
+        margin={"l": 80 if chart_type in ["bar_h", "bar"] else 30,
+                    "r": 100 if chart_type in ["bar_h", "bar"] else 30,
+                    "t": 70, "b": 50},
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(15,17,23,0.8)',
-        font=dict(color='#E4E4E7', size=13),
-        title_font=dict(size=16, color='#818CF8'),
+        font={"color": '#E4E4E7', "size": 13},
+        title_font={"size": 16, "color": '#818CF8'},
         showlegend=False,
-        xaxis=dict(
-            showgrid=False if chart_type in ["bar_h", "bar"] else True,
-            gridcolor='rgba(255,255,255,0.05)',
-            showticklabels=False if chart_type in ["bar_h", "bar"] else True,
-            tickangle=-20 if chart_type == "line" else 0,
-            tickfont=dict(size=11),
-            zeroline=False,
-            range=[0, None] if chart_type in ["bar_h", "bar"] else None,
-        ),
-        yaxis=dict(
-            showgrid=True if chart_type in ["bar_h", "bar"] else True,
-            gridcolor='rgba(255,255,255,0.05)',
-            tickfont=dict(size=11),
-        ),
+        xaxis={
+            "showgrid": False if chart_type in ["bar_h", "bar"] else True,
+            "gridcolor": 'rgba(255,255,255,0.05)',
+            "showticklabels": False if chart_type in ["bar_h", "bar"] else True,
+            "tickangle": -20 if chart_type == "line" else 0,
+            "tickfont": {"size": 11},
+            "zeroline": False,
+            "range": [0, None] if chart_type in ["bar_h", "bar"] else None,
+        },
+        yaxis={
+            "showgrid": True if chart_type in ["bar_h", "bar"] else True,
+            "gridcolor": 'rgba(255,255,255,0.05)',
+            "tickfont": {"size": 11},
+        },
         hovermode='closest',
         bargap=0.5,
     )
@@ -1342,14 +1344,26 @@ if prompt:
 
     with st.chat_message("assistant"):
         step_placeholder = st.empty()
+        answer_placeholder = st.empty()
         step_placeholder.markdown(show_step_progress(1), unsafe_allow_html=True)
 
-        time.sleep(0.3)
-        step_placeholder.markdown(show_step_progress(2), unsafe_allow_html=True)
+        # 流式状态：工具步骤实时更新进度，最终答案逐 token 渲染
+        stream_answer = {"text": ""}
+
+        def _on_step(evt):
+            icon = "✅" if evt.get("status") == "done" else "🔄"
+            step_placeholder.markdown(f"{icon} {evt.get('label', '处理中')}…")
+
+        def _on_token(delta):
+            stream_answer["text"] += delta
+            # 光标符提示生成中，完成后由权威渲染管线接管
+            answer_placeholder.markdown(stream_answer["text"] + "▌")
 
         try:
             start_time = time.time()
-            response = agent.invoke({"input": prompt})
+            response = stream_agent_response(
+                agent, prompt, on_step=_on_step, on_token=_on_token
+            )
             query_time = time.time() - start_time
             answer = response.get("output", "抱歉，我暂时无法回答这个问题。")
         except Exception as e:
@@ -1364,6 +1378,7 @@ if prompt:
                 response = {"output": answer, "intermediate_steps": []}
             else:
                 step_placeholder.empty()
+                answer_placeholder.empty()
                 st.error(f"⚠️ 执行出错：{error_str}")
                 st.session_state.messages.append({
                     "role": "assistant",
@@ -1377,11 +1392,9 @@ if prompt:
         # 抽取本次回答引用的业务知识来源，供"📚 参考知识"面板展示
         rag_sources = extract_rag_sources(response)
 
-        step_placeholder.markdown(show_step_progress(3), unsafe_allow_html=True)
-        time.sleep(0.2)
-        step_placeholder.markdown(show_step_progress(4), unsafe_allow_html=True)
-        time.sleep(0.2)
+        # 流式已完成真实进度展示，清理过程元素后交给下方权威渲染管线
         step_placeholder.empty()
+        answer_placeholder.empty()
 
         chart_data = None
         chart_title = prompt[:30]

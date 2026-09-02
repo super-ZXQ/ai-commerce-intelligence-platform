@@ -50,3 +50,17 @@ test_*.json
 .zcode/
 # 含真实凭据的轮换脚本（仅本地执行）
 deploy/sql/rotate_credentials.local.sql
+
+# Impeccable 临时运行产物（共享设计文件仍保留跟踪）
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/hook.pending.json
+.impeccable/*.png
+.impeccable/review/
+.impeccable/questions/
+.impeccable/live/server.json
+.impeccable/live/sessions/
+.impeccable/live/previews/
+.impeccable/live/annotations/
+.impeccable/live/cache/
+.impeccable/live/*.png

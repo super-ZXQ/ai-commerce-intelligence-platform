@@ -19,18 +19,17 @@ from types import SimpleNamespace
 
 import pytest
 
+from backend.config import Settings
 from backend.routes.export import _sanitize_cell
-from backend.utils.rate_limiter import _get_client_id
-from backend.utils import cache
 from backend.services.rfm_service import (
     RfmDataUnavailableError,
-    _fetch_rfm_raw,
     _build_rfm_snapshot,
+    _fetch_rfm_raw,
     clear_rfm_snapshot_cache,
 )
+from backend.utils import cache
+from backend.utils.rate_limiter import _get_client_id
 from backend.utils.sql_guard import is_read_only_sql
-from backend.config import Settings
-
 
 # ─── 安全#5：CSV 公式注入防护 ───────────────────────────
 
@@ -133,7 +132,7 @@ class TestRefLockRefCount:
         assert len(cache._cache_locks) == 1, "缓存条目未过期，锁应保留"
 
         # 手动过期后清理应回收
-        for k, v in cache._memory_cache.items():
+        for v in cache._memory_cache.values():
             v["expires_at"] = 0
         cache.cleanup_memory_cache()
         assert len(cache._cache_locks) == 0, "过期后锁应被回收"
@@ -199,7 +198,7 @@ class TestRfmDistinctCount:
         async def fake_execute(stmt):
             nonlocal captured_stmt
             captured_stmt = stmt
-            return SimpleNamespace(all=lambda: [])
+            return SimpleNamespace(all=list)
 
         fake_db = SimpleNamespace(execute=fake_execute)
         import datetime

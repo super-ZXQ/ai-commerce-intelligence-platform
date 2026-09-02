@@ -101,9 +101,7 @@ def is_read_only_sql(sql: str) -> bool:
         return False
     if _FORBIDDEN_KEYWORDS.search(cleaned):
         return False
-    if _FORBIDDEN_SELECT_PATTERNS.search(cleaned):
-        return False
-    return True
+    return not _FORBIDDEN_SELECT_PATTERNS.search(cleaned)
 
 
 def ensure_read_only_sql(sql: str) -> None:

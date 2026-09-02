@@ -27,7 +27,7 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from rag.retriever import Retriever  # noqa: E402
+from rag.retriever import Retriever
 
 
 def load_gold(path: Path) -> list[dict]:

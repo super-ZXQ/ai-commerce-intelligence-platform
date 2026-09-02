@@ -53,7 +53,7 @@ def _build_meta_sentinel(docs: list[dict]) -> str:
     return f"{_RAG_META_BEGIN}{json.dumps(payload, ensure_ascii=False)}{_RAG_META_END}"
 
 
-def build_knowledge_tool(retriever: "Retriever") -> Tool:
+def build_knowledge_tool(retriever: Retriever) -> Tool:
     """构造业务知识查询工具。
 
     Args:

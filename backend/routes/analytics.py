@@ -1,19 +1,18 @@
 import logging
-from typing import Optional
-
-from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.routes.auth import get_current_user
 from backend.models.schemas import (
+    CategoryAnalysisResponse,
     SalesOverviewResponse,
     SalesTrendResponse,
     TopProductResponse,
     UserBehaviorResponse,
-    CategoryAnalysisResponse,
 )
+from backend.routes.auth import get_current_user
 from backend.services import analytics_service
 
 logger = logging.getLogger(__name__)
@@ -39,8 +38,8 @@ async def sales_overview(db: AsyncSession = Depends(get_db), user: dict = Depend
 @router.get("/sales-trend", response_model=SalesTrendResponse, summary="销售趋势")
 async def sales_trend(
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
-    start_date: Optional[date] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[date] = Query(None, description="结束日期 YYYY-MM-DD"),
+    start_date: date | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: date | None = Query(None, description="结束日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):

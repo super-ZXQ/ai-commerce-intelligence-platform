@@ -14,16 +14,16 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from datetime import datetime, date  # noqa: E402
-from decimal import Decimal  # noqa: E402
+from datetime import UTC, date, datetime
+from decimal import Decimal
 
-import pymysql  # noqa: E402
-from sqlalchemy import create_engine, text  # noqa: E402
-from sqlalchemy.orm import sessionmaker  # noqa: E402
+import pymysql
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
-from backend.config import get_settings  # noqa: E402
-from backend.database import Base  # noqa: E402
-from backend.models.database_models import Order  # noqa: E402, F401 注册 ORM
+from backend.config import get_settings
+from backend.database import Base
+from backend.models.database_models import Order
 
 
 def main() -> None:
@@ -64,8 +64,8 @@ def main() -> None:
             payment_amount=Decimal("95.00"),
             channel_id="ch1",
             platform_type="APP" if i % 2 else "Web网站",
-            order_time=datetime(2026, 6, 1, 10, 0, 0),
-            payment_time=datetime(2026, 6, 1, 10, 5, 0),
+            order_time=datetime(2026, 6, 1, 10, 0, 0, tzinfo=UTC),
+            payment_time=datetime(2026, 6, 1, 10, 5, 0, tzinfo=UTC),
             is_refunded="否",
             discount_amount=Decimal("5.00"),
             payment_duration_sec=300,

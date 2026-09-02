@@ -12,7 +12,6 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Optional
 
 from . import metrics
 from .vector_store import VectorStore
@@ -87,9 +86,9 @@ class Retriever:
 
     def retrieve(self,
                  query: str,
-                 k: Optional[int] = None,
-                 score_threshold: Optional[float] = None,
-                 filter: Optional[dict] = None,
+                 k: int | None = None,
+                 score_threshold: float | None = None,
+                 filter: dict | None = None,
                  timeout_s: float = 5.0) -> list[dict]:
         """检索 Top-K 业务知识。
 

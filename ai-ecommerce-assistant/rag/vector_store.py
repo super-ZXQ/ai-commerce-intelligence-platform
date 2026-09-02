@@ -12,7 +12,6 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -60,7 +59,7 @@ class VectorStore:
 
     def add_documents(self,
                       documents: list[Document],
-                      ids: Optional[list[str]] = None) -> list[str]:
+                      ids: list[str] | None = None) -> list[str]:
         """添加文档，重复 ID 自动覆盖。
 
         Args:
@@ -92,8 +91,8 @@ class VectorStore:
     def search(self,
                query: str,
                k: int = 3,
-               score_threshold: Optional[float] = None,
-               filter: Optional[dict] = None) -> list[dict]:
+               score_threshold: float | None = None,
+               filter: dict | None = None) -> list[dict]:
         """检索 top-k 文档。
 
         Args:

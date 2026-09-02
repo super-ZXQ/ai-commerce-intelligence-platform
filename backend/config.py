@@ -1,10 +1,10 @@
-import os
 import logging
+import os
+from functools import lru_cache
 from urllib.parse import quote_plus
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
-from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,7 +75,7 @@ class Settings(BaseSettings):
 
     cache_ttl_seconds: int = 300
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context) -> None:  # noqa: PYI063
         if not self.jwt_secret:
             if self.debug:
                 self.jwt_secret = "dev-only-insecure-secret-do-not-use-in-production"
@@ -136,6 +136,6 @@ class Settings(BaseSettings):
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

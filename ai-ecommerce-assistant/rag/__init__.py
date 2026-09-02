@@ -10,25 +10,25 @@
 
 构建脚本：见 build_knowledge_base.py
 """
-from .embeddings import get_embeddings, warm_up, DEFAULT_MODEL
-from .vector_store import VectorStore, DEFAULT_PERSIST_DIR
-from .retriever import Retriever
+from .embeddings import DEFAULT_MODEL, get_embeddings, warm_up
+from .extractor import extract_rag_sources
 from .prompts import (
     KNOWLEDGE_TOOL_DESCRIPTION,
     TOOL_USAGE_RULES,
     build_augmented_prefix,
 )
-from .extractor import extract_rag_sources
+from .retriever import Retriever
+from .vector_store import DEFAULT_PERSIST_DIR, VectorStore
 
 __all__ = [
-    "get_embeddings",
-    "warm_up",
     "DEFAULT_MODEL",
-    "VectorStore",
     "DEFAULT_PERSIST_DIR",
-    "Retriever",
     "KNOWLEDGE_TOOL_DESCRIPTION",
     "TOOL_USAGE_RULES",
+    "Retriever",
+    "VectorStore",
     "build_augmented_prefix",
     "extract_rag_sources",
+    "get_embeddings",
+    "warm_up",
 ]

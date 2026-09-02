@@ -1,8 +1,7 @@
 import logging
 from datetime import date
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -31,7 +30,7 @@ async def rfm_overview(
 
 @router.get("/segments", summary="RFM 用户分群")
 async def rfm_segments(
-    reference_date: Optional[date] = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
+    reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -56,7 +55,7 @@ async def rfm_segment_users(
     segment: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    reference_date: Optional[date] = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
+    reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -78,7 +77,7 @@ async def rfm_segment_users(
 @router.get("/top-users", summary="RFM TOP 用户")
 async def rfm_top_users(
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
-    reference_date: Optional[date] = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
+    reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),

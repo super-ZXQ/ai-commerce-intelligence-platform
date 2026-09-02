@@ -37,13 +37,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
-from typing import Any, Optional
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 # 强制 UTF-8 stdout（Windows PowerShell 默认 GBK，无法打印 • 等符号）
 try:
@@ -76,7 +79,7 @@ class CheckResult:
     status: str  # "ok" | "warn" | "error" | "skipped"
     latency_ms: float
     detail: dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: str = ""
 
     def to_dict(self) -> dict:
@@ -88,12 +91,12 @@ class CheckResult:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _check_http(name: str, url: str, timeout: float = 5.0,
                 expect_status: int = 200,
-                expect_key: Optional[str] = None,
+                expect_key: str | None = None,
                 warn_statuses: tuple[int, ...] = ()) -> CheckResult:
     """HTTP 健康检查通用函数。"""
     started = time.time()
@@ -226,8 +229,8 @@ def _redact_url(url: str) -> str:
         if p.password:
             netloc = p.netloc.replace(f":{p.password}@", ":***@")
             return f"{p.scheme}://{netloc}{p.path}"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("URL 解析/脱敏失败，保留原 URL: %s", exc)
     return url
 
 

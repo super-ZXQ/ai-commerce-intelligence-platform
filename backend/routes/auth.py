@@ -1,17 +1,16 @@
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from backend.config import get_settings
 from backend.utils.auth import (
-    UserCredentials,
     TokenResponse,
+    UserCredentials,
+    authenticate_user,
     create_access_token,
     decode_token,
-    authenticate_user,
 )
-from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -21,7 +20,7 @@ router = APIRouter(prefix="/api/auth", tags=["认证"])
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
     if credentials is None:
         raise HTTPException(status_code=401, detail="未提供认证令牌", headers={"WWW-Authenticate": "Bearer"})
@@ -32,8 +31,8 @@ async def get_current_user(
 
 
 def optional_auth(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-) -> Optional[dict]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> dict | None:
     if credentials is None:
         return None
     token_data = decode_token(credentials.credentials)

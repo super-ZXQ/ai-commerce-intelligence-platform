@@ -1,7 +1,6 @@
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 from jose import JWTError, jwt
@@ -45,16 +44,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def create_access_token(username: str, expires_delta: Optional[timedelta] = None) -> str:
-    expire = datetime.now(timezone.utc) + (
+def create_access_token(username: str, expires_delta: timedelta | None = None) -> str:
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    to_encode = {"sub": username, "exp": expire, "iat": datetime.now(timezone.utc)}
+    to_encode = {"sub": username, "exp": expire, "iat": datetime.now(UTC)}
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-def decode_token(token: str) -> Optional[TokenData]:
+def decode_token(token: str) -> TokenData | None:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
         username: str = payload.get("sub")

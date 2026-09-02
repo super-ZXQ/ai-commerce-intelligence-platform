@@ -5,10 +5,9 @@
 """
 from __future__ import annotations
 
-import os
 import logging
+import os
 import threading
-from typing import Optional
 
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -35,7 +34,7 @@ def _device() -> str:
 
 
 def get_embeddings(model_name: str = DEFAULT_MODEL,
-                   cache_folder: Optional[str] = None) -> HuggingFaceEmbeddings:
+                   cache_folder: str | None = None) -> HuggingFaceEmbeddings:
     """获取（或惰性创建）Embedding 单例。
 
     Args:
