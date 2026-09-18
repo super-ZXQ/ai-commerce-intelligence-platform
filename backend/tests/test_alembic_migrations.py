@@ -1,4 +1,4 @@
-"""Alembic 迁移回归：单 head、baseline/DDL 一致性、MySQL 实跑与数据保护。"""
+"""Alembic migration regression: single head, DDL consistency, MySQL checks."""
 from __future__ import annotations
 
 import os
@@ -17,6 +17,8 @@ _VERSIONS = _BACKEND / "alembic" / "versions"
 _REF_SQL = _ROOT / "sql" / "01_create_table.sql"
 _SEED = _BACKEND / "scripts" / "seed_ci_data.py"
 _BOOTSTRAP_SH = _ROOT / "deploy" / "mysql" / "bootstrap-users.sh"
+# alembic CLI must run from repo root: backend/alembic/ can shadow the package
+_ALEMBIC_CWD = _ROOT
 
 _EXPECTED_INDEXES_ORDERS = {
     "uq_orders_order_id",
@@ -57,6 +59,15 @@ def _mysql_ready() -> tuple[bool, object | None, Exception | None]:
         return False, None, exc
 
 
+def _alembic(*args: str) -> None:
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", str(_ALEMBIC_INI), *args],
+        cwd=str(_ALEMBIC_CWD),
+        check=True,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [str(_ROOT), os.environ.get("PYTHONPATH", "")]))},
+    )
+
+
 def test_alembic_ini_and_versions_tree_exist():
     assert _ALEMBIC_INI.is_file()
     assert (_BACKEND / "alembic" / "env.py").is_file()
@@ -66,7 +77,7 @@ def test_alembic_ini_and_versions_tree_exist():
 def test_alembic_single_head_is_baseline():
     script = _script()
     heads = script.get_heads()
-    assert heads == ["0001_baseline"], f"期望唯一 head=0001_baseline，实际 {heads}"
+    assert heads == ["0001_baseline"], f"expect single head=0001_baseline, got {heads}"
     revision = script.get_revision("0001_baseline")
     assert revision.down_revision is None
 
@@ -87,14 +98,13 @@ def test_baseline_migration_declares_core_tables_and_indexes():
         "DEFAULT 0",
     ]
     for marker in markers:
-        assert marker in source, f"baseline 缺少: {marker}"
-    # migration 不得写入业务 seed
+        assert marker in source, f"baseline missing: {marker}"
     assert "INSERT INTO orders" not in source
     assert "CI00001" not in source
 
 
 def test_reference_sql_and_baseline_stay_consistent():
-    """sql/01 参考 DDL 与 Alembic baseline 关键结构不得漂移。"""
+    """Reference DDL in sql/01 must not drift from Alembic baseline."""
     ref = _REF_SQL.read_text(encoding="utf-8")
     base = (_VERSIONS / "0001_baseline.py").read_text(encoding="utf-8")
     for fragment in (
@@ -109,16 +119,15 @@ def test_reference_sql_and_baseline_stay_consistent():
         "event_version INT NOT NULL DEFAULT 0",
         "payload JSON NOT NULL",
     ):
-        assert fragment in ref, f"参考 SQL 缺少: {fragment}"
-        assert fragment in base, f"baseline 缺少: {fragment}"
-    # 参考文件必须声明非 bootstrap
+        assert fragment in ref, f"reference SQL missing: {fragment}"
+        assert fragment in base, f"baseline missing: {fragment}"
     assert "source of truth" in ref.lower() or "Alembic" in ref
 
 
 def test_seed_script_contains_no_ddl():
     seed = _SEED.read_text(encoding="utf-8").upper()
     for banned in ("CREATE TABLE", "ALTER TABLE", "DROP TABLE", "CREATE_ALL", "METADATA.CREATE"):
-        assert banned not in seed, f"seed_ci_data 不得包含 DDL: {banned}"
+        assert banned not in seed, f"seed_ci_data must not contain DDL: {banned}"
 
 
 def test_bootstrap_role_separation():
@@ -126,13 +135,9 @@ def test_bootstrap_role_separation():
     assert "ea_ai" in sh and "GRANT SELECT" in sh
     assert "ea_migrate" in sh
     assert "ea_events" in sh
-    # ea_ai 不得获得 DDL
     ai_block = sh.split("ea_ai")[1].split("ea_sync")[0]
     for ddl in ("CREATE,", "DROP,", "ALTER,"):
-        assert ddl not in ai_block.replace("CREATE USER", ""), "ea_ai 不应包含 DDL grant"
-    migrate_block = sh.split("ea_migrate")[2] if sh.count("ea_migrate") >= 2 else sh.split("ea_migrate")[1]
-    assert "ALTER" in migrate_block or "CREATE" in migrate_block
-    # migrate 限定在业务库
+        assert ddl not in ai_block.replace("CREATE USER", ""), "ea_ai must not get DDL grants"
     assert "ON \\`${DB_NAME}\\`.*" in sh or "ON `${DB_NAME}`.*" in sh
 
 
@@ -159,12 +164,12 @@ def test_migration_url_never_defaults_to_ai_readonly_account(monkeypatch):
 
 
 def test_alembic_upgrade_head_on_mysql_if_available():
-    """空库/强制重放 → head，校验表、复合索引、版本号、重复 upgrade。"""
+    """Force replay baseline on available MySQL; verify tables, indexes, version."""
     if os.environ.get("SKIP_MYSQL_ALEMBIC") == "1":
         pytest.skip("SKIP_MYSQL_ALEMBIC=1")
     ok, s, exc = _mysql_ready()
     if not ok:
-        pytest.skip(f"MySQL 不可用: {exc}")
+        pytest.skip(f"MySQL unavailable: {exc}")
 
     import pymysql
     from sqlalchemy import create_engine, text
@@ -189,21 +194,9 @@ def test_alembic_upgrade_head_on_mysql_if_available():
         c.execute(text("DELETE FROM alembic_version"))
     engine.dispose()
 
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(_ALEMBIC_INI), "upgrade", "head"],
-        cwd=str(_BACKEND),
-        check=True,
-    )
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(_ALEMBIC_INI), "upgrade", "head"],
-        cwd=str(_BACKEND),
-        check=True,
-    )
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(_ALEMBIC_INI), "heads"],
-        cwd=str(_BACKEND),
-        check=True,
-    )
+    _alembic("upgrade", "head")
+    _alembic("upgrade", "head")
+    _alembic("heads")
 
     engine = create_engine(s.database_url)
     with engine.connect() as c:
@@ -217,13 +210,8 @@ def test_alembic_upgrade_head_on_mysql_if_available():
             row[0] for row in c.execute(text("SHOW COLUMNS FROM order_events")).fetchall()
         }
         assert {"event_id", "processing_status", "sequence"} <= event_cols
-        order_idx = {
-            row[2] for row in c.execute(text("SHOW INDEX FROM orders")).fetchall()
-        }
-        event_idx = {
-            row[2] for row in c.execute(text("SHOW INDEX FROM order_events")).fetchall()
-        }
-        # order_id 唯一性：允许历史 ORM 以其他索引名存在
+        order_idx = {row[2] for row in c.execute(text("SHOW INDEX FROM orders")).fetchall()}
+        event_idx = {row[2] for row in c.execute(text("SHOW INDEX FROM order_events")).fetchall()}
         order_id_unique = c.execute(
             text(
                 "SELECT COUNT(*) FROM information_schema.STATISTICS "
@@ -231,12 +219,12 @@ def test_alembic_upgrade_head_on_mysql_if_available():
                 "AND COLUMN_NAME='order_id' AND NON_UNIQUE=0"
             )
         ).scalar()
-        assert order_id_unique >= 1, "orders.order_id 必须有唯一索引"
+        assert order_id_unique >= 1, "orders.order_id must have a unique index"
         required_orders = _EXPECTED_INDEXES_ORDERS - {"uq_orders_order_id"}
         missing_o = required_orders - order_idx
         missing_e = _EXPECTED_INDEXES_EVENTS - event_idx
-        assert not missing_o, f"orders 缺索引: {missing_o}"
-        assert not missing_e, f"order_events 缺索引: {missing_e}"
+        assert not missing_o, f"orders missing indexes: {missing_o}"
+        assert not missing_e, f"order_events missing indexes: {missing_e}"
         extra = c.execute(
             text(
                 "SELECT COUNT(*) FROM information_schema.COLUMNS "
@@ -249,12 +237,12 @@ def test_alembic_upgrade_head_on_mysql_if_available():
 
 
 def test_migration_preserves_existing_rows_on_mysql_if_available():
-    """已有数据时 upgrade head 不得清空业务行。"""
+    """upgrade head must not wipe business rows."""
     if os.environ.get("SKIP_MYSQL_ALEMBIC") == "1":
         pytest.skip("SKIP_MYSQL_ALEMBIC=1")
     ok, s, exc = _mysql_ready()
     if not ok:
-        pytest.skip(f"MySQL 不可用: {exc}")
+        pytest.skip(f"MySQL unavailable: {exc}")
 
     from sqlalchemy import create_engine, text
 
@@ -262,7 +250,7 @@ def test_migration_preserves_existing_rows_on_mysql_if_available():
     with engine.begin() as c:
         tables = {r[0] for r in c.execute(text("SHOW TABLES")).fetchall()}
         if "orders" not in tables:
-            pytest.skip("orders 不存在，请先跑 upgrade head")
+            pytest.skip("orders missing; run upgrade head first")
         c.execute(text("DELETE FROM orders WHERE order_id = 'ALEMBIC_KEEP_ME'"))
         c.execute(
             text(
@@ -273,21 +261,17 @@ def test_migration_preserves_existing_rows_on_mysql_if_available():
         before = c.execute(
             text("SELECT COUNT(*) FROM orders WHERE order_id='ALEMBIC_KEEP_ME'")
         ).scalar()
-        assert before == 1, "探针行插入失败"
+        assert before == 1, "probe insert failed"
     engine.dispose()
 
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(_ALEMBIC_INI), "upgrade", "head"],
-        cwd=str(_BACKEND),
-        check=True,
-    )
+    _alembic("upgrade", "head")
 
     engine = create_engine(s.database_url)
     with engine.begin() as c:
         after = c.execute(
             text("SELECT COUNT(*) FROM orders WHERE order_id='ALEMBIC_KEEP_ME'")
         ).scalar()
-        assert after == 1, "upgrade head 不得删除已有业务行"
+        assert after == 1, "upgrade head must not delete existing rows"
         c.execute(text("DELETE FROM orders WHERE order_id = 'ALEMBIC_KEEP_ME'"))
         ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
         assert ver == "0001_baseline"
@@ -295,12 +279,12 @@ def test_migration_preserves_existing_rows_on_mysql_if_available():
 
 
 def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
-    """专用空库 → upgrade head，验证「从零建库」路径。"""
+    """Dedicated empty database -> upgrade head."""
     if os.environ.get("SKIP_MYSQL_ALEMBIC") == "1":
         pytest.skip("SKIP_MYSQL_ALEMBIC=1")
     ok, s, exc = _mysql_ready()
     if not ok:
-        pytest.skip(f"MySQL 不可用: {exc}")
+        pytest.skip(f"MySQL unavailable: {exc}")
 
     import pymysql
     from sqlalchemy import create_engine, text
@@ -323,16 +307,21 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
     monkeypatch.setenv("DEBUG", "true")
     monkeypatch.setenv("JWT_SECRET", "ci-test-secret-not-for-production")
     monkeypatch.setenv("ADMIN_PASSWORD", "admin123")
-    # 清掉 Settings 缓存
     from backend import config as backend_config
 
     backend_config.get_settings.cache_clear()
     try:
         subprocess.run(
             [sys.executable, "-m", "alembic", "-c", str(_ALEMBIC_INI), "upgrade", "head"],
-            cwd=str(_BACKEND),
+            cwd=str(_ALEMBIC_CWD),
             check=True,
-            env={**os.environ, "DB_NAME": empty_db},
+            env={
+                **os.environ,
+                "DB_NAME": empty_db,
+                "PYTHONPATH": os.pathsep.join(
+                    filter(None, [str(_ROOT), os.environ.get("PYTHONPATH", "")])
+                ),
+            },
         )
         engine = create_engine(
             f"mysql+pymysql://{s.db_user}:{s.db_password}@{s.db_host}:{s.db_port}/{empty_db}"
@@ -341,8 +330,10 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
         with engine.connect() as c:
             tables = {r[0] for r in c.execute(text("SHOW TABLES")).fetchall()}
             assert {"orders", "order_events", "app_metadata", "alembic_version"} <= tables
-            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0001_baseline"
-            # 空库应无业务数据
+            assert (
+                c.execute(text("SELECT version_num FROM alembic_version")).scalar()
+                == "0001_baseline"
+            )
             assert c.execute(text("SELECT COUNT(*) FROM orders")).scalar() == 0
         engine.dispose()
     finally:

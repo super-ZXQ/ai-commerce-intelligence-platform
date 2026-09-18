@@ -128,23 +128,22 @@ jobs:
           EOF
 
       - name: Alembic 升级 schema
-        working-directory: backend
+        # 必须从仓库根执行：backend/alembic/ 目录会在 backend cwd 下遮蔽 alembic 包
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          set -o pipefail
-          python -m alembic -c alembic.ini upgrade head --raiseerr 2>&1 | tee /tmp/alembic.log
-          python -m alembic -c alembic.ini current 2>&1 | tee -a /tmp/alembic.log
-          python -m alembic -c alembic.ini heads 2>&1 | tee -a /tmp/alembic.log
-          python scripts/ci_schema_sanity.py 2>&1 | tee -a /tmp/alembic.log
+          set -euxo pipefail
+          python -m alembic -c backend/alembic.ini upgrade head --raiseerr
+          python -m alembic -c backend/alembic.ini current
+          python -m alembic -c backend/alembic.ini heads
+          python backend/scripts/ci_schema_sanity.py
 
       - name: Seed CI 测试数据
-        working-directory: backend
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          set -o pipefail
-          python scripts/seed_ci_data.py 2>&1 | tee /tmp/seed_ci.log
+          set -euxo pipefail
+          python backend/scripts/seed_ci_data.py
 
       - name: 跑后端测试
         env:

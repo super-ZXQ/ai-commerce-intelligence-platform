@@ -40,10 +40,21 @@ def _ensure_database() -> None:
 
 def _run_alembic_upgrade() -> None:
     env = os.environ.copy()
-    # migration 使用管理账号；CI 中与 DB_* 相同，Docker 中可注入 MIGRATION_DB_*
+    env["PYTHONPATH"] = os.pathsep.join(
+        filter(None, [str(_REPO_ROOT), env.get("PYTHONPATH", "")])
+    )
+    # 必须从仓库根执行：cwd=backend 时 backend/alembic/ 会遮蔽 site-packages 的 alembic
     subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(_BACKEND / "alembic.ini"), "upgrade", "head"],
-        cwd=str(_BACKEND),
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            str(_BACKEND / "alembic.ini"),
+            "upgrade",
+            "head",
+        ],
+        cwd=str(_REPO_ROOT),
         env=env,
         check=True,
     )

@@ -163,7 +163,7 @@ Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -Argum
 # 1) MySQL 就绪后创建库（本地）
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS ai_commerce_intelligence_platform DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-# 2) Schema 版本化升级（唯一权威路径）
+# 2) Schema 版本化升级（唯一权威路径；务必在仓库根执行，避免 backend/alembic/ 目录遮蔽包）
 python -m alembic -c backend/alembic.ini upgrade head
 
 # 3) 可选：导入公开订单快照（首次 bootstrap）
