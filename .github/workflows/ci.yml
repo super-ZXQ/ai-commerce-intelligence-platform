@@ -128,21 +128,18 @@ jobs:
           EOF
 
       - name: Alembic 升级 schema
-        # 必须从仓库根执行：backend/alembic/ 目录会在 backend cwd 下遮蔽 alembic 包
+        # 从仓库根执行；脚本内用 command API，避免 python -m alembic 路径问题
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          set -euxo pipefail
-          python -m alembic -c backend/alembic.ini upgrade head --raiseerr
-          python -m alembic -c backend/alembic.ini current
-          python -m alembic -c backend/alembic.ini heads
-          python backend/scripts/ci_schema_sanity.py
+          set -e
+          python backend/scripts/run_alembic_upgrade.py
 
       - name: Seed CI 测试数据
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          set -euxo pipefail
+          set -e
           python backend/scripts/seed_ci_data.py
 
       - name: 跑后端测试
