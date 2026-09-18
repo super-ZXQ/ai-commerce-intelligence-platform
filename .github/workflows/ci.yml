@@ -129,33 +129,26 @@ jobs:
 
       - name: Alembic 升级 schema
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -o pipefail
-          python -m alembic -c alembic.ini upgrade head 2>&1 | tee /tmp/alembic.log
-          # schema sanity：核心表与版本号
-          python - <<'PY'
-          import os, pymysql
-          from sqlalchemy import create_engine, text
-          from backend.config import get_settings
-          s = get_settings()
-          eng = create_engine(s.database_url)
-          with eng.connect() as c:
-              tables = {r[0] for r in c.execute(text("SHOW TABLES"))}
-              need = {"orders", "order_events", "app_metadata", "alembic_version"}
-              missing = need - tables
-              assert not missing, f"missing tables: {missing}"
-              ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-              assert ver == "0001_baseline", ver
-          print("OK alembic schema sanity")
-          PY
+          python -m alembic -c alembic.ini upgrade head --raiseerr 2>&1 | tee /tmp/alembic.log
+          python -m alembic -c alembic.ini current 2>&1 | tee -a /tmp/alembic.log
+          python -m alembic -c alembic.ini heads 2>&1 | tee -a /tmp/alembic.log
+          python scripts/ci_schema_sanity.py 2>&1 | tee -a /tmp/alembic.log
 
       - name: Seed CI 测试数据
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -o pipefail
           python scripts/seed_ci_data.py 2>&1 | tee /tmp/seed_ci.log
 
       - name: 跑后端测试
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -o pipefail
           cd backend
