@@ -127,13 +127,33 @@ jobs:
           DEBUG=true
           EOF
 
-      - name: 初始化 schema
-        # 独立初始化脚本不依赖 PYTHONPATH；日志落盘后作为 artifact 上传。
+      - name: Alembic 升级 schema
         working-directory: backend
         run: |
           set -o pipefail
-          python scripts/init_ci_schema.py 2>&1 | tee /tmp/init_schema.log
-          cat /tmp/init_schema.log
+          python -m alembic -c alembic.ini upgrade head 2>&1 | tee /tmp/alembic.log
+          # schema sanity：核心表与版本号
+          python - <<'PY'
+          import os, pymysql
+          from sqlalchemy import create_engine, text
+          from backend.config import get_settings
+          s = get_settings()
+          eng = create_engine(s.database_url)
+          with eng.connect() as c:
+              tables = {r[0] for r in c.execute(text("SHOW TABLES"))}
+              need = {"orders", "order_events", "app_metadata", "alembic_version"}
+              missing = need - tables
+              assert not missing, f"missing tables: {missing}"
+              ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
+              assert ver == "0001_baseline", ver
+          print("OK alembic schema sanity")
+          PY
+
+      - name: Seed CI 测试数据
+        working-directory: backend
+        run: |
+          set -o pipefail
+          python scripts/seed_ci_data.py 2>&1 | tee /tmp/seed_ci.log
 
       - name: 跑后端测试
         run: |
@@ -149,7 +169,8 @@ jobs:
           name: backend-test-report
           path: |
             backend/pytest-output.txt
-            /tmp/init_schema.log
+            /tmp/alembic.log
+            /tmp/seed_ci.log
           if-no-files-found: ignore
           retention-days: 7
 

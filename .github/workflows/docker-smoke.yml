@@ -27,6 +27,8 @@ jobs:
           DB_AI_PASSWORD=ci-ai-password
           DB_SYNC_PASSWORD=ci-sync-password
           DB_EVENT_PASSWORD=ci-event-password
+          DB_MIGRATE_PASSWORD=ci-migrate-password
+          MIGRATION_DB_USER=ea_migrate
           DB_NAME=ai_commerce_intelligence_platform
           REDIS_PASSWORD=
           NGINX_PORT=80
@@ -63,11 +65,30 @@ jobs:
 
       - name: 验证数据、主要入口与 WebSocket
         run: |
+          # Schema 权威：Alembic
+          version="$(docker compose exec -T mysql mysql \
+            -uroot -pci-root-password -Nse \
+            'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
+          echo "alembic_version=$version"
+          test "$version" = "0001_baseline"
+
+          for t in orders order_events app_metadata alembic_version; do
+            docker compose exec -T mysql mysql \
+              -uroot -pci-root-password -Nse \
+              "SHOW TABLES FROM ai_commerce_intelligence_platform LIKE '$t'" | grep -q "$t"
+          done
+
+          # 订单数据：由 backend sync_orders 在 schema 就绪后导入
           row_count="$(docker compose exec -T mysql mysql \
             -uroot -pci-root-password -Nse \
             'SELECT COUNT(*) FROM ai_commerce_intelligence_platform.orders')"
           test "$row_count" = "102287"
           echo "订单数据行数：$row_count"
+
+          # db-migrate 应已成功退出
+          migrate_status="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' ea-db-migrate)"
+          echo "db-migrate: $migrate_status"
+          echo "$migrate_status" | grep -q 'exited 0'
 
           for path in / /BI/ /ai/ /docs /demo /monitor /health-panel; do
             status="$(curl --location --silent --output /dev/null \

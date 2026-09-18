@@ -1,5 +1,15 @@
--- AI Commerce Intelligence Platform - MySQL 8 初始化表结构
--- 由 docker-entrypoint-initdb.d 在首次创建数据卷时自动执行。
+-- AI Commerce Intelligence Platform — MySQL 8 REFERENCE schema
+--
+-- 【重要】本文件不再是 Docker initdb / 生产建表入口。
+-- Schema evolution source of truth = Alembic：
+--   python -m alembic -c backend/alembic.ini upgrade head
+--   backend/alembic/versions/0001_baseline.py
+--
+-- 本文件保留为人工审阅与一致性测试的「参考 DDL」，
+-- 必须与 Alembic baseline 保持一致；不要在新环境中直接 SOURCE 本文件作为唯一初始化。
+--
+-- 订单主数据通过 backend/scripts/sync_orders.py（ea_sync + LOAD DATA）导入，
+-- 不在 MySQL entrypoint initdb 中执行。
 
 CREATE TABLE IF NOT EXISTS orders (
     -- 事件摄入会创建新订单；主键必须可由 MySQL 自增，否则 INSERT 不带 order_seq_id 会失败

@@ -157,15 +157,65 @@ Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -Argum
 Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run ai-ecommerce-assistant/app.py --server.port 8505"
 ```
 
-**初始化数据库：**
+**初始化数据库（Alembic 为主路径）：**
 
 ```bash
-# 登录 MySQL
-mysql -u root -p
-# 执行建表和导入
-SOURCE sql/01_create_table.sql;
-SOURCE sql/02_import_data.sql;
+# 1) MySQL 就绪后创建库（本地）
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS ai_commerce_intelligence_platform DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# 2) Schema 版本化升级（唯一权威路径）
+python -m alembic -c backend/alembic.ini upgrade head
+
+# 3) 可选：导入公开订单快照（首次 bootstrap）
+mysql -u root -p ai_commerce_intelligence_platform < sql/02_import_data.sql
+# 或 SOURCE sql/02_import_data.sql;
+
+# Docker Compose：mysql redis → db-bootstrap → db-migrate(alembic) → backend(sync CSV)
+docker compose up -d mysql redis
+docker compose up -d db-bootstrap db-migrate
+docker compose up -d backend streamlit ai-assistant nginx
 ```
+
+**Alembic 是 schema evolution source of truth**（`backend/alembic/`）。
+`sql/01_create_table.sql` 仅保留为参考 DDL，**不再**挂载到 MySQL `initdb.d`；一致性由 `test_alembic_migrations.py` 校验。
+订单 CSV 由 `backend/scripts/sync_orders.py`（`ea_sync` + LOAD DATA）在 schema 就绪后导入。
+
+### Database Schema Management
+
+| 组件 | 角色 |
+|------|------|
+| MySQL 8 | 正式业务库 |
+| SQLAlchemy 2 async | ORM / 查询层（业务代码） |
+| **Alembic** | **Schema 版本化与升级唯一入口**（`backend/alembic/`） |
+| `ea_app` | API 只读账号 |
+| `ea_ai` | Text-to-SQL 只读账号（**禁止**用于 migration） |
+| `ea_events` | 订单事件写账号（仅 `orders`/`order_events`） |
+| `ea_migrate` | Alembic DDL 账号（Docker / 生产） |
+| `ea_sync` | CSV 同步 / 原子换表 |
+| Redis | 缓存与会话（可降级内存） |
+
+Migration 过程：
+
+1. 修改 SQLAlchemy models 或直接编写 revision（`backend/alembic/versions/`）
+2. `python -m alembic -c backend/alembic.ini revision --autogenerate -m "..."`（需人工审阅）
+3. `python -m alembic -c backend/alembic.ini upgrade head`
+4. CI：空 MySQL → `alembic upgrade head` → schema sanity → `seed_ci_data.py` → pytest
+
+Migration **不写入**业务测试数据；seed 仅在 CI 测试脚本中执行。
+
+### 架构定位（避免误解）
+
+```text
+Client → Nginx
+           ├─ FastAPI (/api, /docs, /monitor)  → MySQL / Redis / Agent Runtime
+           ├─ BI Dashboard Streamlit (/BI/)    → 数据服务 / MySQL（内部经营分析）
+           └─ AI Assistant Streamlit (/ai/)    → agent_core（RAG + Text-to-SQL）
+```
+
+- **FastAPI** = API / Business Service Layer
+- **Streamlit** = BI / Internal Analytics Dashboard（不是系统唯一驱动）
+- **Agent Runtime** (`agent_core`) = AI capability layer
+- **Chroma embedded + BGE** = V1 知识库（当前规模合理；多实例/高并发再评估 Qdrant/Milvus，见 Roadmap，本次不换栈）
 
 ## RAG 业务知识检索增强
 
@@ -403,7 +453,7 @@ services:
     # ... 其余配置不变
 ```
 
-后端 CI 通过 [`backend/scripts/init_ci_schema.py`](backend/scripts/init_ci_schema.py) 初始化 schema 和最小测试数据；测试输出与初始化日志会作为 artifact 保留 7 天，便于排查失败。
+后端 CI 通过 **Alembic `upgrade head`** 初始化 schema（含 sanity 检查），再由 [`backend/scripts/seed_ci_data.py`](backend/scripts/seed_ci_data.py) 仅写入测试数据；`init_ci_schema.py` 保留为本地兼容入口（alembic + seed）。测试输出与初始化日志会作为 artifact 保留 7 天。
 
 ### 2. 全栈健康检查脚本
 
@@ -520,7 +570,7 @@ AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEm
 | **合计** | **252** | **252 passed / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
-后端套件需本地 MySQL 可连接（CI 中由 `init_ci_schema.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
+后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
 
 前端：`backend/static/index.html` 拆分为 `css/studio.css` + `js/studio.js`，并经 Impeccable detector（0 critical/0 error）与桌面三视口（1366×768 / 1440×900 / 1920×1080）验收 `badCount=0`。
 
@@ -638,7 +688,10 @@ ai-commerce-intelligence-platform/
 │   ├── static/                   # HTML 静态页
 │   ├── sql/                      # SQL 脚本
 │   ├── scripts/                  # CI / 工具脚本
-│   │   ├── init_ci_schema.py     # CI 建表 + 5 条 fake orders seed
+│   │   ├── alembic.ini           # Alembic 配置（schema 版本化）
+│   │   ├── alembic/               # migrations + env.py
+│   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
+│   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── sync_orders.py        # CSV 哈希校验 + 原子换表
 │   ├── tests/                    # 164 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
@@ -686,15 +739,15 @@ ai-commerce-intelligence-platform/
 |------|------|
 | 语言 | Python 3.12 |
 | Web 框架 | FastAPI 0.110+ + Uvicorn |
-| ORM | SQLAlchemy 2.0 (async) |
-| 前端 | Streamlit 1.28+ + Plotly |
+| ORM / Schema | SQLAlchemy 2.0 (async) + **Alembic**（schema 版本化，`backend/alembic/`） |
+| 前端 | Streamlit（BI Dashboard + AI Assistant UI）+ Plotly |
 | AI | LangGraph + LangChain + OpenAI 兼容模型接口 |
-| RAG | Chroma（向量库） + BGE-small-zh-v1.5（Embedding），由确定性工作流按意图调度 |
+| RAG | embedded Chroma + BGE-small-zh-v1.5（V1；Roadmap 再评估独立向量服务） |
 | 数据库 | MySQL 8.0 |
 | 缓存 | Redis 7 |
 | 反代 | Nginx |
-| 容器 | Docker + Docker Compose |
-| 测试 | pytest（164 项后端 + 88 项 AI/RAG，隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| 容器 | Docker + Docker Compose（含一次性 `db-migrate`） |
+| 测试 | pytest + Alembic 迁移回归 + 路由/RAG/Text-to-SQL 评测 |
 
 ## License
 

@@ -12,10 +12,9 @@ services:
       - "3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./sql/01_create_table.sql:/docker-entrypoint-initdb.d/01_create_table.sql:ro
-      - ./sql/02_import_data.sql:/docker-entrypoint-initdb.d/02_import_data.sql:ro
-      # MySQL 官方 entrypoint 会对 /var/lib/mysql-files 执行 chown，
-      # 单文件只读挂载会导致容器启动失败。
+      # Schema 由 db-migrate（Alembic）创建，不在 initdb 执行业务 DDL。
+      # sql/01_create_table.sql 仅作参考 DDL，与 backend/alembic 对齐并由测试校验。
+      # 订单 CSV 仍挂载给 mysql-files：backend sync_orders（ea_sync）做 LOAD DATA 导入。
       - ./data/cleaned_orders.csv:/var/lib/mysql-files/cleaned_orders.csv
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:?请设置 DB_ROOT_PASSWORD}"]
@@ -37,12 +36,39 @@ services:
       DB_AI_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       DB_SYNC_PASSWORD: ${DB_SYNC_PASSWORD:?请设置 DB_SYNC_PASSWORD}
       DB_EVENT_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
+      DB_MIGRATE_PASSWORD: ${DB_MIGRATE_PASSWORD:-}
     volumes:
       - ./deploy/mysql/bootstrap-users.sh:/bootstrap-users.sh:ro
     entrypoint: ["sh", "/bootstrap-users.sh"]
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      - ea-network
+
+  # 一次性 schema 升级：仅此服务跑 Alembic，Web worker 不抢 migration
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ea-db-migrate
+    restart: "no"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:-ea_migrate}
+      MIGRATION_DB_PASSWORD: ${DB_MIGRATE_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:?请在根目录 .env 中设置 JWT_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在根目录 .env 中设置 ADMIN_PASSWORD}
+      DEBUG: ${DEBUG:-false}
+      REDIS_ENABLED: "false"
+    entrypoint: ["python", "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
     networks:
       - ea-network
 
@@ -107,6 +133,8 @@ services:
       mysql:
         condition: service_healthy
       db-bootstrap:
+        condition: service_completed_successfully
+      db-migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy

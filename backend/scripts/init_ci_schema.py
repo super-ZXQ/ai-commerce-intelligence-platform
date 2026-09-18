@@ -1,36 +1,33 @@
-"""CI 专用：初始化 MySQL schema + 最小 seed。
+"""CI/本地兼容入口：Alembic 建 schema + seed 测试数据。
 
-为什么独立脚本：
-- 不依赖 PYTHONPATH 环境变量（CI runner 上常失效）
-- 不依赖 working-directory（python -m 把 cwd 加 sys.path[0]，
-  但 from backend.xxx 还需要父目录在 path）
-- 脚本第一件事就是显式 sys.path.insert(repo root)，万无一失
+主路径：
+  python -m alembic -c backend/alembic.ini upgrade head
+  python backend/scripts/seed_ci_data.py
+
+本脚本保留给习惯旧命令的本地开发；CI 已拆成 alembic + seed 两步。
+不再使用 Base.metadata.create_all 作为 schema 权威路径。
 """
+from __future__ import annotations
+
+import os
+import subprocess
 import sys
 from pathlib import Path
 
-# 显式注入 repo root
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_BACKEND = _REPO_ROOT / "backend"
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from datetime import UTC, date, datetime
-from decimal import Decimal
+import pymysql  # noqa: E402
 
-import pymysql
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
-from backend.config import get_settings
-from backend.database import Base
-from backend.models.database_models import Order
+from backend.config import get_settings  # noqa: E402
+from backend.scripts.seed_ci_data import main as seed_main  # noqa: E402
 
 
-def main() -> None:
+def _ensure_database() -> None:
     s = get_settings()
-    # 1. 确保 database 存在
-    conn = pymysql.connect(host=s.db_host, port=s.db_port,
-                           user=s.db_user, password=s.db_password)
+    conn = pymysql.connect(host=s.db_host, port=s.db_port, user=s.db_user, password=s.db_password)
     with conn.cursor() as c:
         c.execute(
             f"CREATE DATABASE IF NOT EXISTS `{s.db_name}` "
@@ -40,42 +37,23 @@ def main() -> None:
     conn.close()
     print("OK database ready")
 
-    # 2. 用 SQLAlchemy ORM 同步建表
-    eng = create_engine(s.database_url)
-    Base.metadata.create_all(eng)
-    with eng.connect() as c:
-        c.execute(text("SELECT 1"))
-    print("OK tables created")
 
-    # 3. 最小 seed：5 条 fake orders
-    #    让 test_sales_overview 的 total_sales > 0 / total_orders > 0 断言通过
-    #    幂等：先清空再插入
-    with eng.begin() as c:
-        c.execute(text("DELETE FROM orders"))
-    Sess = sessionmaker(bind=eng)
-    sess = Sess()
-    for i in range(1, 6):
-        sess.add(Order(
-            # 使用 ORM 属性名赋值，SQLAlchemy 会映射到实际数据库列名。
-            order_no=f"CI{i:05d}",
-            user_name=f"user_{i % 3}",
-            product_id=f"P{i:03d}",
-            order_amount=Decimal("100.00"),
-            payment_amount=Decimal("95.00"),
-            channel_id="ch1",
-            platform_type="APP" if i % 2 else "Web网站",
-            order_time=datetime(2026, 6, 1, 10, 0, 0, tzinfo=UTC),
-            payment_time=datetime(2026, 6, 1, 10, 5, 0, tzinfo=UTC),
-            is_refunded="否",
-            discount_amount=Decimal("5.00"),
-            payment_duration_sec=300,
-            order_date=date(2026, 6, 1),
-            order_hour=10,
-            weekday="Monday",
-        ))
-    sess.commit()
-    sess.close()
-    print("OK 5 fake orders seeded")
+def _run_alembic_upgrade() -> None:
+    env = os.environ.copy()
+    # migration 使用管理账号；CI 中与 DB_* 相同，Docker 中可注入 MIGRATION_DB_*
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", str(_BACKEND / "alembic.ini"), "upgrade", "head"],
+        cwd=str(_BACKEND),
+        env=env,
+        check=True,
+    )
+    print("OK alembic upgrade head")
+
+
+def main() -> None:
+    _ensure_database()
+    _run_alembic_upgrade()
+    seed_main()
 
 
 if __name__ == "__main__":

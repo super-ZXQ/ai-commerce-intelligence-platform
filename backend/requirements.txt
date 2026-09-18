@@ -19,3 +19,5 @@ bcrypt==5.0.0
 httpx==0.28.1
 redis==8.0.0
 msgpack==1.2.2
+# Schema 版本化：Docker 一次性 migrate 服务与本地升级使用；不用业务只读账号。
+alembic==1.16.4

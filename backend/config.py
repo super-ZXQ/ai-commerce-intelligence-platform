@@ -151,6 +151,20 @@ class Settings(BaseSettings):
         )
 
     @property
+    def migration_database_url(self) -> str:
+        """Alembic DDL 连接串：独立 migration 账号，禁止回落到 AI 只读账号。
+
+        优先级：MIGRATION_DB_USER/PASSWORD 环境变量 → 主库管理账号（本地/CI）。
+        Text-to-SQL 的 ea_ai 永不参与 migration。
+        """
+        user = os.environ.get("MIGRATION_DB_USER") or self.db_user
+        password = os.environ.get("MIGRATION_DB_PASSWORD") or self.db_password
+        return (
+            f"mysql+pymysql://{quote_plus(user)}:{quote_plus(password)}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+        )
+
+    @property
     def redis_url(self) -> str:
         if self.redis_password:
             return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"

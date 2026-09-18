@@ -1,8 +1,10 @@
 #!/bin/sh
 set -eu
 
-# 该脚本由一次性 db-bootstrap 容器执行，因此也适用于已经存在的 MySQL 数据卷。
-# 应用账号只读；同步账号额外拥有原子换表与 LOAD DATA INFILE 所需权限。
+# 该脚本由一次性 db-bootstrap 容器执行，适用于空卷与已有数据卷。
+# 注意：Schema 由 db-migrate（Alembic）在 bootstrap 之后创建，因此这里
+# 不能对 orders/order_events 做表级 GRANT——空库上表尚不存在，MySQL 会报 1146。
+# 最小权限改为「限定在业务库 DB_NAME」的库级授权；DDL 仅 ea_migrate / ea_sync。
 
 case "${DB_NAME}" in
   *[!A-Za-z0-9_]*|'')
@@ -19,12 +21,11 @@ APP_PASSWORD_ESCAPED="$(escape_sql_string "${DB_APP_PASSWORD}")"
 AI_PASSWORD_ESCAPED="$(escape_sql_string "${DB_AI_PASSWORD}")"
 SYNC_PASSWORD_ESCAPED="$(escape_sql_string "${DB_SYNC_PASSWORD}")"
 EVENT_PASSWORD_ESCAPED="$(escape_sql_string "${DB_EVENT_PASSWORD}")"
+MIGRATE_PASSWORD_ESCAPED="$(escape_sql_string "${DB_MIGRATE_PASSWORD:-${DB_SYNC_PASSWORD}}")"
 
-# Compose 会等待 MySQL 健康检查通过，但容器网络刚就绪时仍可能出现短暂连接拒绝。
-# 限时重试可保证首次部署不会因这一瞬态失败而阻断后续服务启动。
 attempt=1
 until mysql --protocol=TCP -h mysql -uroot -e "SELECT 1" >/dev/null 2>&1; do
-  if [ "$attempt" -ge 30 ]; then
+  if [ "${attempt}" -ge 30 ]; then
     echo "等待 MySQL 连接超时" >&2
     exit 1
   fi
@@ -50,8 +51,13 @@ GRANT FILE ON *.* TO 'ea_sync'@'%';
 
 CREATE USER IF NOT EXISTS 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
 ALTER USER 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
-GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.orders TO 'ea_events'@'%';
-GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.order_events TO 'ea_events'@'%';
+-- 事件写账号：仅业务库，无 DDL；表级细分在 schema 就绪后可选收紧
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.* TO 'ea_events'@'%';
+
+CREATE USER IF NOT EXISTS 'ea_migrate'@'%' IDENTIFIED BY '${MIGRATE_PASSWORD_ESCAPED}';
+ALTER USER 'ea_migrate'@'%' IDENTIFIED BY '${MIGRATE_PASSWORD_ESCAPED}';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES
+  ON \`${DB_NAME}\`.* TO 'ea_migrate'@'%';
 
 FLUSH PRIVILEGES;
 SQL
