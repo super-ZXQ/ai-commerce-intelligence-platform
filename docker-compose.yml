@@ -36,6 +36,7 @@ services:
       DB_APP_PASSWORD: ${DB_APP_PASSWORD:?请设置 DB_APP_PASSWORD}
       DB_AI_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       DB_SYNC_PASSWORD: ${DB_SYNC_PASSWORD:?请设置 DB_SYNC_PASSWORD}
+      DB_EVENT_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
     volumes:
       - ./deploy/mysql/bootstrap-users.sh:/bootstrap-users.sh:ro
     entrypoint: ["sh", "/bootstrap-users.sh"]
@@ -96,6 +97,8 @@ services:
       DEBUG: ${DEBUG:-false}
       AI_DB_USER: ${AI_DB_USER:-ea_ai}
       AI_DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
+      EVENT_DB_USER: ea_events
+      EVENT_DB_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
     volumes:
       - chroma_data:/app/ai-ecommerce-assistant/data:ro
     expose:

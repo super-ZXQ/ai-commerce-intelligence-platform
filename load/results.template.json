@@ -1,0 +1,16 @@
+{
+  "scenario": "10-rps-events-20-read-users",
+  "executed_at": null,
+  "environment": "local synthetic only",
+  "event_throughput_rps": null,
+  "latency_ms": {"p50": null, "p95": null, "p99": null},
+  "event_backlog": null,
+  "duplicate_events": null,
+  "out_of_order_rejections": null,
+  "error_rate": null,
+  "cache_hit_rate": null,
+  "cache_rebuilds": null,
+  "freshness_seconds": null,
+  "consistency_check": null,
+  "not_executed_reason": "填入真实实验结果；未运行不得替换为估算值"
+}

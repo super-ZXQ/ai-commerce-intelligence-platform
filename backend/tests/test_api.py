@@ -1,8 +1,15 @@
+import asyncio
+from datetime import UTC, datetime
+from uuid import uuid4
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from backend.database import event_session_factory
 from backend.main import app
+from backend.models.schemas import OrderEventInput
+from backend.services import order_event_service
 
 
 # 每个测试使用独立事件循环，避免 aiomysql 连接跨 loop 复用。
@@ -242,6 +249,116 @@ class TestAI:
         assert step_names == ["input_safety", "load_history", "route", "safe_response", "save_session"]
         # 安全属性（不随节点增删而失效）：绝不能触达模型生成或数据库执行节点。
         assert not {"generate_sql", "validate_sql", "execute_sql", "load_schema"} & set(step_names)
+
+
+def _created_event(order_id: str, version: int = 1) -> dict:
+    return {
+        "event_id": str(uuid4()),
+        "order_id": order_id,
+        "event_type": "ORDER_CREATED",
+        "occurred_at": datetime.now(UTC).isoformat(),
+        "version": version,
+        "source": "pytest",
+        "payload": {
+            "user_name": "synthetic_user",
+            "product_id": "SYNTHETIC-PRODUCT",
+            "order_amount": "120.00",
+            "payment_amount": "100.00",
+            "discount_amount": "20.00",
+            "platform_type": "APP",
+        },
+    }
+
+
+class TestOrderEvents:
+    @pytest.mark.asyncio
+    async def test_projection_failure_rolls_back_ledger_and_allows_safe_retry(self, monkeypatch):
+        """读模型投影失败时，event_id 账本不能残留为“已处理”。"""
+        event = OrderEventInput.model_validate(_created_event(f"ROLLBACK-{uuid4().hex[:16]}"))
+
+        def broken_projection(*_args, **_kwargs):
+            raise RuntimeError("模拟订单读模型写入失败")
+
+        monkeypatch.setattr(order_event_service, "_new_order", broken_projection)
+        async with event_session_factory() as db:
+            with pytest.raises(RuntimeError, match="模拟订单读模型写入失败"):
+                await order_event_service.apply_order_event(db, event)
+
+        monkeypatch.undo()
+        async with event_session_factory() as db:
+            retried = await order_event_service.apply_order_event(db, event)
+        assert retried.status == "processed"
+
+    @pytest.mark.asyncio
+    async def test_event_create_duplicate_refund_and_metrics_are_consistent(self, authed_client: AsyncClient):
+        order_id = f"EVT-{uuid4().hex[:20]}"
+        before = (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"]
+        created = _created_event(order_id)
+
+        first = await authed_client.post("/api/order-events", json=created)
+        assert first.status_code == 200
+        assert first.json()["results"][0]["status"] == "processed"
+        after_create = (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"]
+        assert after_create == pytest.approx(before + 100.0)
+
+        duplicate = await authed_client.post("/api/order-events", json=created)
+        assert duplicate.status_code == 200
+        assert duplicate.json()["results"][0]["status"] == "duplicate"
+        assert (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"] == pytest.approx(after_create)
+
+        refunded = {
+            "event_id": str(uuid4()), "order_id": order_id, "event_type": "ORDER_REFUNDED",
+            "occurred_at": datetime.now(UTC).isoformat(), "version": 2, "source": "pytest", "payload": {},
+        }
+        response = await authed_client.post("/api/order-events", json=refunded)
+        assert response.status_code == 200
+        assert response.json()["results"][0]["status"] == "processed"
+        after_refund = (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"]
+        assert after_refund == pytest.approx(before)
+
+    @pytest.mark.asyncio
+    async def test_concurrent_same_event_id_is_processed_once(self, authed_client: AsyncClient):
+        event = _created_event(f"CONCURRENT-{uuid4().hex[:16]}")
+        responses = await asyncio.gather(*[
+            authed_client.post("/api/order-events", json=event) for _ in range(2)
+        ])
+        assert all(response.status_code == 200 for response in responses)
+        statuses = sorted(response.json()["results"][0]["status"] for response in responses)
+        assert statuses == ["duplicate", "processed"]
+
+    @pytest.mark.asyncio
+    async def test_out_of_order_and_terminal_transition_are_rejected(self, authed_client: AsyncClient):
+        order_id = f"ORDERING-{uuid4().hex[:16]}"
+        created = _created_event(order_id, version=10)
+        assert (await authed_client.post("/api/order-events", json=created)).json()["processed"] == 1
+
+        old_cancel = {
+            "event_id": str(uuid4()), "order_id": order_id, "event_type": "ORDER_CANCELLED",
+            "occurred_at": datetime.now(UTC).isoformat(), "version": 9, "source": "pytest", "payload": {},
+        }
+        rejected = await authed_client.post("/api/order-events", json=old_cancel)
+        assert rejected.json()["results"][0]["status"] == "rejected"
+        assert "版本" in rejected.json()["results"][0]["reason"]
+
+        refund = {**old_cancel, "event_id": str(uuid4()), "event_type": "ORDER_REFUNDED", "version": 11}
+        assert (await authed_client.post("/api/order-events", json=refund)).json()["processed"] == 1
+        later_cancel = {**old_cancel, "event_id": str(uuid4()), "version": 12}
+        terminal = await authed_client.post("/api/order-events", json=later_cancel)
+        assert terminal.json()["results"][0]["status"] == "rejected"
+        assert "不能转换" in terminal.json()["results"][0]["reason"]
+
+    @pytest.mark.asyncio
+    async def test_event_contract_rejects_unknown_type_invalid_amount_and_oversized_batch(self, authed_client: AsyncClient):
+        unknown = _created_event("INVALID-TYPE")
+        unknown["event_type"] = "ORDER_PAID"
+        assert (await authed_client.post("/api/order-events", json=unknown)).status_code == 422
+
+        invalid_amount = _created_event("INVALID-AMOUNT")
+        invalid_amount["payload"]["payment_amount"] = "-1.00"
+        assert (await authed_client.post("/api/order-events", json=invalid_amount)).status_code == 422
+
+        batch = {"events": [_created_event(f"BATCH-{index}") for index in range(101)]}
+        assert (await authed_client.post("/api/order-events", json=batch)).status_code == 422
 
 
 class TestExport:

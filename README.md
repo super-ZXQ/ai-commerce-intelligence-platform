@@ -15,11 +15,12 @@
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot + Chroma | 分节点路由、结构化 Text-to-SQL、一次纠错、多轮会话、引用与公开轨迹 |
-| **FastAPI 后端** | FastAPI + SQLAlchemy | 32 个 API 操作，含认证/限流/缓存/监控/RFM |
+| **FastAPI 后端** | FastAPI + SQLAlchemy | 34 个 API 操作，含认证/限流/缓存/监控/RFM 与订单事件摄入 |
+| **订单事件摄入** | MySQL 事务 + 幂等账本 | 创建/退款/取消事件、版本水位乱序保护、精准缓存失效与新鲜度查询 |
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 244 项自动化测试（实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 252 项自动化测试（隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
 
 ## 在线演示
 
@@ -84,7 +85,7 @@ docker compose up -d
 | `/health` `/health/detailed` `/metrics` | backend:8000 | 公开健康检查与 Prometheus 指标 |
 | `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
 
-部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI 和数据同步分别创建最小权限账号；API 与 AI 仅有查询权限。后端启动前会按 CSV SHA-256 校验订单版本；数据变化时先导入临时表、校验行数，再原子替换正式表。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；Excel 因工作簿格式限制仍需在内存中生成。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
+部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入和数据同步分别创建最小权限账号；API 与 AI 仅有查询权限，`ea_events` 仅能更新 `orders` 与 `order_events`。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；Excel 因工作簿格式限制仍需在内存中生成。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
 
 ### 本地开发
 
@@ -246,7 +247,7 @@ Agent 层经历过一次重构，两个版本都保留在 Git 历史中：
 | A：确定性规则（生产在用） | **100%** | 加固前 **24%** → 加固后 **96%** | **60%**（真实泛化） | ~0.007ms | ¥0 |
 | B：LLM 路由（对照实现） | 需配置 `LLM_API_KEY` 补齐（未配置时明确跳过，**不伪造数字**） | 同左 | 同左 | 网络往返级 | token 计费 |
 
-结论：规则路由在**已观测流量分布下是最优解**（确定性、零成本、可解释）。按 dev 集失败模式加固后，
+结论：规则路由在**当前评测集分布下**具有确定性、零成本和可解释优势。按 dev 集失败模式加固后，
 口语改写（"咋算"）、隐私变体（"电话"）、倒序写操作（"把 orders 表删了"）与注入改写均可正确拦截/分类；
 留出集 60% 如实披露残余缺口（导出客户资料、收货地址、记录行写操作、泛宾语盘点）——
 **调优集与留出集分开报告，避免按考卷改答案**。这也是保留 LLM 路由对照与
@@ -380,7 +381,7 @@ rag_tool_call_total 0
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 85 项测试（Python 3.12 + 3.13）+ 后端 147 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 88 项测试（Python 3.12 + 3.13）+ 后端 164 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -479,10 +480,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（244 项，实收全绿）
+### 自动化测试（252 项，实收全绿）
 
 ```bash
-# 后端（156 项，完整运行需要 MySQL）
+# 后端（164 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（88 项）
@@ -491,13 +492,13 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（156 项）：
+后端（164 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
 - `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
-- `test_api.py` / `test_core_safety.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）、安全加固（缓存锁/限流/监控路径归一化）、数据库侧执行时限
+- `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
 
 AI/RAG（88 项）：
 - `test_vector_store.py` — Chroma 增删查改（fake embedder，不依赖真实模型）
@@ -510,13 +511,13 @@ AI/RAG（88 项）：
 
 AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEmbeddings` 生成确定性归一化向量。
 
-**测试规模（实收，非估填）** — 2026-09-05 在本仓库 `.venv`（Python 3.12）实测：
+**测试规模（实收，非估填）** — 2026-09-18 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 156 | **156 passed**（57s） |
-| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（9s） |
-| **合计** | **244** | **244 passed / 0 failed** |
+| `backend/tests` | 164 | **164 passed**（14s） |
+| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（11s） |
+| **合计** | **252** | **252 passed / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `init_ci_schema.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -639,7 +640,7 @@ ai-commerce-intelligence-platform/
 │   ├── scripts/                  # CI / 工具脚本
 │   │   ├── init_ci_schema.py     # CI 建表 + 5 条 fake orders seed
 │   │   └── sync_orders.py        # CSV 哈希校验 + 原子换表
-│   ├── tests/                    # 147 项 API 单元测试
+│   ├── tests/                    # 164 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）
@@ -652,7 +653,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── vector_store.py       # Chroma 封装
 │   │   ├── retriever.py          # 缓存/超时/格式化/埋点
 │   │   └── metrics.py            # 跨进程 stats 共享 + Prometheus 渲染 + JSONL 事件
-│   ├── tests/                    # 85 项 AI/RAG 测试
+│   ├── tests/                    # 88 项 AI/RAG 测试
 │   ├── eval/                     # 评估集 + 评估脚本
 │   ├── data/chroma/              # Chroma 持久化目录
 │   ├── pytest.ini                # pytest 配置
@@ -693,7 +694,7 @@ ai-commerce-intelligence-platform/
 | 缓存 | Redis 7 |
 | 反代 | Nginx |
 | 容器 | Docker + Docker Compose |
-| 测试 | pytest（156 项后端 + 88 项 AI/RAG，实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| 测试 | pytest（164 项后端 + 88 项 AI/RAG，隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
 
 ## License
 

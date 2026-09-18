@@ -18,6 +18,7 @@ escape_sql_string() {
 APP_PASSWORD_ESCAPED="$(escape_sql_string "${DB_APP_PASSWORD}")"
 AI_PASSWORD_ESCAPED="$(escape_sql_string "${DB_AI_PASSWORD}")"
 SYNC_PASSWORD_ESCAPED="$(escape_sql_string "${DB_SYNC_PASSWORD}")"
+EVENT_PASSWORD_ESCAPED="$(escape_sql_string "${DB_EVENT_PASSWORD}")"
 
 # Compose 会等待 MySQL 健康检查通过，但容器网络刚就绪时仍可能出现短暂连接拒绝。
 # 限时重试可保证首次部署不会因这一瞬态失败而阻断后续服务启动。
@@ -46,6 +47,11 @@ ALTER USER 'ea_sync'@'%' IDENTIFIED BY '${SYNC_PASSWORD_ESCAPED}';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX
   ON \`${DB_NAME}\`.* TO 'ea_sync'@'%';
 GRANT FILE ON *.* TO 'ea_sync'@'%';
+
+CREATE USER IF NOT EXISTS 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
+ALTER USER 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.orders TO 'ea_events'@'%';
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.order_events TO 'ea_events'@'%';
 
 FLUSH PRIVILEGES;
 SQL

@@ -15,6 +15,7 @@ _init_lock = threading.Lock()
 RATE_LIMITS = {
     "/api/auth/login": {"requests": 5, "window": 60},
     "/api/ai/query": {"requests": 10, "window": 60},
+    "/api/order-events": {"requests": 120, "window": 60},
     "/api/export/": {"requests": 3, "window": 120},
     "default": {"requests": 100, "window": 60},
 }

@@ -262,6 +262,30 @@ async def test_cache_cleanup_removes_idle_redis_locks(monkeypatch):
     assert not cache._cache_locks
 
 
+@pytest.mark.asyncio
+async def test_tagged_invalidation_removes_only_affected_cache_entries(monkeypatch):
+    monkeypatch.setattr(cache, "_redis_client", None)
+    monkeypatch.setattr(cache, "_redis_available", False)
+    await cache.clear()
+    calls = {"analytics": 0, "other": 0}
+
+    @cache.cached(ttl=60, tags=("analytics",))
+    async def analytics_value():
+        calls["analytics"] += 1
+        return calls["analytics"]
+
+    @cache.cached(ttl=60, tags=("other",))
+    async def other_value():
+        calls["other"] += 1
+        return calls["other"]
+
+    assert await analytics_value() == 1
+    assert await other_value() == 1
+    assert await cache.invalidate_tags("analytics") == 1
+    assert await analytics_value() == 2
+    assert await other_value() == 1
+
+
 def test_proxy_headers_are_ignored_by_default():
     request = SimpleNamespace(
         headers={"x-real-ip": "203.0.113.9"},

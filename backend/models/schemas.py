@@ -1,7 +1,9 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PaginatedResponse(BaseModel):
@@ -29,6 +31,9 @@ class OrderResponse(BaseModel):
     order_date: date | None = Field(None, description="下单日期")
     order_hour: int | None = Field(None, description="下单小时")
     weekday: str | None = Field(None, description="星期几")
+    order_status: str = Field("ACTIVE", description="事件驱动订单状态")
+    event_version: int = Field(0, ge=0, description="最后成功应用的事件版本")
+    updated_at: datetime | None = Field(None, description="最后一次状态事件处理时间")
 
     model_config = {"from_attributes": True}
 
@@ -111,6 +116,95 @@ class CategoryAnalysisResponse(BaseModel):
 class AIQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500, description="自然语言查询")
     thread_id: str | None = Field(None, min_length=1, max_length=128, description="多轮会话标识")
+
+
+# ─────────────────── 订单事件摄入契约 ───────────────────
+
+class _StrictPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class OrderCreatedPayload(_StrictPayload):
+    """新订单事件必须给出创建订单读模型所需的完整字段。"""
+
+    user_name: str = Field(..., min_length=1, max_length=100)
+    product_id: str = Field(..., min_length=1, max_length=50)
+    order_amount: Decimal = Field(..., gt=0, max_digits=18, decimal_places=2)
+    payment_amount: Decimal = Field(..., gt=0, max_digits=18, decimal_places=2)
+    platform_type: str = Field(..., min_length=1, max_length=50)
+    channel_id: str | None = Field(None, max_length=50)
+    discount_amount: Decimal = Field(Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    order_time: datetime | None = None
+
+    @model_validator(mode="after")
+    def payment_cannot_exceed_order_amount(self):
+        if self.payment_amount > self.order_amount:
+            raise ValueError("payment_amount 不能大于 order_amount")
+        return self
+
+
+class OrderStatePayload(_StrictPayload):
+    """退款/取消只允许携带可审计原因，不允许通过 payload 偷改金额或身份字段。"""
+
+    reason: str | None = Field(None, max_length=500)
+
+
+class OrderEventInput(BaseModel):
+    """单条事件的传输协议。
+
+    version 是事件源内同一 order_id 的单调序号。服务端拒绝小于等于当前订单
+    watermark 的非重复事件，防止延迟投递使状态倒退。
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    event_id: UUID
+    order_id: str = Field(..., min_length=1, max_length=50)
+    event_type: Literal["ORDER_CREATED", "ORDER_REFUNDED", "ORDER_CANCELLED"]
+    occurred_at: datetime
+    version: int = Field(..., ge=1, le=2_147_483_647)
+    payload: dict[str, Any]
+    source: str = Field(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
+
+    @model_validator(mode="after")
+    def validate_payload_for_event_type(self):
+        if self.event_type == "ORDER_CREATED":
+            payload = OrderCreatedPayload.model_validate(self.payload)
+        else:
+            payload = OrderStatePayload.model_validate(self.payload)
+        self.payload = payload.model_dump(mode="json")
+        return self
+
+
+class OrderEventBatchRequest(BaseModel):
+    """小批量写入。批内重复 event_id 先在 Pydantic 层拒绝，避免无意义 DB 往返。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    events: list[OrderEventInput] = Field(..., min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def event_ids_must_be_unique(self):
+        ids = [event.event_id for event in self.events]
+        if len(set(ids)) != len(ids):
+            raise ValueError("同一批次 event_id 必须唯一")
+        return self
+
+
+class OrderEventResult(BaseModel):
+    event_id: UUID
+    order_id: str
+    status: Literal["processed", "duplicate", "rejected"]
+    event_type: str
+    reason: str | None = None
+    data_updated_at: datetime | None = None
+
+
+class OrderEventBatchResponse(BaseModel):
+    results: list[OrderEventResult]
+    processed: int
+    duplicates: int
+    rejected: int
 
 
 class AgentStep(BaseModel):

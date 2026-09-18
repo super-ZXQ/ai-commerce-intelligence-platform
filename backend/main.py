@@ -11,8 +11,8 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import get_settings
-from backend.database import check_db_connection, engine
-from backend.routes import ai, analytics, auth, export, monitor, orders, products, rfm
+from backend.database import check_db_connection, check_event_db_connection, engine, event_engine
+from backend.routes import ai, analytics, auth, export, monitor, order_events, orders, products, rfm
 from backend.routes.monitor import (
     _load_rag_stats,
     detailed_health,
@@ -24,6 +24,7 @@ from backend.services.rfm_service import RfmDataUnavailableError
 from backend.utils.cache import cleanup_memory_cache, close_redis, init_redis
 from backend.utils.cache import clear as clear_cache
 from backend.utils.rate_limiter import check_rate_limit
+from backend.utils.event_metrics import render_prometheus
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +56,8 @@ async def lifespan(app: FastAPI):
         # 生产 API 不应以“表面存活、业务接口全部失败”的状态继续运行。
         raise RuntimeError("数据库连接失败，终止后端启动")
     logger.info("✅ 数据库连接检查完成")
+    if not await check_event_db_connection():
+        raise RuntimeError("事件数据库连接失败，终止后端启动")
 
     if settings.redis_enabled:
         redis_ok = await init_redis(settings.redis_url)
@@ -78,6 +81,7 @@ async def lifespan(app: FastAPI):
         pass
     await close_redis()
     await engine.dispose()
+    await event_engine.dispose()
     logger.info("👋 数据库连接池已关闭")
 
 
@@ -206,6 +210,7 @@ async def rfm_unavailable_handler(request: Request, exc: RfmDataUnavailableError
 
 app.include_router(auth.router)
 app.include_router(orders.router)
+app.include_router(order_events.router)
 app.include_router(products.router)
 app.include_router(analytics.router)
 app.include_router(ai.router)
@@ -261,6 +266,7 @@ async def metrics_alias() -> PlainTextResponse:
     return PlainTextResponse(
         content=(
             render_backend_prometheus()
+            + render_prometheus()
             + render_rag_prometheus(_load_rag_stats() or {})
         ),
         media_type="text/plain; version=0.0.4",

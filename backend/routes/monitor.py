@@ -15,6 +15,9 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from backend.database import check_db_connection
 from backend.utils.cache import check_redis_health
 from backend.utils.cache import stats as cache_stats
+from backend.utils.cache import operational_snapshot
+from backend.utils.event_metrics import snapshot as event_metrics_snapshot
+from agent_core.operational_metrics import snapshot as agent_metrics_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,8 @@ async def get_metrics():
             ],
         },
         "cache": cache_status,
+        "order_events": event_metrics_snapshot(),
+        "agent_failures": agent_metrics_snapshot(),
     }
 
 
@@ -200,13 +205,26 @@ def render_backend_prometheus() -> str:
     total = _request_stats["total"]
     success = _request_stats["success"]
     error = _request_stats["error"]
+    cache = operational_snapshot()
+    agent = agent_metrics_snapshot()
     return "\n".join([
         f"commerce_backend_uptime_seconds {uptime}",
         f"commerce_http_requests_total {total}",
         f'commerce_http_responses_total{{status="success"}} {success}',
         f'commerce_http_responses_total{{status="error"}} {error}',
-        "",
-    ])
+        "# TYPE cache_hits_total counter",
+        f"cache_hits_total {cache['hits']}",
+        "# TYPE cache_rebuild_total counter",
+        f"cache_rebuild_total {cache['rebuilds']}",
+        "# TYPE cache_rebuild_inflight gauge",
+        f"cache_rebuild_inflight {cache['rebuild_inflight']}",
+    ] + [
+        f'llm_failures_total{{category="{category}"}} {count}'
+        for category, count in sorted(agent["llm_failures"].items())
+    ] + [
+        f'rag_failures_total{{category="{category}"}} {count}'
+        for category, count in sorted(agent["rag_failures"].items())
+    ] + [""])
 
 
 @router.get("/rag-stats", summary="RAG 检索统计")

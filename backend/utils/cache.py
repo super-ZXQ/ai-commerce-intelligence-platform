@@ -1,10 +1,12 @@
 import asyncio
+import builtins
 import hashlib
 import inspect
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections import defaultdict
+from collections.abc import Awaitable, Callable, Iterable
 from functools import wraps
 from typing import Any
 
@@ -39,6 +41,12 @@ class _RefLock:
 
 
 _cache_locks: dict[str, _RefLock] = {}
+# 标签到缓存键的反向索引。订单事件只清理 analytics/rfm 标签，绝不 FLUSHDB。
+_cache_tag_keys: dict[str, set[str]] = defaultdict(set)
+_cache_key_tags: dict[str, set[str]] = {}
+_cache_tag_key_expiry: dict[str, float] = {}
+_cache_metrics = {"hits": 0, "rebuilds": 0}
+_cache_tag_generated_at: dict[str, float] = {}
 
 
 def _release_lock_if_idle(key: str) -> None:
@@ -113,7 +121,28 @@ def _to_jsonable(value: Any) -> Any:
 def _evict_memory_entry(key: str) -> None:
     """从内存缓存删除条目并尝试回收对应的防击穿锁。"""
     _memory_cache.pop(key, None)
+    _remove_key_from_tags(key)
     _release_lock_if_idle(key)
+
+
+def _remove_key_from_tags(key: str) -> None:
+    """删除本地标签反向索引，防止已过期缓存键无限累积。"""
+    for tag in _cache_key_tags.pop(key, builtins.set()):
+        keys = _cache_tag_keys.get(tag)
+        if keys is not None:
+            keys.discard(key)
+            if not keys:
+                _cache_tag_keys.pop(tag, None)
+                _cache_tag_generated_at.pop(tag, None)
+    _cache_tag_key_expiry.pop(key, None)
+
+
+def _prune_tag_indices() -> None:
+    """缓存 TTL 到期后同步剔除本地标签索引。"""
+    now = time.time()
+    for key, expires_at in list(_cache_tag_key_expiry.items()):
+        if expires_at <= now:
+            _remove_key_from_tags(key)
 
 
 async def _cache_contains(key: str) -> bool:
@@ -142,6 +171,7 @@ async def get(key: str) -> Any | None:
         try:
             raw = await _redis_client.get(key)
             if raw is not None:
+                _cache_metrics["hits"] += 1
                 return json.loads(raw)
             return None
         except Exception as e:
@@ -152,6 +182,7 @@ async def get(key: str) -> Any | None:
     if entry["expires_at"] < time.time():
         _evict_memory_entry(key)
         return None
+    _cache_metrics["hits"] += 1
     return entry["data"]
 
 
@@ -183,6 +214,12 @@ async def clear() -> None:
             pass
     _memory_cache.clear()
     _cache_locks.clear()
+    _cache_tag_keys.clear()
+    _cache_key_tags.clear()
+    _cache_tag_key_expiry.clear()
+    _cache_tag_generated_at.clear()
+    _cache_metrics["hits"] = 0
+    _cache_metrics["rebuilds"] = 0
 
 
 async def stats() -> dict:
@@ -195,13 +232,89 @@ async def stats() -> dict:
                 "backend": "redis",
                 "keys": await _redis_client.dbsize(),
                 "memory_human": info.get("used_memory_human", "N/A"),
+                "hits": _cache_metrics["hits"],
+                "rebuilds": _cache_metrics["rebuilds"],
+                "rebuild_inflight": sum(1 for lock in _cache_locks.values() if lock.lock.locked()),
             }
         except Exception:
-            return {"status": "error", "backend": "redis_fallback_memory", "keys": len(_memory_cache)}
-    return {"status": "ok", "backend": "memory", "keys": len(_memory_cache)}
+            return {
+                "status": "degraded",
+                "backend": "redis_fallback_memory",
+                "keys": len(_memory_cache),
+                "hits": _cache_metrics["hits"],
+                "rebuilds": _cache_metrics["rebuilds"],
+                "rebuild_inflight": sum(1 for lock in _cache_locks.values() if lock.lock.locked()),
+            }
+    return {
+        "status": "ok",
+        "backend": "memory",
+        "keys": len(_memory_cache),
+        "hits": _cache_metrics["hits"],
+        "rebuilds": _cache_metrics["rebuilds"],
+        "rebuild_inflight": sum(1 for lock in _cache_locks.values() if lock.lock.locked()),
+    }
 
 
-def cached(ttl: int = DEFAULT_TTL):
+async def _register_tags(cache_key: str, tags: Iterable[str], ttl: int) -> None:
+    """记录标签反向索引；Redis 可用时索引也写入 Redis，支持多进程精准失效。"""
+    _prune_tag_indices()
+    tag_list = tuple(dict.fromkeys(tag for tag in tags if tag))
+    expires_at = time.time() + ttl
+    for tag in tag_list:
+        _cache_tag_keys[tag].add(cache_key)
+        _cache_tag_generated_at[tag] = time.time()
+    if tag_list:
+        _cache_key_tags[cache_key] = builtins.set(tag_list)
+        _cache_tag_key_expiry[cache_key] = expires_at
+    if _redis_available and _redis_client and tag_list:
+        try:
+            for tag in tag_list:
+                tag_key = f"_cache_tag:{tag}"
+                # score 是缓存键到期时间，避免常驻标签集合积累无效键。
+                await _redis_client.zadd(tag_key, {cache_key: expires_at})
+                await _redis_client.zremrangebyscore(tag_key, "-inf", time.time())
+                await _redis_client.expire(tag_key, ttl)
+        except Exception as exc:
+            logger.warning("Redis 缓存标签登记失败，使用进程内索引: %s", exc)
+
+
+async def invalidate_tags(*tags: str) -> int:
+    """按业务标签失效缓存，而不是清空无界 Redis 数据库。"""
+    _prune_tag_indices()
+    normalized = tuple(dict.fromkeys(tag for tag in tags if tag))
+    keys: set[str] = builtins.set()
+    for tag in normalized:
+        keys.update(_cache_tag_keys.pop(tag, builtins.set()))
+        _cache_tag_generated_at.pop(tag, None)
+
+    if _redis_available and _redis_client and normalized:
+        try:
+            for tag in normalized:
+                tag_key = f"_cache_tag:{tag}"
+                await _redis_client.zremrangebyscore(tag_key, "-inf", time.time())
+                keys.update(await _redis_client.zrangebyscore(tag_key, time.time(), "+inf"))
+                await _redis_client.delete(tag_key)
+            if keys:
+                await _redis_client.delete(*keys)
+        except Exception as exc:
+            logger.warning("Redis 标签失效失败，继续清理进程内缓存: %s", exc)
+
+    for key in keys:
+        _evict_memory_entry(key)
+    return len(keys)
+
+
+def operational_snapshot() -> dict[str, Any]:
+    """无需 I/O 的指标快照，供同步 Prometheus 渲染与 freshness API 使用。"""
+    return {
+        "hits": _cache_metrics["hits"],
+        "rebuilds": _cache_metrics["rebuilds"],
+        "rebuild_inflight": sum(1 for lock in _cache_locks.values() if lock.lock.locked()),
+        "tag_generated_at": dict(_cache_tag_generated_at),
+    }
+
+
+def cached(ttl: int = DEFAULT_TTL, *, tags: tuple[str, ...] = ()):
     """缓存装饰器：自动识别并跳过 SQLAlchemy Session 等不可哈希参数。
 
     约定：被装饰函数的形参名以 "_" 开头的（如 db / session / conn）会被排除在
@@ -259,7 +372,9 @@ def cached(ttl: int = DEFAULT_TTL):
                             else cached_result
                         )
                     result = await func(*args, **kwargs)
+                    _cache_metrics["rebuilds"] += 1
                     await set(cache_key, result, ttl=ttl)
+                    await _register_tags(cache_key, tags, ttl)
                     logger.debug(f"已缓存: {cache_key} (TTL={ttl}s)")
                     return result
             finally:
@@ -271,6 +386,7 @@ def cached(ttl: int = DEFAULT_TTL):
 def cleanup_memory_cache() -> int:
     """清理过期内存条目与孤立锁（纯内存操作，后台任务同步调用即可）。"""
     now = time.time()
+    _prune_tag_indices()
     expired = [k for k, v in _memory_cache.items() if v["expires_at"] < now]
     for k in expired:
         _evict_memory_entry(k)

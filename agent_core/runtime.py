@@ -13,6 +13,7 @@ from uuid import uuid4
 from langgraph.graph import END, START, StateGraph
 
 from agent_core.models import AgentIntent, AgentResult, AgentSource, AgentStep, AgentUsage, ModelResponse
+from agent_core.operational_metrics import record_llm_failure, record_rag_failure
 from agent_core.session import ConversationStore, MemoryConversationStore, Message
 from agent_core.sql_safety import (
     SQLValidationError,
@@ -229,7 +230,8 @@ class AgentRuntime:
         try:
             sources = (await self._retriever(state["query"]))[:3]
             event = self._event("retrieve", started, f"检索到 {len(sources)} 条来源")
-        except Exception:  # noqa: BLE001 - RAG 无法使用时允许无引用降级
+        except Exception as exc:  # noqa: BLE001 - RAG 无法使用时允许无引用降级
+            record_rag_failure(type(exc).__name__)
             sources = []
             event = self._event("retrieve", started, "知识检索不可用，已降级", "error")
         return {
@@ -261,6 +263,7 @@ class AgentRuntime:
                 state["query"], state["schema"], state.get("history", []), state.get("sources", []), previous_error
             )
         except Exception as exc:  # noqa: BLE001 - 模型边界需可控降级
+            record_llm_failure(type(exc).__name__)
             retry_count = state.get("retry_count", 0) + 1
             return {
                 "generated_sql": "",
@@ -349,6 +352,7 @@ class AgentRuntime:
                 state.get("sql"), state.get("rows", []),
             )
         except Exception as exc:  # noqa: BLE001 - 模型边界需可控降级
+            record_llm_failure(type(exc).__name__)
             return {
                 "answer": f"⚠️ 回答生成失败：{_public_error(exc)}。",
                 "steps": self._append(state, self._event("synthesize", started, "回答生成失败", "error")),

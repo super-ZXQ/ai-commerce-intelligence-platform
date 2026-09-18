@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     ai_db_user: str = ""
     ai_db_password: str = ""
 
+    # 订单事件摄入专用写账号。Docker 中为 ea_events，只授予 orders/order_events
+    # 的 SELECT/INSERT/UPDATE；绝不能传给 Agent 或 AI 助手。
+    event_db_user: str = ""
+    event_db_password: str = ""
+    order_event_timeout_seconds: float = 5.0
+    order_event_batch_max_size: int = 100
+
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""
@@ -130,6 +137,16 @@ class Settings(BaseSettings):
         password = self.ai_db_password if self.ai_db_user else self.db_password
         return (
             f"mysql+pymysql://{quote_plus(user)}:{quote_plus(password)}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+        )
+
+    @property
+    def event_async_database_url(self) -> str:
+        """事件写库连接串；未配置专用账号时仅为本地开发兼容而回落主账号。"""
+        user = self.event_db_user or self.db_user
+        password = self.event_db_password if self.event_db_user else self.db_password
+        return (
+            f"mysql+aiomysql://{quote_plus(user)}:{quote_plus(password)}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
         )
 
