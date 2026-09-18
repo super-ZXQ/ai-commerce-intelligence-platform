@@ -26,6 +26,7 @@ jobs:
           DB_APP_PASSWORD=ci-app-password
           DB_AI_PASSWORD=ci-ai-password
           DB_SYNC_PASSWORD=ci-sync-password
+          DB_EVENT_PASSWORD=ci-event-password
           DB_NAME=ai_commerce_intelligence_platform
           REDIS_PASSWORD=
           NGINX_PORT=80
