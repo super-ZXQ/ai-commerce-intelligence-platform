@@ -9,7 +9,7 @@ import uuid
 import pytest
 
 from agent_core import observability as obs
-from agent_core.models import AgentResult, AgentSource, AgentStep, AgentUsage
+from agent_core.models import AgentResult, AgentSource, AgentUsage
 from agent_core.runtime import AgentRuntime
 
 

@@ -20,7 +20,7 @@
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 252 项自动化测试（隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 301 项自动化测试（隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 50 条 GLM 真实评测 + 12 条安全拒答端到端评测 |
 
 ## 在线演示
 
@@ -541,10 +541,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（252 项，实收全绿）
+### 自动化测试（301 项，实收全绿）
 
 ```bash
-# 后端（164 项，完整运行需要 MySQL）
+# 后端（213 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（88 项）
@@ -553,12 +553,14 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（164 项）：
+后端（213 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
-- `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
+- `test_live_model_evaluation.py` — 真实评测集约束（50 条，reference SQL 全部可执行）、结果集比较、安全拒答集 12 条覆盖四类越权缺口、路由加固回归（拦截不误伤）
+- `test_observability.py` — Langfuse 开关语义、trace_id 派生、汇总上报与 Runtime 接线（假 SDK，不依赖真实服务）
+- `test_monitor_auth.py` — 监控端点 JWT 保护开关开/关两态
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
 
 AI/RAG（88 项）：
@@ -572,13 +574,13 @@ AI/RAG（88 项）：
 
 AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEmbeddings` 生成确定性归一化向量。
 
-**测试规模（实收，非估填）** — 2026-09-18 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
+**测试规模（实收，非估填）** — 2026-10-13 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 164 | **164 passed**（14s） |
-| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（11s） |
-| **合计** | **252** | **252 passed / 0 failed** |
+| `backend/tests` | 213 | **213 passed**（约 30s） |
+| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（约 11s） |
+| **合计** | **301** | **301 passed / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -653,9 +655,19 @@ python eval/run_sql_eval.py --output eval/sql_eval_report.json
 
 ### 真实模型评测
 
-真实模型评测需要用户显式配置 API Key 和 `--allow-network`，不会在 CI 中消耗额度。最新可审计快照使用智谱 `glm-4-flash-250414`，在完整 102,287 行数据上的 15 条评测中通过 14 条（93.33%）：结构化输出 100%、SQL 结果正确率 90%、知识关键词覆盖率与引用完整率均为 100%，P50/P95 延迟为 1,508/8,941 ms，共使用 6,894 Tokens。
+真实模型评测需要用户显式配置 API Key 和 `--allow-network`，不会在 CI 中消耗额度。
 
-评测比较候选 SQL 与参考 SQL 的实际结果集，不使用 SQL 字符串相等或模型自评。唯一失败项及逐条输出保留在 [`docs/evaluation/`](docs/evaluation/README.md)；15 条小样本不代表所有真实问题的总体准确率。
+- **数据准确性评测集（50 条）**：`agent_core/eval/live_model_cases.jsonl`，30 条 Text-to-SQL（结果集比对）+ 20 条知识问答（关键词覆盖 + 引用完整）。2026-09-18 快照使用智谱 `glm-4-flash-250414`，在完整 102,287 行数据上的 15 条评测中通过 14 条（93.33%）：结构化输出 100%、SQL 结果正确率 90%、知识关键词覆盖率与引用完整率均为 100%，P50/P95 延迟为 1,508/8,941 ms，共使用 6,894 Tokens；该快照为 15 条时的历史记录，扩容至 50 条后需重新跑取新快照（命令见下）。
+- **安全拒答评测集（12 条）**：`agent_core/eval/live_safety_cases.jsonl`，走完整 Agent Runtime 端到端，覆盖导出客户资料 / 收货地址 / 记录行写操作 / 泛宾语盘点 / 提示词注入 / 隐私字段六类，判定「路由 blocked + 未执行 SQL + 拒绝话术」三要素。
+
+运行命令（需要 `LLM_API_KEY`）：
+
+```bash
+python -m agent_core.live_evaluation --allow-network          # 50 条数据准确性
+python -m agent_core.live_safety_evaluation --allow-network   # 12 条安全拒答
+```
+
+评测比较候选 SQL 与参考 SQL 的实际结果集，不使用 SQL 字符串相等或模型自评。唯一失败项及逐条输出保留在 [`docs/evaluation/`](docs/evaluation/README.md)；小样本不代表所有真实问题的总体准确率。
 
 ### 已知限制与降级
 
@@ -663,7 +675,8 @@ python eval/run_sql_eval.py --output eval/sql_eval_report.json
 - Redis 不可用：自动降级到最多 1,000 个会话的内存存储；会话保留最近 6 轮、TTL 30 分钟。
 - RAG 无命中：继续执行可用分支并返回空来源，不伪造引用。
 - SQL 校验或执行失败：仅使用脱敏错误纠正一次，第二次失败后停止循环并返回明确错误。
-- 真实模型评测仅 15 条且输出具有随机性；当前快照有 1 条 SQL 在一次纠错后仍失败。
+- 真实模型评测扩容至 50 条 + 12 条安全拒答，但 50 条的新快照需配置 Key 后重跑（命令见上节）；模型输出具有随机性，历史快照有 1 条 SQL 在一次纠错后仍失败。
+- 敌意题目盲出集（`agent_core/eval/adversarial/`）等待第三方同学出题，当前为空——不预置题目冒充评测。
 - 本地演示可使用 SQLite；生产与完整 CI 使用 MySQL 8，只读账号是安全边界的一部分。
 
 ## 项目结构
