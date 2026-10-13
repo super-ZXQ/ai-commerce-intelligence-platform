@@ -57,6 +57,8 @@ docker exec ea-nginx nginx -s reload
 
 RFM 计算在 `streamlit_app.py` 内联 `compute_rfm_data()`，缓存通过用户名/订单数/金额哈希。
 
+`bi_style.py` 是 `streamlit_app.py` 的伴生样式模块（仅它一处 import），与入口文件同级放在根目录是**有意设计**：移动会连带修改 Docker 构建上下文（`Dockerfile.streamlit` 的 `COPY . .`）与 CI 的 ruff 检查范围，收益不成比例。勿移动。
+
 ## 企业级配色（所有图表必须统一映射）
 
 ```python
