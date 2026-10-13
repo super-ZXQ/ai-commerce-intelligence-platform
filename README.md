@@ -221,6 +221,13 @@ Client → Nginx
 - **Agent Runtime** (`agent_core`) = AI capability layer
 - **Chroma embedded + BGE** = V1 知识库（当前规模合理；多实例/高并发再评估 Qdrant/Milvus，见 Roadmap，本次不换栈）
 
+## 可观测性：Prometheus × Langfuse 双层体系
+
+- **Prometheus（看森林）**：QPS、失败率、token 总量、缓存命中等聚合指标，支撑看板与告警；
+- **Langfuse（看树木，可选，默认关闭）**：每次 AI 查询的完整 trace——每个 LangGraph 节点一个 span、每次 LLM 调用一个 generation，含 prompt / token / 成本 / 延迟，可在 UI 逐节点回放。`LANGFUSE_ENABLED=true` + Key 配置即启用，未配置时静默跳过（`docker-compose.observability.yml` 自托管）。
+
+分工定位、启用步骤与统计脚本（日查询量 / 平均 token 成本 / P50·P95 延迟）见 [docs/observability.md](docs/observability.md)。
+
 ## RAG 业务知识检索增强
 
 AI 分析助手内置 RAG 能力，能同时利用**业务知识库**和**SQL 数据查询**回答用户问题。

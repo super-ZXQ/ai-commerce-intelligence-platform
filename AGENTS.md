@@ -86,6 +86,7 @@ ENTERPRISE_COLORS_FULL = {
 - **`@cached` 防击穿** — 基于 `asyncio.Lock` 的 double-check lock，过期时异步重建
 - **内存缓存上限 1000 条** — 满时先清理过期条目再驱逐最旧条目；`cleanup_memory_cache()` 同步清理 `_cache_locks`
 - **公开监控端点** — `/api/monitor/services-status`、`/health/detailed`、`/metrics` 默认无需 JWT（导航页/监控面板/健康面板调用）；`MONITOR_AUTH_REQUIRED=true` 可开启全端点 JWT 保护（公网部署建议），开关默认关闭保持向后兼容，测试见 `backend/tests/test_monitor_auth.py`
+- **Langfuse trace 观测默认关闭** — `LANGFUSE_ENABLED=true` + Key 配置后启用；未配置时 `agent_core/observability.py` 全部静默降级，主流程零影响；自托管栈见 `docker-compose.observability.yml`，分工与口径见 `docs/observability.md`；不得删除或改造已有 Prometheus 指标 / 事件 JSONL / UI 执行轨迹
 
 ## 排查路径
 

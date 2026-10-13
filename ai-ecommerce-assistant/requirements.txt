@@ -19,3 +19,7 @@ torch==2.13.0
 setuptools==83.0.0
 httpx==0.28.1
 msgpack==1.2.2
+
+# Langfuse trace 级观测（可选功能，未配置 Key 时 SDK 静默不发送）。
+# 用于记录每次 AI 查询的节点 span / token / 成本 / 延迟，详见 docs/observability.md。
+langfuse==3.15.0

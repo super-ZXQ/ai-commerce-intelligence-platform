@@ -13,6 +13,7 @@ from uuid import uuid4
 from langgraph.graph import END, START, StateGraph
 
 from agent_core.models import AgentIntent, AgentResult, AgentSource, AgentStep, AgentUsage, ModelResponse
+from agent_core import observability
 from agent_core.operational_metrics import record_llm_failure, record_rag_failure
 from agent_core.session import ConversationStore, MemoryConversationStore, Message
 from agent_core.sql_safety import (
@@ -388,13 +389,22 @@ class AgentRuntime:
         }
 
     async def invoke(self, query: str, *, owner: str = "anonymous", thread_id: str | None = None) -> RuntimeState:
-        return await self._graph.ainvoke(
-            {
-                "query": query.strip(), "owner": owner, "request_id": str(uuid4()),
-                "thread_id": thread_id or str(uuid4()), "steps": [], "retry_count": 0,
-                "sources": [], "rows": [], "started_at": time.perf_counter(),
-            }
+        initial_state = {
+            "query": query.strip(), "owner": owner, "request_id": str(uuid4()),
+            "thread_id": thread_id or str(uuid4()), "steps": [], "retry_count": 0,
+            "sources": [], "rows": [], "started_at": time.perf_counter(),
+        }
+        # Langfuse trace 观测：未配置环境变量时 config 为 None，行为与原来完全一致
+        trace_config = observability.build_query_config(
+            request_id=initial_state["request_id"], owner=owner,
+            query=initial_state["query"], thread_id=initial_state["thread_id"],
         )
+        if trace_config is not None:
+            state = await self._graph.ainvoke(initial_state, config=trace_config)
+        else:
+            state = await self._graph.ainvoke(initial_state)
+        self._record_trace_summary(initial_state["request_id"], state)
+        return state
 
     async def astream(
         self,
@@ -418,10 +428,19 @@ class AgentRuntime:
                 "thread_id": thread_id or str(uuid4()), "steps": [], "retry_count": 0,
                 "sources": [], "rows": [], "started_at": time.perf_counter(),
             }
+            # Langfuse trace 观测：未配置环境变量时不传 config，行为与原来完全一致
+            trace_config = observability.build_query_config(
+                request_id=state["request_id"], owner=owner,
+                query=state["query"], thread_id=state["thread_id"],
+            )
             emitted = 0
             # stream_mode="updates" 逐节点产出增量；RuntimeState 无 reducer，
             # 每个 update 的 "steps" 都是全量列表，用 emitted 游标只下发新步骤。
-            async for update in self._graph.astream(state, stream_mode="updates"):
+            if trace_config is not None:
+                updates = self._graph.astream(state, config=trace_config, stream_mode="updates")
+            else:
+                updates = self._graph.astream(state, stream_mode="updates")
+            async for update in updates:
                 for node_update in update.values():
                     if not isinstance(node_update, dict):
                         continue
@@ -431,7 +450,27 @@ class AgentRuntime:
                         for step in steps[emitted:]:
                             on_step(asdict(step))
                         emitted = max(emitted, len(steps))
+            self._record_trace_summary(state["request_id"], state)
             return state
         finally:
             if hook_token is not None:
                 reset_token_hook(hook_token)
+
+    @staticmethod
+    def _record_trace_summary(request_id: str, state: RuntimeState) -> None:
+        """查询结束后把 token/延迟/意图/步骤链汇总进 Langfuse trace。
+
+        未启用 Langfuse 时 observability 内部静默返回；汇总失败只记日志，
+        不影响调用方已拿到的结果。
+        """
+        result: AgentResult | None = state.get("result")
+        if result is None:
+            return
+        observability.record_query_summary(
+            request_id,
+            intent=result.intent,
+            usage=result.usage,
+            latency_ms=result.usage.latency_ms,
+            step_names=[step.name for step in result.steps],
+            sql_error=result.sql_error,
+        )
