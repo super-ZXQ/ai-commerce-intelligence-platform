@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,11 +94,7 @@ def _new_order(
     *,
     order_seq_id: int | None = None,
 ) -> Order:
-    """将已校验的创建事件投影为 orders 读模型行。
-
-    order_seq_id：Docker 旧卷/历史 schema 可能没有 AUTO_INCREMENT，因此调用方
-    应显式传入主键；为 None 时依赖数据库自增。
-    """
+    """创建订单；业务写入省略主键，由迁移后的数据库自增分配。"""
     return Order(
         id=order_seq_id,
         order_no=event.order_id,
@@ -155,9 +151,7 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
             return _reject(ledger, event, "订单已存在，拒绝重复创建")
         payload = OrderCreatedPayload.model_validate(event.payload)
         order_time = _utc_naive(payload.order_time or event.occurred_at)
-        # 显式分配主键：不依赖目标库是否配置了 AUTO_INCREMENT。
-        max_seq = await db.scalar(select(func.max(Order.id)))
-        db.add(_new_order(event, payload, order_time, order_seq_id=(max_seq or 0) + 1))
+        db.add(_new_order(event, payload, order_time))
         ledger.processing_status = _PROCESSED
         ledger.processed_at = _utc_now_naive()
         return _result(event, "processed")
