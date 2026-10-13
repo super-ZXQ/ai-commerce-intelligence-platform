@@ -11,7 +11,9 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
+from uuid import uuid4
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -57,6 +59,28 @@ class VectorStore:
         logger.info("VectorStore 就绪: %s (collection=%s)",
                     persist_dir, collection_name)
 
+    @property
+    def knowledge_version(self) -> str:
+        """共享版本文件使其他进程的检索缓存也能识别写入。"""
+        try:
+            return (Path(self.persist_dir) / "knowledge.version").read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return "0"
+
+    def _publish_version(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.persist_dir, delete=False) as file:
+            file.write(uuid4().hex)
+            temporary = file.name
+        os.replace(temporary, Path(self.persist_dir) / "knowledge.version")
+
+    def delete_documents(self, ids: list[str]) -> None:
+        if ids:
+            self._publish_version()
+            try:
+                self._store.delete(ids=ids)
+            finally:
+                self._publish_version()
+
     def add_documents(self,
                       documents: list[Document],
                       ids: list[str] | None = None) -> list[str]:
@@ -73,15 +97,12 @@ class VectorStore:
             return []
         if ids is None:
             ids = [d.metadata.get("doc_id") or f"auto-{i}" for i, d in enumerate(documents)]
-        # Chroma 的 add(ids=...) 在 ID 重复时会抛 InvalidCollectionAPIError，
-        # 需先删除旧记录
+        # LangChain Chroma使用upsert；无需先删除，避免写入失败时丢失旧记录。
+        self._publish_version()
         try:
-            existing = self._store.get(ids=ids).get("ids", [])
-            if existing:
-                self._store.delete(ids=existing)
-        except Exception:
-            pass
-        self._store.add_documents(documents=documents, ids=ids)
+            self._store.add_documents(documents=documents, ids=ids)
+        finally:
+            self._publish_version()
         # langchain-chroma 的 Chroma 客户端写入即自动持久化（PersistentClient），
         # 无需（也没有）手动 persist 调用。
         return ids
@@ -123,21 +144,13 @@ class VectorStore:
         return results
 
     def count(self) -> int:
-        try:
-            return self._store._collection.count()
-        except Exception:
-            return 0
+        return self._store._collection.count()
 
     def delete_all(self):
         """清空集合（保留 collection 结构，仅清空文档）。"""
-        try:
-            # 直接通过 collection API 删全部，比 reset() 物理删文件更安全
-            all_ids = self.get_all_ids()
-            if all_ids:
-                self._store.delete(ids=all_ids)
-            logger.warning("⚠️ 已清空向量库（%d 条）: %s", len(all_ids), self.collection_name)
-        except Exception as e:
-            logger.error("清空失败: %s", e)
+        all_ids = self.get_all_ids()
+        self.delete_documents(all_ids)
+        logger.warning("⚠️ 已清空向量库（%d 条）: %s", len(all_ids), self.collection_name)
 
     def reset(self, force_physical: bool = False):
         """清空向量库。
@@ -169,11 +182,8 @@ class VectorStore:
                 relevance_score_fn=_distance_to_relevance,
             )
         except Exception as e:
-            logger.error("重建 store 失败: %s", e)
+            raise RuntimeError("重建向量库失败") from e
 
     def get_all_ids(self) -> list[str]:
         """获取全部已写入 ID（用于增量构建比对）。"""
-        try:
-            return self._store.get().get("ids", [])
-        except Exception:
-            return []
+        return self._store.get().get("ids", [])

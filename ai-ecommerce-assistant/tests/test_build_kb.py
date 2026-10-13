@@ -45,10 +45,15 @@ def test_doc_id_deterministic():
     assert a == b
 
 
-def test_doc_id_length_is_16():
-    """截断到 16 字符（64 bit 哈希）。"""
+def test_doc_id_is_full_sha256():
+    """完整规范化内容的SHA256。"""
     a = _make_doc_id("a.md", "S", "content")
-    assert len(a) == 16
+    assert len(a) == 64
+
+
+def test_doc_id_detects_changes_after_first_200_characters():
+    assert _make_doc_id("a.md", "S", "x" * 250 + "old") != _make_doc_id("a.md", "S", "x" * 250 + "new")
+    assert _make_doc_id("a.md", "S", "a\r\nb  \r\n") == _make_doc_id("a.md", "S", "a\nb\n")
 
 
 def test_doc_id_differs_on_content():
