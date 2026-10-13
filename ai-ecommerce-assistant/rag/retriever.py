@@ -79,7 +79,7 @@ class Retriever:
     @staticmethod
     def _key(query: str, k: int, threshold: float) -> str:
         raw = f"{query.strip()}|k={k}|t={threshold}"
-        return hashlib.md5(raw.encode()).hexdigest()
+        return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
     def retrieve(self,
                  query: str,

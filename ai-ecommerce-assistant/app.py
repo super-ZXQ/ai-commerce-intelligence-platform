@@ -163,7 +163,7 @@ QUERY_CACHE_MAX_ENTRIES = 50
 def get_cache_key(question: str, fingerprint: str = "") -> str:
     """缓存 key 必须绑定模型指纹（key:base_url:model 的哈希），
     否则换模型/API Key 后同一问题会直接命中旧模型的缓存答案。"""
-    return hashlib.md5(f"{fingerprint}:{question}".encode()).hexdigest()
+    return hashlib.md5(f"{fingerprint}:{question}".encode(), usedforsecurity=False).hexdigest()
 
 
 def _cache_lookup(cache: dict, key: str) -> dict | None:
@@ -679,7 +679,7 @@ def render_sql_block(sql: str | None, query_time: float | None = None):
         return
 
     escaped_sql = raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    copy_id = f"sql_{hashlib.md5(raw.encode()).hexdigest()[:8]}"
+    copy_id = f"sql_{hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()[:8]}"
     st.markdown(f"""
     <div class="sql-block">
         <button class="sql-copy-btn" onclick="
@@ -997,7 +997,8 @@ for msg_idx, msg in enumerate(st.session_state.messages):
             # 反馈状态按问答内容哈希记录，而不是消息索引：重新生成会删除消息对，
             # 索引前移后索引 key 会把反馈错位到别的消息行上。
             feedback_key = "fb_" + hashlib.md5(
-                (msg.get("question", "") + "\x00" + msg.get("content", "")).encode()
+                (msg.get("question", "") + "\x00" + msg.get("content", "")).encode(),
+                usedforsecurity=False,
             ).hexdigest()[:12]
             if "feedbacks" not in st.session_state:
                 st.session_state.feedbacks = {}

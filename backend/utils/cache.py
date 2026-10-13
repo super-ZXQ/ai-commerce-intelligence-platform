@@ -105,7 +105,7 @@ async def check_redis_health() -> dict:
 
 def _make_key(*args, **kwargs) -> str:
     raw = json.dumps({"a": args, "k": kwargs}, sort_keys=True, default=str)
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
 
 def _to_jsonable(value: Any) -> Any:

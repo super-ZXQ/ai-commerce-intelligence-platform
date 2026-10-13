@@ -87,6 +87,10 @@ docker compose up -d
 
 部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入和数据同步分别创建最小权限账号；API 与 AI 仅有查询权限，`ea_events` 仅能更新 `orders` 与 `order_events`。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；Excel 因工作簿格式限制仍需在内存中生成。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
 
+**生产环境安全加固（公网部署必读）：**
+
+监控端点（`/metrics`、`/api/monitor/*`、`/health/detailed`）默认免鉴权，以便本地开发与导航页/监控面板直接调用。**公网部署时建议在 `.env` 中设置 `MONITOR_AUTH_REQUIRED=true`**，这些端点将与其他业务接口一样要求 JWT Bearer 令牌（监控面板如需无人值守访问，需为其登录态配置对应的 Nginx 例外或改用内网访问）。开关默认关闭，保持既有调用方式向后兼容；测试见 `backend/tests/test_monitor_auth.py`。
+
 ### 本地开发
 
 ```bash

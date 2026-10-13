@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     # 直接对公网暴露时保持 False：XFF 第一个 IP 由客户端可控，开启可被伪造绕过限流。
     trust_proxy_headers: bool = False
 
+    # 监控端点访问保护开关（/metrics、/api/monitor/*、/health/detailed）。
+    # 默认 False 免鉴权：本地开发与导航页/监控面板/健康面板调用保持向后兼容；
+    # 公网部署建议设为 true，此时这些端点与其他业务接口一样要求 JWT Bearer 令牌。
+    monitor_auth_required: bool = False
+
     default_page_size: int = 20
     max_page_size: int = 100
 

@@ -74,7 +74,7 @@ def _doc_type(filename: str) -> str:
 
 def _make_doc_id(source: str, section: str, content: str) -> str:
     raw = f"{source}::{section}::{content[:200]}"
-    return hashlib.md5(raw.encode()).hexdigest()[:16]
+    return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 def _split_by_sections(text: str) -> Iterator[tuple[str, str]]:

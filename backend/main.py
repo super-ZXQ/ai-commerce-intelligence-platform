@@ -5,7 +5,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -17,6 +17,7 @@ from backend.routes import ai, analytics, auth, export, monitor, order_events, o
 from backend.routes.monitor import (
     _load_rag_stats,
     detailed_health,
+    optional_monitor_auth,
     record_request,
     render_backend_prometheus,
     render_rag_prometheus,
@@ -268,15 +269,15 @@ async def health_check() -> dict:
     return {"status": "healthy" if db_ok else "degraded", "database": "connected" if db_ok else "disconnected"}
 
 
-@app.get("/health/detailed", tags=["系统"])
+@app.get("/health/detailed", tags=["系统"], dependencies=[Depends(optional_monitor_auth)])
 async def detailed_health_alias() -> dict:
-    """兼容运维工具的公开详细健康检查路径。"""
+    """兼容运维工具的详细健康检查路径（开关开启时需 JWT）。"""
     return await detailed_health()
 
 
-@app.get("/metrics", response_class=PlainTextResponse, tags=["系统"])
+@app.get("/metrics", response_class=PlainTextResponse, tags=["系统"], dependencies=[Depends(optional_monitor_auth)])
 async def metrics_alias() -> PlainTextResponse:
-    """公开的 Prometheus 指标路径。"""
+    """Prometheus 指标路径（开关开启时需 JWT）。"""
     return PlainTextResponse(
         content=(
             render_backend_prometheus()
