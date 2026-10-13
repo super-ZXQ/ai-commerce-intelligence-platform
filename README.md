@@ -9,18 +9,22 @@
 
 基于 **102,287 条公开电商订单样本**，完成从数据清洗、特征工程到多维分析与可视化的完整链路。系统采用前后端分离架构，提供交互式 BI 看板、分节点 Agent 智能查询、RAG 业务知识检索、RESTful API、RFM 用户画像和实时监控。
 
+2026-10-13审计已修复页面认证、SQL字段权限、模型网络访问、数据库账号回退、订单并发主键和RAG缓存更新等问题。数据库与页面回归通过 **417项测试**（含真实MySQL与Nginx容器认证联测）；真实模型接口认证失败，**本次B/C路由和SQL生成能力尚未验收**。新独立路由集规则准确率56.7%，真实检索对照未证明Hybrid收益，因此保留LangGraph、生产规则路由与现有检索默认方案，不追加Reranker。
+
+完整证据、业务取舍和限制见 [审计报告](AUDIT_REPORT.md)、[修复报告](FIX_REPORT.md)、[评测报告](EVALUATION_REPORT.md)、[架构与安全边界](docs/AUDIT_ARCHITECTURE.md) 和 [面试技术总结](docs/INTERVIEW_TECHNICAL_SUMMARY.md)。后文原有GLM与路由数字为历史实验，不能替代本次新集验收。
+
 ## 功能概览
 
 | 模块 | 技术栈 | 功能 |
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot + Chroma | 分节点路由、结构化 Text-to-SQL、一次纠错、多轮会话、引用与公开轨迹 |
-| **FastAPI 后端** | FastAPI + SQLAlchemy | 34 个 API 操作，含认证/限流/缓存/监控/RFM 与订单事件摄入 |
+| **FastAPI 后端** | FastAPI + SQLAlchemy | 认证/限流/缓存/监控/RFM 与订单事件摄入 |
 | **订单事件摄入** | MySQL 事务 + 幂等账本 | 创建/退款/取消事件、版本水位乱序保护、精准缓存失效与新鲜度查询 |
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 301 项自动化测试（隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 50 条 GLM 真实评测 + 12 条安全拒答端到端评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 417项自动化测试；保留原数据集，新增30题路由、18题检索、20题MySQL SQL评测；能力结果与失败限制见评测报告 |
 
 ## 在线演示
 
@@ -55,11 +59,13 @@ git clone https://github.com/super-ZXQ/ai-commerce-intelligence-platform.git
 cd ai-commerce-intelligence-platform
 
 cp deploy/.env.example .env
-# 编辑 .env 填入四类 MySQL 密码、JWT Secret、LLM API Key
+# 编辑 .env 填入数据库账号密码、JWT Secret、bcrypt登录密码与模型配置
 
 docker compose up -d --build
 docker compose ps
 ```
+
+生产页面Cookie要求HTTPS，请在入口配置TLS后使用 `/demo` 登录，再访问 `/BI/` 或 `/ai/`。仅本地HTTP演示可显式设置 `DEBUG=true` 并使用开发密码；生产禁止这样配置。Docker BI默认读取实时数据库；本地未配置数据库时显示“静态演示”，不包含订单事件更新。历史数据卷必须执行新增迁移与 `db-permissions` 授权阶段。
 
 **服务架构：**
 
@@ -70,7 +76,9 @@ docker compose up -d
 ├── ea-backend      → FastAPI (Docker 内网 :8000)
 ├── ea-ai-assistant → AI 助手 (Docker 内网 :8502, baseUrlPath=/ai)
 ├── ea-db-bootstrap → 一次性创建最小权限数据库账号
-├── ea-mysql        → MySQL 8.0 (Docker 内网 :3306) + 自动建表
+├── ea-db-migrate   → Alembic迁移（含历史主键自增修复）
+├── db-permissions  → 迁移后授予AI账号必要列SELECT
+├── ea-mysql        → MySQL 8.0 (Docker 内网 :3306)
 └── ea-redis        → Redis 7 Alpine (Docker 内网 :6379) + AOF持久化 + LRU淘汰
 ```
 
