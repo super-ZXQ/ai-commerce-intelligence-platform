@@ -175,6 +175,11 @@ services:
     environment:
       AUTH_BACKEND_URL: http://backend:8000
       PUBLIC_LOGIN_URL: /demo
+      BI_DATA_MODE: database
+      DB_HOST: mysql
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      AI_DB_USER: ea_ai
+      AI_DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
     expose:
       - "8501"
     command:
@@ -190,6 +195,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      db-permissions:
+        condition: service_completed_successfully
     networks:
       - ea-network
 

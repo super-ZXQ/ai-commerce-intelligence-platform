@@ -5,12 +5,12 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine, text
+from sqlglot import transpile
 
 from agent_core.db_schema import describe_table
 from agent_core.live_evaluation import (
     DEFAULT_CSV,
     LiveCase,
-    _execute,
     build_sqlite_database,
     canonical_rows,
     evaluate_live_model,
@@ -36,7 +36,9 @@ def test_live_dataset_reference_sql_all_executable() -> None:
     connection = build_sqlite_database(DEFAULT_CSV)
     try:
         for case in cases:
-            rows = _execute(connection, case.reference_sql or "")
+            # reference为仓库冻结的可信oracle；新隐私策略会拒绝部分旧用户明细题，
+            # 不改gold，也不把模型候选绕过安全门；此测试仅验证oracle可执行性。
+            rows = connection.execute(transpile(case.reference_sql, read="mysql", write="sqlite")[0]).fetchall()
             assert isinstance(rows, list), case.id
     finally:
         connection.close()
@@ -59,11 +61,12 @@ def test_canonical_rows_ignores_alias_column_and_row_order() -> None:
 def test_describe_table_uses_sqlalchemy_inspection() -> None:
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as connection:
-        connection.execute(text("CREATE TABLE orders (order_id TEXT NOT NULL, amount REAL)"))
+        connection.execute(text("CREATE TABLE orders (order_id TEXT NOT NULL, payment_amount REAL, secret TEXT)"))
     schema = describe_table(engine, "orders")
     assert "CREATE TABLE orders" in schema
     assert "order_id TEXT NOT NULL" in schema
-    assert "amount REAL" in schema
+    assert "payment_amount REAL" in schema
+    assert "secret" not in schema
 
 
 @pytest.mark.asyncio

@@ -4,4 +4,7 @@ numpy==2.4.6
 plotly==6.8.0
 streamlit==1.58.0
 httpx==0.28.1
+sqlalchemy==2.0.51
+pymysql==1.2.0
+python-dotenv==1.2.2
 msgpack==1.2.2

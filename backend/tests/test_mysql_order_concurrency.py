@@ -129,3 +129,65 @@ async def test_projection_failure_rolls_back_both_tables(sessions, monkeypatch):
         assert await db.scalar(select(Order).where(Order.order_no == item.order_id)) is None
     monkeypatch.setattr(service, "_new_order", original)
     assert (await apply(sessions, item)).status == "processed"
+
+
+async def test_api_ai_and_bi_effective_metrics_agree_after_events(sessions, mysql_audit_url):
+    from agent_core.business_data import describe_data_range, load_live_orders
+    from agent_core.sql_safety import validate_and_limit_sql
+    from backend.services.analytics_service import get_sales_overview
+
+    sync_engine = create_engine(mysql_audit_url)
+    items = [event() for _ in range(3)]
+    try:
+        for item in items:
+            await apply(sessions, item)
+        for step in (None, "ORDER_REFUNDED", "ORDER_CANCELLED"):
+            if step:
+                await apply(sessions, event(items[1 if step == "ORDER_REFUNDED" else 2].order_id, step, 2))
+            async with sessions() as db:
+                api = await get_sales_overview.__wrapped__(db)
+                sql = validate_and_limit_sql(
+                    "SELECT COALESCE(SUM(payment_amount),0), COUNT(DISTINCT order_id) "
+                    "FROM orders WHERE order_status='ACTIVE' AND COALESCE(is_refund,'否')<>'是'"
+                )
+                ai_sales, ai_orders = (await db.execute(text(sql))).one()
+            frame = load_live_orders(sync_engine)
+            assert api.total_sales == ai_sales == frame["付款金额"].sum()
+            assert api.total_orders == ai_orders == frame["订单号"].nunique()
+        assert "2026-" in describe_data_range(sync_engine)
+    finally:
+        sync_engine.dispose()
+
+
+def test_ai_account_actual_grants_allow_aggregates_and_deny_writes(mysql_audit_url):
+    import secrets
+    from sqlalchemy.exc import DBAPIError
+    from agent_core.db_permissions import verify_ai_permissions
+    from agent_core.sql_safety import ORDER_COLUMNS
+
+    admin = create_engine(mysql_audit_url, hide_parameters=True)
+    user, password = "audit_" + uuid4().hex[:20], secrets.token_urlsafe(24)
+    reader = None
+    try:
+        with admin.begin() as connection:
+            connection.execute(text(f"CREATE USER '{user}'@'%' IDENTIFIED BY :password"), {"password": password})
+            fields = ",".join(sorted(ORDER_COLUMNS))
+            connection.execute(text(f"GRANT SELECT ({fields}) ON `{mysql_audit_url.database}`.orders TO '{user}'@'%'"))
+        reader = create_engine(mysql_audit_url.set(username=user, password=password), hide_parameters=True)
+        verify_ai_permissions(reader)
+        with reader.connect() as connection:
+            assert connection.execute(text("SELECT COUNT(DISTINCT order_id),SUM(payment_amount) FROM orders")).one()
+            for sql in ("UPDATE orders SET payment_amount=0", "SELECT payload FROM order_events", "DELETE FROM orders", "CREATE TABLE denied(id INT)"):
+                with pytest.raises(DBAPIError):
+                    connection.execute(text(sql))
+                connection.rollback()
+        with admin.begin() as connection:
+            connection.execute(text(f"GRANT UPDATE ON `{mysql_audit_url.database}`.orders TO '{user}'@'%'"))
+        with pytest.raises(ValueError):
+            verify_ai_permissions(reader)
+    finally:
+        if reader is not None:
+            reader.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f"DROP USER IF EXISTS '{user}'@'%'"))
+        admin.dispose()

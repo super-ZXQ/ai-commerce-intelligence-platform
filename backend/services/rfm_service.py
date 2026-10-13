@@ -41,6 +41,7 @@ _snapshot_locks: dict[tuple[str | None, int], asyncio.Lock] = {}
 # 与 backend/utils/cache.py 同理：锁可能"已取用但还在等待队列中"，
 # 用引用计数保护，防止快照逐出时误回收正在使用的锁
 _snapshot_lock_refs: dict[tuple[str | None, int], int] = {}
+_snapshot_generation = 0
 
 
 async def _fetch_rfm_raw(db: AsyncSession, ref_date) -> list[dict]:
@@ -56,6 +57,7 @@ async def _fetch_rfm_raw(db: AsyncSession, ref_date) -> list[dict]:
             Order.order_date <= ref_date,
             Order.payment_amount > 0,
             Order.order_status == "ACTIVE",
+            func.coalesce(Order.is_refunded, "否") != "是",
         )
     ).group_by(
         Order.user_name
@@ -211,11 +213,14 @@ async def _get_rfm_snapshot(
                 _snapshot_cache.move_to_end(key)
                 return cached_snapshot["data"]
 
+            generation = _snapshot_generation
             snapshot = await _build_rfm_snapshot(
                 db,
                 reference_date=reference_date,
                 n_bins=n_bins,
             )
+            if generation != _snapshot_generation:
+                return snapshot
             _snapshot_cache[key] = {
                 "data": snapshot,
                 "expires_at": now + _SNAPSHOT_TTL_SECONDS,
@@ -240,9 +245,14 @@ async def _get_rfm_snapshot(
 
 def clear_rfm_snapshot_cache() -> None:
     """清空 RFM 进程内快照；数据源变更后调用。"""
+    global _snapshot_generation
+    _snapshot_generation += 1
     _snapshot_cache.clear()
-    _snapshot_locks.clear()
-    _snapshot_lock_refs.clear()
+    # 不回收正在持有或等待的锁，避免失效动作破坏防击穿。
+    for key, lock in list(_snapshot_locks.items()):
+        if not lock.locked() and _snapshot_lock_refs.get(key, 0) == 0:
+            _snapshot_locks.pop(key, None)
+            _snapshot_lock_refs.pop(key, None)
 
 
 def _summary_from_snapshot(snapshot: dict) -> dict:

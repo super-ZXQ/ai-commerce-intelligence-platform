@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import threading
 import time
@@ -53,7 +54,7 @@ def _ensure_events_file_handler(path: str) -> logging.Handler:
             return _events_file_handler
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        h = logging.FileHandler(target, encoding="utf-8")
+        h = RotatingFileHandler(target, maxBytes=1024 * 1024, backupCount=4, encoding="utf-8")
         h.setLevel(logging.INFO)
         h.setFormatter(logging.Formatter("%(message)s"))
         _events_logger.addHandler(h)
@@ -101,6 +102,11 @@ def log_event(event_type: str, **fields) -> None:
     - event: 事件类型
     - 其余 fields 透传
     """
+    # 保留事件结构与观测指标，隐去问题内容和可能包含数据的SQL/错误文本。
+    for key in ("query", "sql", "answer", "error"):
+        if key in fields:
+            fields[key + "_length"] = len(str(fields[key]))
+            fields[key] = "[redacted]"
     payload = {
         "ts": int(time.time() * 1000),
         "event": event_type,

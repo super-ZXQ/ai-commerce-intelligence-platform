@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import html
-import json
 import logging
 import os
 import re
@@ -36,8 +35,11 @@ from assistant_text_utils import (
 
 from agent_core import AgentRuntime
 from agent_core.db_schema import describe_table
+from agent_core.db_permissions import verify_ai_permissions
+from agent_core.business_data import BUSINESS_CONTEXT, describe_data_range
 from agent_core.model_adapter import OpenAIModelAdapter
 from agent_core.page_auth import require_page_user
+from agent_core.privacy import append_feedback
 from agent_core.models import AgentSource
 from agent_core.session import MemoryConversationStore
 from agent_core.sql_safety import dialect_from_url
@@ -70,7 +72,7 @@ def record_feedback(question: str, answer: str, rating: str,
 
     Args:
         question: 用户问题。
-        answer: AI 回答（前 500 字符，避免文件膨胀）。
+        answer: AI 回答，仅记录长度，不保存内容。
         rating: "up" 或 "down"。
         rag_sources: 本次回答引用的业务知识来源（用于线下分析"误检索"）。
 
@@ -79,20 +81,17 @@ def record_feedback(question: str, answer: str, rating: str,
     """
     payload = {
         "ts": int(time.time() * 1000),
-        "question": question[:300],
-        "answer_preview": answer[:500],
+        "question_length": len(question),
+        "answer_length": len(answer),
         "rating": rating,
         "rag_sources_count": len(rag_sources or []),
         "rag_filenames": [s.get("filename", "") for s in (rag_sources or [])],
     }
     try:
-        p = Path(FEEDBACK_LOG_PATH)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        append_feedback(FEEDBACK_LOG_PATH, payload)
         return True
     except Exception as e:
-        logger.warning("反馈落盘失败: %s", e)
+        logger.warning("反馈落盘失败: %s", type(e).__name__)
         return False
 
 API_KEY = os.getenv("LLM_API_KEY")
@@ -111,40 +110,6 @@ DB_NAME = os.getenv("DB_NAME", "ai_commerce_intelligence_platform")
 
 USE_MYSQL = bool(DB_USER and DB_PASSWORD)
 
-BUSINESS_CONTEXT = """## 数据时间范围
-- 数据时间范围：2025-01-01 至 2025-12-31（共1年数据）
-- 当前日期：2026年（数据截止到2025年12月31日）
-- 【重要】当用户提到"最近N天"时，指的是数据中的最近N天，而非当前日期
-
-## 业务指标定义
-- 付款金额 = 实际销售额（非订单金额）
-- 平台类型枚举值：APP、微信公众号、Web网站、其他
-- 是否退款：是=已退款，否=未退款
-- 退款率 = 退款订单数 / 总订单数
-- 复购率 = 消费2次及以上的用户数 / 总用户数
-- 客单价 = 总付款金额 / 总订单数
-- 数据起止日期仅用于解释“最近”问题；用户未指定时间时，禁止添加 order_time/order_date 条件或全年过滤
-- 订单量必须使用 COUNT(DISTINCT order_id)，禁止使用 COUNT(*)
-- 除非用户明确要求排除退款，否则销售额、订单量、用户数等指标包含退款订单
-- 用户明确指定月份或日期时必须严格使用该范围，不得扩大为全年
-- RFM 分层阈值：Recency≤30天为活跃，Frequency≥2次为高频，Monetary≥1500元为高价值
-- 下单小时：0-23，高峰时段为 11-13 时和 19-21 时
-- 星期几：周一至周日
-
-## 回答规则
-1. 始终先查看表结构确认列名，再编写 SQL
-2. 日期筛选使用 order_date 列，格式 'YYYY-MM-DD'
-3. 【重要】当用户提到"最近N天"时，自动替换为数据中的最近N天。例如：
-   - "最近7天" → 数据中最近7天：2025-12-25 至 2025-12-31
-   - "最近30天" → 数据中最近30天
-4. 金额查询使用 payment_amount（实际付款金额）
-5. 退款相关使用 is_refund = '是' 表示已退款
-6. SQL 结果较大时使用 LIMIT 限制
-7. 先给出数据结论，再附上 SQL 语句
-8. 用中文回答
-9. 仅回答电商数据相关问题
-10. 如果发现某指标明显异常（如某渠道退款率远超平均值），请在回答末尾添加【异常预警】段落，给出业务建议"""
-
 SENSITIVE_PATTERNS = [
     r"密码", r"手机号", r"身份证", r"地址.*具体", r"订单明细.*用户名",
     r"个人.*信息", r"隐私", r"password", r"phone.*number",
@@ -160,34 +125,8 @@ def is_sensitive_query(query: str) -> bool:
     return False
 
 
-# 会话内查询缓存：TTL 防止长会话后数据/配置已变仍命中旧答案；
-# 容量上限防止消息携带全量 records 导致 session 无界膨胀。
-QUERY_CACHE_TTL_SECONDS = 1800
-QUERY_CACHE_MAX_ENTRIES = 50
 
 
-def get_cache_key(question: str, fingerprint: str = "") -> str:
-    """缓存 key 必须绑定模型指纹（key:base_url:model 的哈希），
-    否则换模型/API Key 后同一问题会直接命中旧模型的缓存答案。"""
-    return hashlib.md5(f"{fingerprint}:{question}".encode(), usedforsecurity=False).hexdigest()
-
-
-def _cache_lookup(cache: dict, key: str) -> dict | None:
-    """带 TTL 的缓存读取；过期条目即时清除。"""
-    entry = cache.get(key)
-    if entry is None:
-        return None
-    if time.time() - entry["ts"] > QUERY_CACHE_TTL_SECONDS:
-        cache.pop(key, None)
-        return None
-    return entry["data"]
-
-
-def _cache_store(cache: dict, key: str, data: dict) -> None:
-    """写入缓存；超出上限时按写入顺序淘汰最旧条目。"""
-    while len(cache) >= QUERY_CACHE_MAX_ENTRIES:
-        cache.pop(next(iter(cache)))
-    cache[key] = {"ts": time.time(), "data": data}
 
 
 st.set_page_config(page_title="AI Commerce Intelligence Platform", layout="wide",
@@ -367,8 +306,6 @@ if "messages" not in st.session_state:
         }
     ]
 
-if "query_cache" not in st.session_state:
-    st.session_state.query_cache = {}
 
 if "query_history" not in st.session_state:
     st.session_state.query_history = []
@@ -389,6 +326,8 @@ def get_db_uri():
             f"mysql+pymysql://{quote_plus(DB_USER)}:{quote_plus(DB_PASSWORD)}"
             f"@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
         )
+    if os.getenv("AI_DATA_MODE") != "demo":
+        raise ValueError("请配置AI_DB_USER/AI_DB_PASSWORD；SQLite演示须显式设置AI_DATA_MODE=demo")
     db_path = os.path.join(os.path.dirname(__file__), "ecommerce.db")
     return f"sqlite:///{db_path}"
 
@@ -398,10 +337,12 @@ def init_engine() -> Engine | None:
     """初始化受只读拦截器保护的 SQLAlchemy Engine。"""
     try:
         engine = create_engine(get_db_uri(), pool_pre_ping=True)
+        if USE_MYSQL and os.getenv("DEBUG", "false").lower() != "true":
+            verify_ai_permissions(engine)
         guard_read_only_engine(engine)
         return engine
     except Exception as e:
-        logger.warning("SQLAlchemy engine 初始化失败: %s", e, exc_info=True)
+        logger.warning("SQLAlchemy engine 初始化失败: %s", type(e).__name__)
         st.warning(f"SQLAlchemy engine 初始化失败：{sanitize_error(e)}")
         return None
 
@@ -520,7 +461,9 @@ def get_session_runtime(_engine, _retriever):
         ]
 
     async def load_schema() -> str:
-        return await asyncio.to_thread(describe_table, _engine, "orders")
+        def load():
+            return describe_table(_engine, "orders") + "\n" + describe_data_range(_engine)
+        return await asyncio.to_thread(load)
 
     async def execute_sql(sql: str) -> list[dict]:
         try:
@@ -640,7 +583,7 @@ def run_sql_query(sql: str) -> pd.DataFrame:
         converted = [tuple(_convert_value(value) for value in row) for row in raw_rows]
         return pd.DataFrame(converted, columns=cols)
     except Exception as exc:
-        logger.warning("只读 SQL 执行失败: %s", exc, exc_info=True)
+        logger.warning("只读 SQL 执行失败: %s", type(exc).__name__)
         raise SQLExecutionError(sanitize_error(exc)) from exc
 
 
@@ -952,7 +895,6 @@ with st.sidebar:
              "chart_title": "", "result_data": None, "sql": None, "query_time": None,
              "rag_sources": []}
         ]
-        st.session_state.query_cache = {}
         # 轮换 thread_id：Agent 会话存储按 owner+thread_id 记忆上下文，
         # 只清 UI 消息会导致"清空"后下一问仍注入最多 6 轮旧对话。
         st.session_state.thread_id = str(uuid4())
@@ -1119,44 +1061,7 @@ if prompt:
                                           "sql": None, "query_time": None})
         st.stop()
 
-    cache_key = get_cache_key(prompt, st.session_state.get("runtime_fingerprint", ""))
-    cached = _cache_lookup(st.session_state.query_cache, cache_key)
-    if cached is not None:
-        st.session_state.messages.append({"role": "user", "content": prompt,
-                                          "chart_title": "", "result_data": None,
-                                          "sql": None, "query_time": None})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        with st.chat_message("assistant"):
-            st.info("从缓存读取")
-            render_answer_with_highlights(cached["answer"])
-            try:
-                # result_data 为空也走共用函数：SQL 块仍需展示（与历史回放一致）
-                result_df = pd.DataFrame(cached["result_data"]) if cached.get("result_data") else None
-                render_result_block(
-                    result_df,
-                    sql=cached.get("sql"),
-                    query_time=cached.get("query_time"),
-                    question=prompt,
-                    chart_title=cached.get("chart_title", ""),
-                    key_prefix=f"cache_{cache_key}",
-                )
-            except Exception as e:
-                st.caption(f"缓存图表加载失败：{str(e)[:50]}")
-            render_agent_steps(cached.get("agent_steps") or [])
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": cached["answer"],
-            "chart_title": cached.get("chart_title"),
-            "result_data": cached.get("result_data"),
-            "sql": cached.get("sql"),
-            "query_time": cached.get("query_time"),
-            "question": prompt,
-            "rag_sources": cached.get("rag_sources") or [],
-            "agent_steps": cached.get("agent_steps") or [],
-        })
-        st.stop()
-
+    cache_key = uuid4().hex
     st.session_state.messages.append({"role": "user", "content": prompt,
                                       "chart_title": "", "result_data": None,
                                       "sql": None, "query_time": None})
@@ -1265,16 +1170,6 @@ if prompt:
             "agent_steps": agent_steps,
         }
         st.session_state.messages.append(msg_data)
-
-        _cache_store(st.session_state.query_cache, cache_key, {
-            "answer": answer,
-            "chart_title": chart_title,
-            "result_data": result_data,
-            "sql": extracted_sql,
-            "query_time": query_time,
-            "rag_sources": rag_sources,
-            "agent_steps": agent_steps,
-        })
 
         st.session_state.query_history.append({
             "question": prompt,

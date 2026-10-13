@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import case, func, select, text
+from sqlalchemy import and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database_models import Order
@@ -19,29 +19,31 @@ logger = logging.getLogger(__name__)
 
 # “销售额/GMV”在事件读模型中定义为可确认的有效订单金额；退款和取消不会继续
 # 占用经营指标。退款金额仍单独保留，避免把金额静默抹掉。
-_ACTIVE_ORDER = Order.order_status == "ACTIVE"
+_ACTIVE_ORDER = and_(Order.order_status == "ACTIVE", func.coalesce(Order.is_refunded, "否") != "是")
+_REFUNDED_ORDER = or_(Order.order_status == "REFUNDED", Order.is_refunded == "是")
 
 
 @cached(ttl=120, tags=("analytics",))
 async def get_sales_overview(db: AsyncSession) -> SalesOverviewResponse:
     """获取销售总览：总销售额、订单数、客单价、用户数、退款率"""
     stmt = select(
-        func.coalesce(func.sum(Order.payment_amount), 0).label("total_sales"),
-        func.count(Order.id).label("total_orders"),
-        func.count(func.distinct(Order.user_name)).label("total_users"),
+        func.coalesce(func.sum(case((_ACTIVE_ORDER, Order.payment_amount), else_=0)), 0).label("total_sales"),
+        func.sum(case((_ACTIVE_ORDER, 1), else_=0)).label("total_orders"),
+        func.count(func.distinct(case((_ACTIVE_ORDER, Order.user_name), else_=None))).label("total_users"),
         func.sum(
-            case((Order.is_refunded == "是", Order.payment_amount), else_=0)
+            case((_REFUNDED_ORDER, Order.payment_amount), else_=0)
         ).label("total_refund_amount"),
-        func.sum(case((Order.is_refunded == "是", 1), else_=0)).label(
+        func.sum(case((_REFUNDED_ORDER, 1), else_=0)).label(
             "refund_count"
         ),
-    ).where(_ACTIVE_ORDER)
+        func.count(Order.id).label("refund_denominator"),
+    ).where(Order.order_status != "CANCELLED")
     row = (await db.execute(stmt)).one()
 
     total_sales = round(row.total_sales, 2)
-    total_orders = row.total_orders
+    total_orders = row.total_orders or 0
     avg_order_value = round(total_sales / total_orders, 2) if total_orders > 0 else 0
-    refund_rate = round(row.refund_count / total_orders * 100, 2) if total_orders > 0 else 0
+    refund_rate = round((row.refund_count or 0) / row.refund_denominator * 100, 2) if row.refund_denominator else 0
 
     return SalesOverviewResponse(
         total_sales=total_sales,
@@ -205,15 +207,16 @@ async def get_category_analysis(db: AsyncSession) -> CategoryAnalysisResponse:
     # 显式 .label() 命名，避免下游 row[i] 位置索引脆性
     stmt = select(
         Order.platform_type.label("platform_type"),
-        func.count(Order.id).label("order_count"),
-        func.sum(Order.payment_amount).label("total_sales"),
-        (func.sum(Order.payment_amount) / func.count(Order.id)).label("avg_order_value"),
+        func.sum(case((_ACTIVE_ORDER, 1), else_=0)).label("order_count"),
+        func.sum(case((_ACTIVE_ORDER, Order.payment_amount), else_=0)).label("total_sales"),
+        (func.sum(case((_ACTIVE_ORDER, Order.payment_amount), else_=0))
+         / func.nullif(func.sum(case((_ACTIVE_ORDER, 1), else_=0)), 0)).label("avg_order_value"),
         (
-            func.sum(case((Order.is_refunded == "是", 1), else_=0))
+            func.sum(case((_REFUNDED_ORDER, 1), else_=0))
             / func.count(Order.id)
             * 100
         ).label("refund_rate"),
-    ).where(_ACTIVE_ORDER).group_by(Order.platform_type)
+    ).where(Order.order_status != "CANCELLED").group_by(Order.platform_type)
 
     result = await db.execute(stmt)
     rows = result.all()
@@ -226,7 +229,7 @@ async def get_category_analysis(db: AsyncSession) -> CategoryAnalysisResponse:
                 total_sales=round(float(row.total_sales), 2),
                 # MySQL 聚合金额返回 Decimal，统一转为 float 后再计算百分比。
                 sales_ratio=round(float(row.total_sales) / float(total_sales) * 100, 2),
-                avg_order_value=round(float(row.avg_order_value), 2),
+                avg_order_value=round(float(row.avg_order_value or 0), 2),
                 refund_rate=round(float(row.refund_rate), 2),
             )
             for row in rows
