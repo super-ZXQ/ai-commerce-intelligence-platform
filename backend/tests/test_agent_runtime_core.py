@@ -31,10 +31,10 @@ def test_sql_guard_blocks_unsafe_or_multiple_statements(sql: str) -> None:
 
 
 def test_sql_guard_adds_and_caps_limit() -> None:
-    assert "LIMIT 500" in validate_and_limit_sql("SELECT * FROM orders")
-    assert "LIMIT 10" in validate_and_limit_sql("SELECT * FROM orders LIMIT 10")
-    assert "LIMIT 500" in validate_and_limit_sql("SELECT * FROM orders LIMIT 1000")
-    assert validate_and_limit_sql("WITH recent AS (SELECT * FROM orders) SELECT * FROM recent")
+    assert "LIMIT 500" in validate_and_limit_sql("SELECT payment_amount FROM orders")
+    assert "LIMIT 10" in validate_and_limit_sql("SELECT payment_amount FROM orders LIMIT 10")
+    assert "LIMIT 500" in validate_and_limit_sql("SELECT payment_amount FROM orders LIMIT 1000")
+    assert validate_and_limit_sql("WITH recent AS (SELECT payment_amount FROM orders) SELECT payment_amount FROM recent")
 
 
 @pytest.mark.asyncio
@@ -221,11 +221,12 @@ async def test_api_adapter_preserves_fields_and_null_token_usage(monkeypatch) ->
 def test_sql_guard_caps_join_count() -> None:
     """LIMIT 只裁剪输出行数，多表笛卡尔积的中间结果仍会被完整算完，必须在 AST 层拦掉。"""
     three_joins = (
-        "SELECT * FROM orders o1 JOIN orders o2 ON 1=1 JOIN orders o3 ON 1=1 JOIN orders o4 ON 1=1"
+        "SELECT o1.product_id FROM orders o1 JOIN orders o2 ON o1.product_id=o2.product_id "
+        "JOIN orders o3 ON o2.product_id=o3.product_id JOIN orders o4 ON o3.product_id=o4.product_id"
     )
     assert validate_and_limit_sql(three_joins)
     with pytest.raises(SQLValidationError, match="JOIN"):
-        validate_and_limit_sql(f"{three_joins} JOIN orders o5 ON 1=1")
+        validate_and_limit_sql(f"{three_joins} JOIN orders o5 ON o4.product_id=o5.product_id")
 
 
 def test_execution_guard_pushes_timeout_into_mysql_select() -> None:

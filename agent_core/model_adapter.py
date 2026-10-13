@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from agent_core.models import AgentIntent, AgentSource, ModelResponse
 from agent_core.session import Message
 from agent_core.streaming import emit_token
+from agent_core.model_network import model_http_clients
 
 
 class _SQLPlan(BaseModel):
@@ -36,12 +37,14 @@ class OpenAIModelAdapter:
     def _client(self, *, stream_usage: bool = False) -> ChatOpenAI:
         if not self._api_key:
             raise RuntimeError("模型未配置")
+        http_client, http_async_client = model_http_clients()
         return ChatOpenAI(
             api_key=self._api_key,
             base_url=self._base_url,
             model=self._model,
             temperature=0,
-            timeout=120,
+            http_client=http_client,
+            http_async_client=http_async_client,
             max_retries=1,
             stream_usage=stream_usage,
         )
@@ -161,12 +164,4 @@ SQL：{sql or '未执行'}
     def test_connection(self) -> None:
         if not self._api_key:
             raise RuntimeError("模型未配置")
-        ChatOpenAI(
-            api_key=self._api_key,
-            base_url=self._base_url,
-            model=self._model,
-            temperature=0,
-            timeout=15,
-            max_retries=0,
-            max_tokens=1,
-        ).invoke("仅回复 OK")
+        self._client().bind(max_tokens=1).invoke("仅回复 OK")

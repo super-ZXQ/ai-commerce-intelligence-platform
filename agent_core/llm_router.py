@@ -36,16 +36,20 @@ class _IntentPlan(BaseModel):
 
 def _build_client():
     from langchain_openai import ChatOpenAI
+    from agent_core.model_network import model_http_clients
 
     api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         raise RuntimeError("LLM_API_KEY 未配置，无法运行 LLM 路由（A/B 的 B 侧需要 key）")
+    http_client, http_async_client = model_http_clients()
     return ChatOpenAI(
         api_key=api_key,
         base_url=os.environ.get("LLM_BASE_URL", "https://api.deepseek.com"),
         model=os.environ.get("LLM_MODEL", "deepseek-chat"),
         temperature=0,
         timeout=30,
+        http_client=http_client,
+        http_async_client=http_async_client,
         max_retries=1,
     )
 

@@ -37,6 +37,7 @@ from assistant_text_utils import (
 from agent_core import AgentRuntime
 from agent_core.db_schema import describe_table
 from agent_core.model_adapter import OpenAIModelAdapter
+from agent_core.page_auth import require_page_user
 from agent_core.models import AgentSource
 from agent_core.session import MemoryConversationStore
 from agent_core.sql_safety import dialect_from_url
@@ -47,6 +48,7 @@ from backend.utils.sql_guard import (
 from backend.utils.text_cleaner import clean_sql, sanitize_error
 
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
+require_page_user()
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +99,12 @@ API_KEY = os.getenv("LLM_API_KEY")
 BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
 MODEL_NAME = os.getenv("LLM_MODEL", "deepseek-chat")
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_USER = os.getenv("AI_DB_USER")
+DB_PASSWORD = os.getenv("AI_DB_PASSWORD")
+# 老环境仅允许显式开发回退，默认不把主库账号交给模型工具。
+if os.getenv("DEBUG", "false").lower() == "true" and os.getenv("AI_DB_ALLOW_MAIN_FALLBACK", "false").lower() == "true":
+    DB_USER = DB_USER or os.getenv("DB_USER")
+    DB_PASSWORD = DB_PASSWORD if DB_USER == os.getenv("AI_DB_USER") else os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_NAME = os.getenv("DB_NAME", "ai_commerce_intelligence_platform")
@@ -368,7 +374,7 @@ if "query_history" not in st.session_state:
     st.session_state.query_history = []
 
 if "model_api_key" not in st.session_state:
-    st.session_state.model_api_key = API_KEY or ""
+    st.session_state.model_api_key = ""
 if "model_base_url" not in st.session_state:
     st.session_state.model_base_url = BASE_URL
 if "model_name" not in st.session_state:
@@ -479,12 +485,14 @@ class _LazyRetriever:
 
 def get_session_runtime(_engine, _retriever):
     """按当前 Streamlit 会话创建共享 Runtime；API Key 不进入全局缓存。"""
-    api_key = st.session_state.get("model_api_key", "").strip()
+    custom_key = st.session_state.get("model_api_key", "").strip()
+    api_key = custom_key or API_KEY
     if _engine is None or not api_key:
         return None
 
-    base_url = st.session_state.get("model_base_url", BASE_URL).strip()
-    model_name = st.session_state.get("model_name", MODEL_NAME).strip()
+    # 服务端凭据只发送到运维配置的服务；自定义地址必须使用用户自己的 Key。
+    base_url = st.session_state.get("model_base_url", BASE_URL).strip() if custom_key else BASE_URL
+    model_name = st.session_state.get("model_name", MODEL_NAME).strip() if custom_key else MODEL_NAME
     fingerprint = hashlib.sha256(f"{api_key}:{base_url}:{model_name}".encode()).hexdigest()
     if st.session_state.get("runtime_fingerprint") == fingerprint:
         return st.session_state.get("runtime_instance")
@@ -543,7 +551,7 @@ def get_session_runtime(_engine, _retriever):
 
 def render_runtime_status(db_engine, rag_status: dict) -> None:
     """在主区域展示模型、数据库、RAG 三类可观察状态，便于无 Key/降级时快速定位。"""
-    has_key = bool(st.session_state.get("model_api_key", "").strip())
+    has_key = bool(st.session_state.get("model_api_key", "").strip() or API_KEY)
     db_ok = db_engine is not None
     rag_count = int(rag_status.get("count") or 0)
     rag_ready = bool(rag_status.get("ok")) and rag_count > 0
@@ -581,7 +589,7 @@ def render_runtime_status(db_engine, rag_status: dict) -> None:
 
 def render_setup_guide(db_engine) -> None:
     """无 API Key 或数据库不可用时，在主区域给出可恢复的下一步。"""
-    has_key = bool(st.session_state.get("model_api_key", "").strip())
+    has_key = bool(st.session_state.get("model_api_key", "").strip() or API_KEY)
     if has_key and db_engine is not None:
         return
     if db_engine is None:

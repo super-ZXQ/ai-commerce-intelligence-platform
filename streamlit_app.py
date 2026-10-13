@@ -8,6 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from agent_core.page_auth import require_page_user
 from backend.utils.rfm_scoring import assign_segment, quantile_scores
 from bi_style import BI_DASHBOARD_CSS
 
@@ -93,6 +94,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+require_page_user()
 
 st.markdown(BI_DASHBOARD_CSS, unsafe_allow_html=True)
 
