@@ -20,7 +20,10 @@ def resolve_model_target(url: httpx.URL) -> str:
         addresses = {item[4][0] for item in socket.getaddrinfo(url.host, 443, type=socket.SOCK_STREAM)}
     except OSError as exc:
         raise ValueError("模型域名解析失败") from exc
-    if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+    if not addresses or any(
+        not ipaddress.ip_address(address).is_global or ipaddress.ip_address(address).is_multicast
+        for address in addresses
+    ):
         raise ValueError("模型域名解析到非公共IP，拒绝访问")
     return sorted(addresses)[0]
 

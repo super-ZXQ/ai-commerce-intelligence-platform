@@ -14,6 +14,8 @@ _init_lock = threading.Lock()
 
 RATE_LIMITS = {
     "/api/auth/login": {"requests": 5, "window": 60},
+    # 页面每个静态资源都会触发auth_request，不能共用业务接口的低频额度。
+    "/api/auth/page-session": {"requests": 1000, "window": 60},
     "/api/ai/query": {"requests": 10, "window": 60},
     "/api/order-events": {"requests": 120, "window": 60},
     "/api/export/": {"requests": 3, "window": 120},

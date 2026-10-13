@@ -36,3 +36,17 @@ def test_direct_page_gate_fails_closed_and_does_not_send_identity(monkeypatch):
     monkeypatch.setenv("AUTH_BACKEND_URL", "http://127.0.0.1:1")
     with pytest.raises(httpx.HTTPError):
         verify_page_session("forged")
+
+
+def test_oversized_jwt_is_rejected_before_decode():
+    from backend.utils.auth import decode_token
+    assert decode_token("x" * 8193) is None
+
+
+def test_page_asset_auth_has_separate_rate_limit_budget():
+    from types import SimpleNamespace
+    from backend.utils.rate_limiter import check_rate_limit
+
+    request = SimpleNamespace(url=SimpleNamespace(path="/api/auth/page-session"), headers={}, client=SimpleNamespace(host="asset-test"))
+    for _ in range(101):
+        check_rate_limit(request)

@@ -22,7 +22,7 @@ def test_reject_untrusted_urls(url):
         resolve_model_target(httpx.URL(url))
 
 
-@pytest.mark.parametrize("address", ["127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "::1", "::ffff:127.0.0.1"])
+@pytest.mark.parametrize("address", ["127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "::1", "::ffff:127.0.0.1", "224.0.0.1", "ff02::1"])
 def test_reject_any_private_dns_answer(monkeypatch, address):
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: _dns("8.8.8.8", address))
     with pytest.raises(ValueError):

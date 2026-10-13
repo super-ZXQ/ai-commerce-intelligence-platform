@@ -58,6 +58,9 @@ async def lifespan(app: FastAPI):
         # 生产 API 不应以“表面存活、业务接口全部失败”的状态继续运行。
         raise RuntimeError("数据库连接失败，终止后端启动")
     logger.info("✅ 数据库连接检查完成")
+    if not settings.debug:
+        # 启动即验证AI账户的实际授权，拒绝借用root或带写权限的遗留账号。
+        await asyncio.to_thread(ai.ai_service._get_sync_engine)
     if not await check_event_db_connection():
         raise RuntimeError("事件数据库连接失败，终止后端启动")
 

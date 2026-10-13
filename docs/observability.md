@@ -1,5 +1,7 @@
 # 观测体系：Prometheus（业务指标）× Langfuse（LLM trace）
 
+2026-10-13 安全审计更新：启动自托管观测栈前，必须在根目录 `.env` 配置独立的 `LANGFUSE_ENCRYPTION_KEY`（64位十六进制随机值，可用 `python -c "import secrets; print(secrets.token_hex(32))"` 生成）。已移除 Compose 中的固定默认值。已有观测数据库需先备份并按 Langfuse 的密钥轮换流程处理；不要直接换值后假设旧加密数据仍可读。此调整不改变默认关闭的 trace 功能、Prometheus、JSONL 或 UI 执行轨迹。
+
 ## 为什么有两套
 
 两套系统回答的是**不同问题**，互不替代：

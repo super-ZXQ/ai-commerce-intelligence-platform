@@ -126,6 +126,7 @@ jobs:
           ANALYST_USERNAME=analyst
           ANALYST_PASSWORD=analyst123
           DEBUG=true
+          AI_DB_ALLOW_MAIN_FALLBACK=true
           EOF
 
       - name: Alembic 升级 schema

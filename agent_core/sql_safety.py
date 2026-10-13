@@ -16,7 +16,7 @@ ORDER_COLUMNS = {
     "order_hour", "weekday", "order_status", "event_version", "updated_at",
 }
 _SAFE_FUNCTIONS = {
-    "COUNT", "SUM", "AVG", "MIN", "MAX", "ROUND", "ABS", "CEIL", "FLOOR",
+    "AND", "OR", "COUNT", "SUM", "AVG", "MIN", "MAX", "ROUND", "ABS", "CEIL", "FLOOR",
     "COALESCE", "NULLIF", "IF", "IFNULL", "CASE", "CAST", "TRY_CAST", "EXTRACT",
     "DATE", "DATE_ADD", "DATE_SUB", "DATEDIFF", "TIMESTAMPDIFF", "DATE_FORMAT",
     "TIME_TO_STR", "TS_OR_DS_TO_DATE", "TS_OR_DS_TO_TIMESTAMP", "YEAR", "MONTH", "DAY", "DAY_OF_MONTH", "DAY_OF_WEEK",
@@ -90,6 +90,16 @@ def validate_and_limit_sql(
             on = node.args.get("on")
             if node.args.get("kind") == "CROSS" or on is None or not list(on.find_all(exp.Column)):
                 raise SQLValidationError("禁止笛卡尔积JOIN")
+            predicates = list(on.flatten()) if isinstance(on, exp.And) else [on]
+            if any(
+                not isinstance(predicate, exp.EQ)
+                or not isinstance(predicate.left, exp.Column)
+                or not isinstance(predicate.right, exp.Column)
+                or not predicate.left.table
+                or predicate.left.table.lower() == predicate.right.table.lower()
+                for predicate in predicates
+            ):
+                raise SQLValidationError("JOIN必须使用不同来源字段的等值条件，禁止恒真或OR条件")
     try:
         # 按作用域解析CTE/别名，不能把全部CTE名称从所有物理表中直接相减。
         for scope in traverse_scope(expression):

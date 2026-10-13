@@ -78,7 +78,7 @@ services:
       NEXTAUTH_SECRET: langfuse-nextauth-secret-change-me
       SALT: langfuse-salt-change-me
       # v3 要求 64 位十六进制加密密钥；生产用 openssl rand -hex 32 生成
-      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?请设置64位十六进制LANGFUSE_ENCRYPTION_KEY}
       TELEMETRY_ENABLED: "false"
       # ── 存储连接 ──
       DATABASE_URL: postgresql://langfuse:langfuse-db-password-change-me@postgres:5432/langfuse
@@ -108,7 +108,7 @@ services:
       CLICKHOUSE_URL: http://langfuse:langfuse-ch-password-change-me@clickhouse:8123
       CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse:langfuse-ch-password-change-me@clickhouse:9000/langfuse
       REDIS_URL: redis://redis:6379
-      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?请设置64位十六进制LANGFUSE_ENCRYPTION_KEY}
       TELEMETRY_ENABLED: "false"
     command: ["node", "server.js", "start", "worker"]
 

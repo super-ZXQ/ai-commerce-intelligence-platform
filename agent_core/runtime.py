@@ -347,6 +347,11 @@ class AgentRuntime:
                 "answer": f"⚠️ 查询执行失败：{state['sql_error']}。已停止自动重试，请调整问题后再试。",
                 "steps": self._append(state, self._event("synthesize", started, "返回可控失败说明", "error")),
             }
+        if state["intent"] == "knowledge" and not state.get("sources"):
+            return {
+                "answer": "知识库未检索到有效证据，暂时无法可靠回答，请补充具体业务概念或参考文档。",
+                "steps": self._append(state, self._event("synthesize", started, "无证据，未调用回答模型")),
+            }
         try:
             response = await self._answer_generator(
                 state["query"], state["intent"], state.get("history", []), state.get("sources", []),
@@ -369,7 +374,9 @@ class AgentRuntime:
 
     async def _save_session(self, state: RuntimeState) -> dict[str, Any]:
         started = time.perf_counter()
-        await self._conversations.save_turn(state["owner"], state["thread_id"], state["query"], state["answer"])
+        # 已拦截问题可能含凭据/个人信息，不能借下一轮history再发送给模型。
+        question = "[已拦截的敏感请求]" if state["intent"] == "blocked" else state["query"]
+        await self._conversations.save_turn(state["owner"], state["thread_id"], question, state["answer"])
         return {"steps": self._append(state, self._event("save_session", started, "保存本轮会话"))}
 
     async def _finalize(self, state: RuntimeState) -> dict[str, Any]:

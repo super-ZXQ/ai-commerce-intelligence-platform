@@ -119,7 +119,7 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 ADMIN_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
             if self.analyst_password and not self.analyst_password.startswith(("$2a$", "$2b$", "$2y$")):
                 raise ValueError("生产环境 ANALYST_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
-            if not self.ai_db_user or not self.ai_db_password or self.ai_db_user == self.db_user:
+            if not self.ai_db_user or not self.ai_db_password or self.ai_db_user in {self.db_user, "root"}:
                 raise ValueError("生产环境必须配置独立 AI_DB_USER / AI_DB_PASSWORD，只授予必要 SELECT 权限")
 
     @property

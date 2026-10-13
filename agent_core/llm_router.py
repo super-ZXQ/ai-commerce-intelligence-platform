@@ -63,9 +63,17 @@ async def classify_intent_llm(query: str) -> AgentIntent:
 async def classify_intent_llm_detailed(query: str) -> dict:
     """返回意图及用量/延迟，供评测统计。"""
     t0 = time.perf_counter()
-    resp = await _build_client().with_structured_output(
-        _IntentPlan, method="json_mode", include_raw=True
-    ).ainvoke(_SYSTEM + "\n用户问题：" + query)
+    client = _build_client()
+    try:
+        resp = await client.with_structured_output(
+            _IntentPlan, method="json_mode", include_raw=True
+        ).ainvoke(_SYSTEM + "\n用户问题：" + query)
+    finally:
+        sync, asynchronous = getattr(client, "http_client", None), getattr(client, "http_async_client", None)
+        if sync is not None:
+            sync.close()
+        if asynchronous is not None:
+            await asynchronous.aclose()
     raw = resp.get("raw") if isinstance(resp, dict) else None
     parsed = resp.get("parsed") if isinstance(resp, dict) else None
     if parsed is None:

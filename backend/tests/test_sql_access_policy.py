@@ -43,6 +43,8 @@ UNSAFE = [
     "WITH RECURSIVE t AS (SELECT 1) SELECT 1 FROM t",
     "SELECT a.product_id FROM orders a CROSS JOIN orders b",
     "SELECT a.product_id FROM orders a JOIN orders b ON 1=1",
+    "SELECT a.product_id FROM orders a JOIN orders b ON a.product_id=a.product_id",
+    "SELECT a.product_id FROM orders a JOIN orders b ON a.product_id=b.product_id OR 1=1",
     "SELECT payment_amount FROM orders FOR UPDATE",
 ]
 
