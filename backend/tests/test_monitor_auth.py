@@ -4,6 +4,7 @@
 1. 默认关闭（MONITOR_AUTH_REQUIRED=false）：免令牌可访问，保持向后兼容；
 2. 开启后：无令牌 401，无效令牌 401，有效 JWT 正常返回。
 """
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from backend.config import get_settings
@@ -19,6 +20,15 @@ _MONITOR_PATHS = [
     "/metrics",
     "/health/detailed",
 ]
+
+
+@pytest.fixture(autouse=True)
+def isolated_rag_stats(tmp_path, monkeypatch):
+    """鉴权测试使用独立快照，不依赖开发机的未跟踪运行产物。"""
+    path = tmp_path / "rag_stats.json"
+    path.write_text('{"retriever": {}}', encoding="utf-8")
+    monkeypatch.setattr("backend.routes.monitor._RAG_STATS_PATH", str(path))
+    monkeypatch.setattr(get_settings(), "monitor_auth_required", False)
 
 
 async def _login(ac: AsyncClient) -> str:
