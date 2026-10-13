@@ -1,0 +1,2678 @@
+{
+  "date": "2026-10-14",
+  "scope": "development_only_no_production_changes",
+  "normalized_exact_overlap_with_old_sets": 0,
+  "dataset_sha256": {
+    "premerge_routing_dev.jsonl": "ae5af2faba98b427a082d9a44c00b9d79dbbf62da1a820162eda4d9f17556523",
+    "premerge_rag_calibration.jsonl": "69fb37e48e14281b9f9af80c1c50090e24d08b0050e3481b7a2e5cb607b361a0"
+  },
+  "routing_dev": {
+    "n": 25,
+    "accuracy": 0.24,
+    "macro_f1": 0.135632183908046,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "usage_missing": 0,
+    "errors": {},
+    "details": [
+      {
+        "id": "dev-d01",
+        "gold": "data",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-d02",
+        "gold": "data",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-d03",
+        "gold": "data",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-d04",
+        "gold": "data",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-d05",
+        "gold": "data",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-k01",
+        "gold": "knowledge",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-k02",
+        "gold": "knowledge",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-k03",
+        "gold": "knowledge",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-k04",
+        "gold": "knowledge",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-k05",
+        "gold": "knowledge",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-h01",
+        "gold": "hybrid",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-h02",
+        "gold": "hybrid",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-h03",
+        "gold": "hybrid",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-h04",
+        "gold": "hybrid",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-h05",
+        "gold": "hybrid",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-c01",
+        "gold": "clarification",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-c02",
+        "gold": "clarification",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-c03",
+        "gold": "clarification",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-c04",
+        "gold": "clarification",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-c05",
+        "gold": "clarification",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-b01",
+        "gold": "blocked",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-b02",
+        "gold": "blocked",
+        "pred": "blocked",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-b03",
+        "gold": "blocked",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-b04",
+        "gold": "blocked",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      },
+      {
+        "id": "dev-b05",
+        "gold": "blocked",
+        "pred": "data",
+        "latency_ms": 0,
+        "model_called": false
+      }
+    ],
+    "status": "RUN",
+    "cost_cny": 0,
+    "confusion": {
+      "data -> data": 5,
+      "knowledge -> data": 5,
+      "hybrid -> data": 5,
+      "clarification -> data": 5,
+      "blocked -> data": 4,
+      "blocked -> blocked": 1
+    }
+  },
+  "previous_audit_failures": [
+    {
+      "id": "r07",
+      "gold": "knowledge",
+      "pred": "data",
+      "latency_ms": 0.02570000015111873,
+      "model_called": false
+    },
+    {
+      "id": "r08",
+      "gold": "knowledge",
+      "pred": "data",
+      "latency_ms": 0.023799999780749204,
+      "model_called": false
+    },
+    {
+      "id": "r09",
+      "gold": "knowledge",
+      "pred": "data",
+      "latency_ms": 0.023300000066228677,
+      "model_called": false
+    },
+    {
+      "id": "r10",
+      "gold": "knowledge",
+      "pred": "data",
+      "latency_ms": 0.025599999844416743,
+      "model_called": false
+    },
+    {
+      "id": "r13",
+      "gold": "hybrid",
+      "pred": "knowledge",
+      "latency_ms": 0.03399999968678458,
+      "model_called": false
+    },
+    {
+      "id": "r19",
+      "gold": "clarification",
+      "pred": "data",
+      "latency_ms": 0.02410000024610781,
+      "model_called": false
+    },
+    {
+      "id": "r20",
+      "gold": "clarification",
+      "pred": "data",
+      "latency_ms": 0.02300000005561742,
+      "model_called": false
+    },
+    {
+      "id": "r21",
+      "gold": "clarification",
+      "pred": "data",
+      "latency_ms": 0.02680000034160912,
+      "model_called": false
+    },
+    {
+      "id": "r22",
+      "gold": "clarification",
+      "pred": "data",
+      "latency_ms": 0.023399999918183312,
+      "model_called": false
+    },
+    {
+      "id": "r23",
+      "gold": "clarification",
+      "pred": "data",
+      "latency_ms": 0.02189999986512703,
+      "model_called": false
+    },
+    {
+      "id": "r24",
+      "gold": "clarification",
+      "pred": "data",
+      "latency_ms": 0.022199999875738285,
+      "model_called": false
+    },
+    {
+      "id": "r28",
+      "gold": "blocked",
+      "pred": "data",
+      "latency_ms": 0.023499999770137947,
+      "model_called": false
+    },
+    {
+      "id": "r29",
+      "gold": "blocked",
+      "pred": "data",
+      "latency_ms": 0.02499999982319423,
+      "model_called": false
+    }
+  ],
+  "bge_raw_scores": [
+    {
+      "id": "cal-p01",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "business_glossary.md",
+          "section": "二、用户行为指标",
+          "score": 0.579447289625903
+        },
+        {
+          "filename": "kpi_formulas.md",
+          "section": "2. 用户相关",
+          "score": 0.5570424808401037
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "用户类",
+          "score": 0.5522380263042559
+        }
+      ]
+    },
+    {
+      "id": "cal-p02",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "gold_queries.md",
+          "section": "客单价类",
+          "score": 0.5668523782288242
+        },
+        {
+          "filename": "api_docs.md",
+          "section": "一、平台概览",
+          "score": 0.5582154636702136
+        },
+        {
+          "filename": "api_docs.md",
+          "section": "前言/概述",
+          "score": 0.5534742358041723
+        }
+      ]
+    },
+    {
+      "id": "cal-p03",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "gold_queries.md",
+          "section": "商品 / 类目类（商品表未引入前的占位）",
+          "score": 0.5960112698215957
+        },
+        {
+          "filename": "business_glossary.md",
+          "section": "一、销售与财务指标",
+          "score": 0.5649732795358988
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "占比类",
+          "score": 0.5616150229297797
+        }
+      ]
+    },
+    {
+      "id": "cal-p04",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "data_dictionary.md",
+          "section": "orders 表字段说明",
+          "score": 0.5940192096194112
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "订单类",
+          "score": 0.5644728200600768
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "商品 / 类目类（商品表未引入前的占位）",
+          "score": 0.5577745901554867
+        }
+      ]
+    },
+    {
+      "id": "cal-p05",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "api_docs.md",
+          "section": "七、限流规则",
+          "score": 0.6695540221811608
+        },
+        {
+          "filename": "api_docs.md",
+          "section": "前言/概述",
+          "score": 0.5488033904536852
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "八、SQL 安全规则",
+          "score": 0.5478605385840275
+        }
+      ]
+    },
+    {
+      "id": "cal-p06",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "business_rules.md",
+          "section": "四、用户行为预警",
+          "score": 0.6356366178505393
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "二、平台渠道诊断",
+          "score": 0.5748282467039111
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "七、数据隐私",
+          "score": 0.5584670750499583
+        }
+      ]
+    },
+    {
+      "id": "cal-p07",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "business_glossary.md",
+          "section": "七、货币与单位",
+          "score": 0.5376056684191418
+        },
+        {
+          "filename": "kpi_formulas.md",
+          "section": "3. 客单价 / 订单相关",
+          "score": 0.516046606679674
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "商品 / 类目类（商品表未引入前的占位）",
+          "score": 0.5031000061293627
+        }
+      ]
+    },
+    {
+      "id": "cal-p08",
+      "no_answer": false,
+      "results": [
+        {
+          "filename": "kpi_formulas.md",
+          "section": "前言/概述",
+          "score": 0.6171192419252842
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "前言/概述",
+          "score": 0.5797490797288646
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "商品 / 类目类（商品表未引入前的占位）",
+          "score": 0.5716548569797727
+        }
+      ]
+    },
+    {
+      "id": "cal-n01",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "gold_queries.md",
+          "section": "占比类",
+          "score": 0.556359702792275
+        },
+        {
+          "filename": "kpi_formulas.md",
+          "section": "4. 退款相关",
+          "score": 0.555260536857248
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "异常检测类",
+          "score": 0.5441569559777598
+        }
+      ]
+    },
+    {
+      "id": "cal-n02",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "gold_queries.md",
+          "section": "客单价类",
+          "score": 0.5192234297631614
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "商品 / 类目类（商品表未引入前的占位）",
+          "score": 0.5161992544698182
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "行为类",
+          "score": 0.5028355881569102
+        }
+      ]
+    },
+    {
+      "id": "cal-n03",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "gold_queries.md",
+          "section": "占比类",
+          "score": 0.5202888324077498
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "一、指标健康区间",
+          "score": 0.5014099938508805
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "四、用户行为预警",
+          "score": 0.5000266148905216
+        }
+      ]
+    },
+    {
+      "id": "cal-n04",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "business_rules.md",
+          "section": "一、指标健康区间",
+          "score": 0.4893463179212666
+        },
+        {
+          "filename": "kpi_formulas.md",
+          "section": "4. 退款相关",
+          "score": 0.4887917021910359
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "二、平台渠道诊断",
+          "score": 0.4839517135656579
+        }
+      ]
+    },
+    {
+      "id": "cal-n05",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "business_glossary.md",
+          "section": "六、统计时间范围约定",
+          "score": 0.49864834363915456
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "订单类",
+          "score": 0.4953439976134511
+        },
+        {
+          "filename": "gold_queries.md",
+          "section": "商品 / 类目类（商品表未引入前的占位）",
+          "score": 0.4946295777190833
+        }
+      ]
+    },
+    {
+      "id": "cal-n06",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "business_rules.md",
+          "section": "四、用户行为预警",
+          "score": 0.46176656727588317
+        },
+        {
+          "filename": "business_glossary.md",
+          "section": "五、RFM 客户分层（与 BI 看板一致）",
+          "score": 0.4605734492501921
+        },
+        {
+          "filename": "data_dictionary.md",
+          "section": "orders 表字段说明",
+          "score": 0.45640306457776747
+        }
+      ]
+    },
+    {
+      "id": "cal-n07",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "business_rules.md",
+          "section": "一、指标健康区间",
+          "score": 0.4495516170895261
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "四、用户行为预警",
+          "score": 0.4425547485958953
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "九、回答模板",
+          "score": 0.44084425541110506
+        }
+      ]
+    },
+    {
+      "id": "cal-n08",
+      "no_answer": true,
+      "results": [
+        {
+          "filename": "gold_queries.md",
+          "section": "前言/概述",
+          "score": 0.4561762648701977
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "三、时间分布异常",
+          "score": 0.45320316806465316
+        },
+        {
+          "filename": "business_glossary.md",
+          "section": "五、RFM 客户分层（与 BI 看板一致）",
+          "score": 0.4488680174324534
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "0.4": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.5,
+      "mrr": 0.5,
+      "no_answer_accuracy": 0.0,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "gold_queries.md",
+              "用户类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "api_docs.md",
+              "一、平台概览"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "gold_queries.md",
+              "占比类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "gold_queries.md",
+              "订单类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "business_rules.md",
+              "七、数据隐私"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "七、货币与单位"
+            ],
+            [
+              "kpi_formulas.md",
+              "3. 客单价 / 订单相关"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "gold_queries.md",
+              "异常检测类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "gold_queries.md",
+              "行为类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ],
+            [
+              "gold_queries.md",
+              "订单类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_glossary.md",
+              "五、RFM 客户分层（与 BI 看板一致）"
+            ],
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "九、回答模板"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "三、时间分布异常"
+            ],
+            [
+              "business_glossary.md",
+              "五、RFM 客户分层（与 BI 看板一致）"
+            ]
+          ]
+        }
+      ]
+    },
+    "0.45": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.5,
+      "mrr": 0.5,
+      "no_answer_accuracy": 0.125,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "gold_queries.md",
+              "用户类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "api_docs.md",
+              "一、平台概览"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "gold_queries.md",
+              "占比类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "gold_queries.md",
+              "订单类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "business_rules.md",
+              "七、数据隐私"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "七、货币与单位"
+            ],
+            [
+              "kpi_formulas.md",
+              "3. 客单价 / 订单相关"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "gold_queries.md",
+              "异常检测类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "gold_queries.md",
+              "行为类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ],
+            [
+              "gold_queries.md",
+              "订单类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_glossary.md",
+              "五、RFM 客户分层（与 BI 看板一致）"
+            ],
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "三、时间分布异常"
+            ]
+          ]
+        }
+      ]
+    },
+    "0.5": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.5,
+      "mrr": 0.5,
+      "no_answer_accuracy": 0.625,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "gold_queries.md",
+              "用户类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "api_docs.md",
+              "一、平台概览"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "gold_queries.md",
+              "占比类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "gold_queries.md",
+              "订单类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "business_rules.md",
+              "七、数据隐私"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "七、货币与单位"
+            ],
+            [
+              "kpi_formulas.md",
+              "3. 客单价 / 订单相关"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "gold_queries.md",
+              "异常检测类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "gold_queries.md",
+              "行为类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    },
+    "0.55": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.375,
+      "mrr": 0.375,
+      "no_answer_accuracy": 0.875,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "gold_queries.md",
+              "用户类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "客单价类"
+            ],
+            [
+              "api_docs.md",
+              "一、平台概览"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "gold_queries.md",
+              "占比类"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "gold_queries.md",
+              "订单类"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "business_rules.md",
+              "七、数据隐私"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    },
+    "0.6": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.25,
+      "mrr": 0.25,
+      "no_answer_accuracy": 1.0,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    },
+    "0.65": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.125,
+      "mrr": 0.125,
+      "no_answer_accuracy": 1.0,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 0,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ]
+          ]
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    },
+    "0.7": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.0,
+      "mrr": 0.0,
+      "no_answer_accuracy": 1.0,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    },
+    "0.75": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.0,
+      "mrr": 0.0,
+      "no_answer_accuracy": 1.0,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    },
+    "0.8": {
+      "n": 16,
+      "answerable": 8,
+      "unanswerable": 8,
+      "recall_at_3": 0.0,
+      "mrr": 0.0,
+      "no_answer_accuracy": 1.0,
+      "details": [
+        {
+          "id": "cal-p01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p02",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p05",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p06",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-p08",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n01",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n02",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n03",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n04",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n05",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n06",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n07",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        },
+        {
+          "id": "cal-n08",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 0,
+          "sources": []
+        }
+      ]
+    }
+  }
+}

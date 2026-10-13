@@ -1,0 +1,42 @@
+[
+  {
+    "notebook": "01_data_cleaning.ipynb",
+    "cells_executed": 2,
+    "status": "PASS"
+  },
+  {
+    "notebook": "02_sales_analysis.ipynb",
+    "cells_executed": 1,
+    "status": "PASS"
+  },
+  {
+    "notebook": "03_time_analysis.ipynb",
+    "cells_executed": 1,
+    "status": "PASS"
+  },
+  {
+    "notebook": "04_product_user_analysis.ipynb",
+    "cells_executed": 10,
+    "status": "PASS"
+  },
+  {
+    "notebook": "05_visualization.ipynb",
+    "cells_executed": 8,
+    "status": "PASS"
+  },
+  {
+    "output_files": [
+      "04_product_orders.csv",
+      "04_product_sales.csv",
+      "04_user_spending.csv",
+      "05_01_商品销售额TOP10.png",
+      "05_02_平台销售额占比.png",
+      "05_03_每日销售趋势.png",
+      "05_04_用户消费TOP10.png",
+      "05_核心业务分析图_四合一.png",
+      "daily_sales.csv",
+      "hourly_orders.csv",
+      "weekday_sales.csv"
+    ]
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-14",
+  "project": "acip-premerge",
+  "pages": {
+    "/health": {
+      "anonymous_status": 200
+    },
+    "/nginx-health": {
+      "anonymous_status": 200
+    },
+    "/docs": {
+      "anonymous_status": 200
+    },
+    "/BI/": {
+      "anonymous_status": 401,
+      "authorized_status": 200,
+      "authorized_websocket": "PASS"
+    },
+    "/ai/": {
+      "anonymous_status": 401,
+      "authorized_status": 200,
+      "authorized_websocket": "PASS"
+    }
+  },
+  "login_status": 200,
+  "health": {
+    "status": "healthy",
+    "checks": {
+      "database": {
+        "status": "ok"
+      },
+      "cache": {
+        "status": "ok",
+        "backend": "redis",
+        "keys": 0,
+        "memory_human": "1.02M",
+        "hits": 0,
+        "rebuilds": 0,
+        "rebuild_inflight": 0
+      },
+      "redis": {
+        "status": "ok",
+        "backend": "redis",
+        "used_memory_human": "1.07M",
+        "keys": 0
+      }
+    },
+    "timestamp": "2026-10-13T23:45:10.615942+00:00"
+  },
+  "database": {
+    "returncode": 0,
+    "counts_and_revision": [
+      "102287",
+      "0002_order_auto_increment"
+    ]
+  }
+}

@@ -69,6 +69,23 @@ def test_describe_table_uses_sqlalchemy_inspection() -> None:
     assert "secret" not in schema
 
 
+async def test_failed_sql_retries_still_count_model_usage():
+    """拒绝危险SQL不能丢失已经产生的两次调用费用。"""
+    class RejectedSQLAdapter:
+        async def generate_sql(self, *args):
+            return ModelResponse("DELETE FROM orders", input_tokens=12, output_tokens=3, total_tokens=15)
+
+    report = await evaluate_live_model(
+        adapter=RejectedSQLAdapter(),
+        cases=[LiveCase(id="usage-regression", kind="sql", query="统计金额", reference_sql="SELECT SUM(payment_amount) FROM orders")],
+        csv_path=DEFAULT_CSV, request_delay_seconds=0,
+    )
+    assert report["summary"]["passed"] == 0
+    assert report["summary"]["input_tokens"] == 24
+    assert report["summary"]["output_tokens"] == 6
+    assert report["summary"]["total_tokens"] == 30
+
+
 @pytest.mark.asyncio
 async def test_model_adapter_explicitly_uses_json_mode(monkeypatch) -> None:
     captured = {}

@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-13",
+  "key_present": true,
+  "process_key_present": true,
+  "root_key_present": true,
+  "backend_key_present": true,
+  "root_backend_key_equal": true,
+  "effective_matches_backend": false,
+  "key_has_outer_whitespace": false,
+  "key_contains_whitespace": false,
+  "base_url_is_official": true,
+  "model": "deepseek-v4-flash",
+  "evaluations": {
+    "routing": {
+      "status": "RUN",
+      "evidence": "premerge_routing_live.json"
+    },
+    "text_to_sql": {
+      "status": "RUN",
+      "evidence": "premerge_sql_live.json"
+    },
+    "answers": {
+      "status": "RUN",
+      "evidence": "premerge_answers_live.json"
+    }
+  },
+  "model_discovery": {
+    "http_status": 200
+  },
+  "minimal_chat": {
+    "http_status": 200
+  },
+  "evaluations_ready": true,
+  "diagnostic_date": "2026-10-13",
+  "evaluation_date": "2026-10-14",
+  "configuration_note": "原本机env未修改；成功评测使用用户授权的临时进程凭据。"
+}

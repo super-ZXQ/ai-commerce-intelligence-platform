@@ -2,8 +2,8 @@
 
 规则依据 agent_core/eval/routing_robustness.jsonl（dev 集，25 条）的失败模式加固：
 倒序写操作（"把 orders 表删了"）、隐私变体（"电话"）、注入改写（"忽略上面的要求"）、
-口语知识问法（"咋算""啥意思"）。泛化水平以留出集 routing_robustness_heldout.jsonl
-（10 条，调优前冻结）为准，不参与规则调优。
+口语知识问法（"咋算""啥意思"）。routing_robustness_heldout.jsonl（10条）标签保留，但后续安全加固
+已使用其相关失败模式，现仅作历史回归；新审计与开发集分开报告。
 
 安全拒答评测集 agent_core/eval/live_safety_cases.jsonl（12 条）暴露的越权缺口
 在本模块加固：隐私宾语变体（客户资料/收货地址/联系方式）、记录行级写操作
