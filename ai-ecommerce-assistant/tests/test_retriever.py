@@ -15,6 +15,7 @@ from rag.retriever import Retriever
 def fake_store() -> MagicMock:
     """Mock VectorStore.search，按 query 返回伪结果。"""
     s = MagicMock()
+    s.knowledge_version = "v1"
     s.count.return_value = 1
 
     def _search(query, k=3, score_threshold=None, filter=None):
@@ -26,6 +27,49 @@ def fake_store() -> MagicMock:
 
     s.search.side_effect = _search
     return s
+
+
+def test_filters_and_versions_do_not_share_cache(fake_store):
+    r = Retriever(fake_store)
+    r.retrieve("q", filter={"doc_type": "kpi"})
+    r.retrieve("q", filter={"doc_type": "glossary"})
+    assert fake_store.search.call_count == 2
+    fake_store.knowledge_version = "v2"
+    r.retrieve("q", filter={"doc_type": "kpi"})
+    assert fake_store.search.call_count == 3
+
+
+def test_filter_key_order_is_stable_and_return_value_is_isolated(fake_store):
+    r = Retriever(fake_store)
+    first = r.retrieve("q", filter={"a": 1, "b": 2})
+    first[0]["content"] = "polluted"
+    assert r.retrieve("q", filter={"b": 2, "a": 1})[0]["content"] != "polluted"
+    assert fake_store.search.call_count == 1
+
+
+def test_invalidation_during_inflight_search_cannot_repopulate_cache(fake_store):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    entered, release = Event(), Event()
+
+    def search(*a, **k):
+        entered.set()
+        assert release.wait(5)
+        return [{"content": "old", "metadata": {}, "score": .8}]
+
+    fake_store.search.side_effect = search
+    r = Retriever(fake_store)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(r.retrieve, "q")
+        assert entered.wait(5)
+        r.invalidate_cache()
+        fake_store.knowledge_version = "v2"
+        release.set()
+        pending.result()
+    assert r.get_stats()["cache_size"] == 0
+    r.retrieve("q")
+    assert fake_store.search.call_count == 2
 
 
 # ─────────────────── 缓存 ───────────────────

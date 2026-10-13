@@ -58,7 +58,9 @@ services:
       DB_PORT: 3306
       DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
       MIGRATION_DB_USER: ${MIGRATION_DB_USER:-ea_migrate}
-      MIGRATION_DB_PASSWORD: ${DB_MIGRATE_PASSWORD:-}
+      MIGRATION_DB_PASSWORD: ${DB_MIGRATE_PASSWORD:-${DB_SYNC_PASSWORD}}
+      AI_DB_USER: ea_ai
+      AI_DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?请在根目录 .env 中设置 JWT_SECRET}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在根目录 .env 中设置 ADMIN_PASSWORD}
       DEBUG: ${DEBUG:-false}
@@ -68,6 +70,21 @@ services:
       mysql:
         condition: service_healthy
       db-bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - ea-network
+
+  db-permissions:
+    image: mysql:8.0
+    restart: "no"
+    environment:
+      MYSQL_PWD: ${DB_ROOT_PASSWORD:?请设置 DB_ROOT_PASSWORD}
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+    volumes:
+      - ./deploy/mysql/grant-ai.sh:/grant-ai.sh:ro
+    entrypoint: ["sh", "/grant-ai.sh"]
+    depends_on:
+      db-migrate:
         condition: service_completed_successfully
     networks:
       - ea-network
@@ -136,6 +153,8 @@ services:
         condition: service_completed_successfully
       db-migrate:
         condition: service_completed_successfully
+      db-permissions:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -153,6 +172,14 @@ services:
       dockerfile: Dockerfile.streamlit
     container_name: ea-streamlit
     restart: unless-stopped
+    environment:
+      AUTH_BACKEND_URL: http://backend:8000
+      PUBLIC_LOGIN_URL: /demo
+      BI_DATA_MODE: database
+      DB_HOST: mysql
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      AI_DB_USER: ea_ai
+      AI_DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
     expose:
       - "8501"
     command:
@@ -168,6 +195,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      db-permissions:
+        condition: service_completed_successfully
     networks:
       - ea-network
 
@@ -180,10 +209,14 @@ services:
     container_name: ea-ai-assistant
     restart: unless-stopped
     environment:
+      AUTH_BACKEND_URL: http://backend:8000
+      PUBLIC_LOGIN_URL: /demo
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: ea_ai
       DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
+      AI_DB_USER: ea_ai
+      AI_DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
@@ -210,6 +243,8 @@ services:
       mysql:
         condition: service_healthy
       db-bootstrap:
+        condition: service_completed_successfully
+      db-permissions:
         condition: service_completed_successfully
     networks:
       - ea-network

@@ -9,20 +9,26 @@
 
 基于 **102,287 条公开电商订单样本**，完成从数据清洗、特征工程到多维分析与可视化的完整链路。系统采用前后端分离架构，提供交互式 BI 看板、分节点 Agent 智能查询、RAG 业务知识检索、RESTful API、RFM 用户画像和实时监控。
 
+2026-10-13审计已修复页面认证、SQL字段权限、模型网络访问、数据库账号回退、订单并发主键和RAG缓存更新等问题。数据库与页面回归通过 **417项测试**（含真实MySQL与Nginx容器认证联测）；真实模型接口认证失败，**本次B/C路由和SQL生成能力尚未验收**。新独立路由集规则准确率56.7%，真实检索对照未证明Hybrid收益，因此保留LangGraph、生产规则路由与现有检索默认方案，不追加Reranker。
+
+完整证据、业务取舍和限制见 [审计报告](AUDIT_REPORT.md)、[修复报告](FIX_REPORT.md)、[评测报告](EVALUATION_REPORT.md)、[架构与安全边界](docs/AUDIT_ARCHITECTURE.md)。后文原有GLM与路由数字为历史实验，不能替代本次新集验收。
+
 ## 功能概览
 
 | 模块 | 技术栈 | 功能 |
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
 | **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot + Chroma | 分节点路由、结构化 Text-to-SQL、一次纠错、多轮会话、引用与公开轨迹 |
-| **FastAPI 后端** | FastAPI + SQLAlchemy | 34 个 API 操作，含认证/限流/缓存/监控/RFM 与订单事件摄入 |
+| **FastAPI 后端** | FastAPI + SQLAlchemy | 认证/限流/缓存/监控/RFM 与订单事件摄入 |
 | **订单事件摄入** | MySQL 事务 + 幂等账本 | 创建/退款/取消事件、版本水位乱序保护、精准缓存失效与新鲜度查询 |
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 252 项自动化测试（隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 417项自动化测试；保留原数据集，新增30题路由、18题检索、20题MySQL SQL评测；能力结果与失败限制见评测报告 |
 
 ## 在线演示
+
+以下为本地 Docker 一键部署后的访问入口（公网演示地址待真实部署后补充，部署流程见 [docs/deploy-vps.md](docs/deploy-vps.md)，演示脚本见 [docs/demo_script.md](docs/demo_script.md)）：
 
 | 应用 | 链接 | 说明 |
 |------|------|------|
@@ -53,11 +59,13 @@ git clone https://github.com/super-ZXQ/ai-commerce-intelligence-platform.git
 cd ai-commerce-intelligence-platform
 
 cp deploy/.env.example .env
-# 编辑 .env 填入四类 MySQL 密码、JWT Secret、LLM API Key
+# 编辑 .env 填入数据库账号密码、JWT Secret、bcrypt登录密码与模型配置
 
 docker compose up -d --build
 docker compose ps
 ```
+
+生产页面Cookie要求HTTPS，请在入口配置TLS后使用 `/demo` 登录，再访问 `/BI/` 或 `/ai/`。仅本地HTTP演示可显式设置 `DEBUG=true` 并使用开发密码；生产禁止这样配置。Docker BI默认读取实时数据库；本地未配置数据库时显示“静态演示”，不包含订单事件更新。历史数据卷必须执行新增迁移与 `db-permissions` 授权阶段。
 
 **服务架构：**
 
@@ -68,7 +76,9 @@ docker compose up -d
 ├── ea-backend      → FastAPI (Docker 内网 :8000)
 ├── ea-ai-assistant → AI 助手 (Docker 内网 :8502, baseUrlPath=/ai)
 ├── ea-db-bootstrap → 一次性创建最小权限数据库账号
-├── ea-mysql        → MySQL 8.0 (Docker 内网 :3306) + 自动建表
+├── ea-db-migrate   → Alembic迁移（含历史主键自增修复）
+├── db-permissions  → 迁移后授予AI账号必要列SELECT
+├── ea-mysql        → MySQL 8.0 (Docker 内网 :3306)
 └── ea-redis        → Redis 7 Alpine (Docker 内网 :6379) + AOF持久化 + LRU淘汰
 ```
 
@@ -86,6 +96,10 @@ docker compose up -d
 | `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
 
 部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入和数据同步分别创建最小权限账号；API 与 AI 仅有查询权限，`ea_events` 仅能更新 `orders` 与 `order_events`。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；Excel 因工作簿格式限制仍需在内存中生成。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
+
+**生产环境安全加固（公网部署必读）：**
+
+监控端点（`/metrics`、`/api/monitor/*`、`/health/detailed`）默认免鉴权，以便本地开发与导航页/监控面板直接调用。**公网部署时建议在 `.env` 中设置 `MONITOR_AUTH_REQUIRED=true`**，这些端点将与其他业务接口一样要求 JWT Bearer 令牌（监控面板如需无人值守访问，需为其登录态配置对应的 Nginx 例外或改用内网访问）。开关默认关闭，保持既有调用方式向后兼容；测试见 `backend/tests/test_monitor_auth.py`。
 
 ### 本地开发
 
@@ -216,6 +230,13 @@ Client → Nginx
 - **Streamlit** = BI / Internal Analytics Dashboard（不是系统唯一驱动）
 - **Agent Runtime** (`agent_core`) = AI capability layer
 - **Chroma embedded + BGE** = V1 知识库（当前规模合理；多实例/高并发再评估 Qdrant/Milvus，见 Roadmap，本次不换栈）
+
+## 可观测性：Prometheus × Langfuse 双层体系
+
+- **Prometheus（看森林）**：QPS、失败率、token 总量、缓存命中等聚合指标，支撑看板与告警；
+- **Langfuse（看树木，可选，默认关闭）**：每次 AI 查询的完整 trace——每个 LangGraph 节点一个 span、每次 LLM 调用一个 generation，含 prompt / token / 成本 / 延迟，可在 UI 逐节点回放。`LANGFUSE_ENABLED=true` + Key 配置即启用，未配置时静默跳过（`docker-compose.observability.yml` 自托管）。
+
+分工定位、启用步骤与统计脚本（日查询量 / 平均 token 成本 / P50·P95 延迟）见 [docs/observability.md](docs/observability.md)。
 
 ## RAG 业务知识检索增强
 
@@ -530,10 +551,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（252 项，实收全绿）
+### 自动化测试（301 项，实收全绿）
 
 ```bash
-# 后端（164 项，完整运行需要 MySQL）
+# 后端（213 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（88 项）
@@ -542,12 +563,14 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（164 项）：
+后端（213 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
-- `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
+- `test_live_model_evaluation.py` — 真实评测集约束（50 条，reference SQL 全部可执行）、结果集比较、安全拒答集 12 条覆盖四类越权缺口、路由加固回归（拦截不误伤）
+- `test_observability.py` — Langfuse 开关语义、trace_id 派生、汇总上报与 Runtime 接线（假 SDK，不依赖真实服务）
+- `test_monitor_auth.py` — 监控端点 JWT 保护开关开/关两态
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
 
 AI/RAG（88 项）：
@@ -561,13 +584,13 @@ AI/RAG（88 项）：
 
 AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEmbeddings` 生成确定性归一化向量。
 
-**测试规模（实收，非估填）** — 2026-09-18 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
+**测试规模（实收，非估填）** — 2026-10-13 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 164 | **164 passed**（14s） |
-| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（11s） |
-| **合计** | **252** | **252 passed / 0 failed** |
+| `backend/tests` | 213 | **213 passed**（约 30s） |
+| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（约 11s） |
+| **合计** | **301** | **301 passed / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -642,9 +665,19 @@ python eval/run_sql_eval.py --output eval/sql_eval_report.json
 
 ### 真实模型评测
 
-真实模型评测需要用户显式配置 API Key 和 `--allow-network`，不会在 CI 中消耗额度。最新可审计快照使用智谱 `glm-4-flash-250414`，在完整 102,287 行数据上的 15 条评测中通过 14 条（93.33%）：结构化输出 100%、SQL 结果正确率 90%、知识关键词覆盖率与引用完整率均为 100%，P50/P95 延迟为 1,508/8,941 ms，共使用 6,894 Tokens。
+真实模型评测需要用户显式配置 API Key 和 `--allow-network`，不会在 CI 中消耗额度。
 
-评测比较候选 SQL 与参考 SQL 的实际结果集，不使用 SQL 字符串相等或模型自评。唯一失败项及逐条输出保留在 [`docs/evaluation/`](docs/evaluation/README.md)；15 条小样本不代表所有真实问题的总体准确率。
+- **数据准确性评测集（50 条）**：`agent_core/eval/live_model_cases.jsonl`，30 条 Text-to-SQL（结果集比对）+ 20 条知识问答（关键词覆盖 + 引用完整）。2026-09-18 快照使用智谱 `glm-4-flash-250414`，在完整 102,287 行数据上的 15 条评测中通过 14 条（93.33%）：结构化输出 100%、SQL 结果正确率 90%、知识关键词覆盖率与引用完整率均为 100%，P50/P95 延迟为 1,508/8,941 ms，共使用 6,894 Tokens；该快照为 15 条时的历史记录，扩容至 50 条后需重新跑取新快照（命令见下）。
+- **安全拒答评测集（12 条）**：`agent_core/eval/live_safety_cases.jsonl`，走完整 Agent Runtime 端到端，覆盖导出客户资料 / 收货地址 / 记录行写操作 / 泛宾语盘点 / 提示词注入 / 隐私字段六类，判定「路由 blocked + 未执行 SQL + 拒绝话术」三要素。
+
+运行命令（需要 `LLM_API_KEY`）：
+
+```bash
+python -m agent_core.live_evaluation --allow-network          # 50 条数据准确性
+python -m agent_core.live_safety_evaluation --allow-network   # 12 条安全拒答
+```
+
+评测比较候选 SQL 与参考 SQL 的实际结果集，不使用 SQL 字符串相等或模型自评。唯一失败项及逐条输出保留在 [`docs/evaluation/`](docs/evaluation/README.md)；小样本不代表所有真实问题的总体准确率。
 
 ### 已知限制与降级
 
@@ -652,7 +685,8 @@ python eval/run_sql_eval.py --output eval/sql_eval_report.json
 - Redis 不可用：自动降级到最多 1,000 个会话的内存存储；会话保留最近 6 轮、TTL 30 分钟。
 - RAG 无命中：继续执行可用分支并返回空来源，不伪造引用。
 - SQL 校验或执行失败：仅使用脱敏错误纠正一次，第二次失败后停止循环并返回明确错误。
-- 真实模型评测仅 15 条且输出具有随机性；当前快照有 1 条 SQL 在一次纠错后仍失败。
+- 真实模型评测扩容至 50 条 + 12 条安全拒答，但 50 条的新快照需配置 Key 后重跑（命令见上节）；模型输出具有随机性，历史快照有 1 条 SQL 在一次纠错后仍失败。
+- 敌意题目盲出集（`agent_core/eval/adversarial/`）等待第三方同学出题，当前为空——不预置题目冒充评测。
 - 本地演示可使用 SQLite；生产与完整 CI 使用 MySQL 8，只读账号是安全边界的一部分。
 
 ## 项目结构

@@ -6,10 +6,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import threading
 import time
 from collections import OrderedDict
+from copy import deepcopy
 
 from . import metrics
 from .vector_store import VectorStore
@@ -59,6 +61,7 @@ class Retriever:
         self._cache_ttl = cache_ttl
         self._cache: OrderedDict[str, tuple[float, list[dict]]] = OrderedDict()
         self._lock = threading.Lock()
+        self._generation = 0
         # 跨进程 stats 文件路径
         self._stats_path = stats_path
         self._dump_interval_s = dump_interval_s
@@ -77,9 +80,14 @@ class Retriever:
         }
 
     @staticmethod
-    def _key(query: str, k: int, threshold: float) -> str:
-        raw = f"{query.strip()}|k={k}|t={threshold}"
-        return hashlib.md5(raw.encode()).hexdigest()
+    def _key(query: str, k: int, threshold: float, filter: dict | None = None, knowledge_version: str = "0") -> str:
+        raw = json.dumps([query, k, threshold, filter, knowledge_version], sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    def invalidate_cache(self) -> None:
+        with self._lock:
+            self._generation += 1
+            self._cache.clear()
 
     def retrieve(self,
                  query: str,
@@ -99,18 +107,22 @@ class Retriever:
         Returns:
             [{"content", "metadata", "score"}]
         """
-        k = k or self.k
+        k = self.k if k is None else k
+        if k < 1:
+            raise ValueError("k必须大于0")
         threshold = score_threshold if score_threshold is not None else self.score_threshold
-        cache_key = self._key(query, k, threshold)
+        version = str(self._store.knowledge_version)
+        cache_key = self._key(query, k, threshold, filter, version)
 
         with self._lock:
+            generation = self._generation
             # 1. 查缓存
             if cache_key in self._cache:
                 ts, cached = self._cache[cache_key]
                 if time.time() - ts < self._cache_ttl:
                     self._cache.move_to_end(cache_key)
                     self.stats["cache_hits"] += 1
-                    logger.debug("RAG 缓存命中: %s", query[:30])
+                    logger.debug("RAG 缓存命中 question_length=%d", len(query))
                     metrics.log_event(
                         "retrieval",
                         query=query[:100],
@@ -120,7 +132,7 @@ class Retriever:
                         cache_hit=True,
                         source="cache",
                     )
-                    return cached
+                    return deepcopy(cached)
                 # 过期
                 del self._cache[cache_key]
 
@@ -132,7 +144,7 @@ class Retriever:
                 query, k=k, score_threshold=threshold, filter=filter
             )
         except Exception as e:
-            logger.error("RAG 检索失败: %s", e)
+            logger.error("RAG 检索失败: %s", type(e).__name__)
             results = []
             search_failed = True
         elapsed_ms = (time.time() - t0) * 1000
@@ -146,9 +158,10 @@ class Retriever:
         #    正常检索出的空结果（阈值过滤后无命中）仍照常缓存。
         if not search_failed:
             with self._lock:
-                if len(self._cache) >= self._cache_max:
-                    self._cache.popitem(last=False)  # LRU 淘汰
-                self._cache[cache_key] = (time.time(), results)
+                if generation == self._generation and version == str(self._store.knowledge_version) and self._cache_max > 0:
+                    if len(self._cache) >= self._cache_max:
+                        self._cache.popitem(last=False)
+                    self._cache[cache_key] = (time.time(), deepcopy(results))
 
         # 4. 更新 Top1 score 桶
         if results:
@@ -172,8 +185,8 @@ class Retriever:
             source="store",
         )
 
-        logger.debug("RAG 检索: q=%r hits=%d top1=%.2f ms=%.1f",
-                     query[:30], len(results),
+        logger.debug("RAG 检索: question_length=%d hits=%d top1=%.2f ms=%.1f",
+                     len(query), len(results),
                      results[0]["score"] if results else 0, elapsed_ms)
         return results
 

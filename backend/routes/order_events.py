@@ -59,7 +59,7 @@ async def ingest_order_events(
             )
         except Exception as exc:
             # 服务端保留可诊断日志；API 响应不回显驱动异常、SQL 或连接串。
-            logger.exception("订单事件处理失败 event_type=%s order_id=%s", event.event_type, event.order_id)
+            logger.error("订单事件处理失败 event_type=%s error_type=%s", event.event_type, type(exc).__name__)
             raise HTTPException(
                 status_code=503,
                 detail={"error_code": "EVENT_WRITE_UNAVAILABLE", "message": "订单事件暂时无法处理"},

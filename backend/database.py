@@ -28,6 +28,8 @@ event_engine = create_async_engine(
     max_overflow=max(1, min(settings.db_max_overflow, 5)),
     pool_recycle=settings.db_pool_recycle,
     pool_pre_ping=True,
+    # 不对尚不存在的订单持有间隙锁；已有订单仍由 FOR UPDATE 串行化状态转换。
+    isolation_level="READ COMMITTED",
     echo=settings.debug,
 )
 

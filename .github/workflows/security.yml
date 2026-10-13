@@ -1,0 +1,87 @@
+# GitHub Actions 安全扫描：密钥泄露 / 依赖漏洞 / 代码静态安全
+# 触发：PR 同步 main / push main
+#
+# 说明：
+# - gitleaks：扫描 git 全历史与 PR diff 中的密钥（AWS Key、Token、私钥等）
+# - pip-audit：对两套依赖（后端 dev、AI 助手）对照 OSV/PyPI 漏洞库逐项审计，
+#   任一已知漏洞即失败；版本钉死在 backend/requirements-dev.txt
+# - bandit：Python 代码静态安全分析，中高危（-ll）失败；
+#   版本与阈值经本地预跑验证（bandit 1.9.4，中高危 0）
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────── 1. Gitleaks 密钥泄露扫描 ───────────
+  gitleaks:
+    name: Gitleaks 密钥扫描
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 需要完整 git 历史：仅扫 PR diff 会漏掉历史提交中的密钥
+          fetch-depth: 0
+      - name: Gitleaks 扫描（全历史）
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────── 2. 依赖漏洞审计：后端（dev 含运行） ───────────
+  pip-audit-backend:
+    name: pip-audit（后端依赖）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装 pip-audit（版本钉在 backend/requirements-dev.txt）
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+      - name: 审计后端依赖（含传递依赖）
+        # requirements-dev.txt 头部 -r requirements.txt 已含运行依赖
+        run: pip-audit -r backend/requirements-dev.txt
+
+  # ─────────── 3. 依赖漏洞审计：AI 助手 ───────────
+  pip-audit-ai-assistant:
+    name: pip-audit（AI 助手依赖）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装 pip-audit（版本钉在 backend/requirements-dev.txt）
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+      - name: 审计 AI 助手依赖（含传递依赖）
+        run: pip-audit -r ai-ecommerce-assistant/requirements.txt
+
+  # ─────────── 4. Bandit 代码静态安全分析 ───────────
+  bandit:
+    name: Bandit 静态安全分析
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装 bandit（版本钉在 backend/requirements-dev.txt）
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+      - name: Bandit 扫描（中高危失败）
+        # -ll：只报告 MEDIUM 及以上；退出码非零即 CI 失败
+        run: |
+          bandit -r backend agent_core ai-ecommerce-assistant \
+            streamlit_app.py scripts -ll

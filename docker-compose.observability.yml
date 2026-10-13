@@ -1,0 +1,117 @@
+# Langfuse v3 自托管观测栈（可选组件，与主栈解耦）
+#
+# 用法：
+#   docker compose -f docker-compose.observability.yml up -d
+#   首次访问 http://localhost:3000 创建账号，在项目设置里拿
+#   Public Key / Secret Key，填入根目录 .env：
+#     LANGFUSE_ENABLED=true
+#     LANGFUSE_PUBLIC_KEY=pk-lf-...
+#     LANGFUSE_SECRET_KEY=sk-lf-...
+#     LANGFUSE_HOST=http://localhost:3000
+#   重启后端与 AI 助手容器后生效；未配置时全部 trace 上报静默跳过。
+#
+# 资源需求：约 4GB 内存（clickhouse + postgres + redis + web + worker）。
+# 生产部署请改掉下方所有占位 secret，并按 docs/deploy-vps.md 配置 HTTPS。
+#
+# 注意：本文件与主 docker-compose.yml 的网络、数据卷完全隔离，
+# 不影响现有部署链路；删除本栈不影响业务数据。
+
+name: ai-commerce-observability
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse-db-password-change-me
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    # v3  traces/observations 的存储引擎，替代 v2 的 postgres 单库方案
+    image: clickhouse/clickhouse-server:25.5-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: langfuse-ch-password-change-me
+      CLICKHOUSE_DB: default
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # ── 以下 secret 均为占位值，生产必须修改 ──
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: langfuse-nextauth-secret-change-me
+      SALT: langfuse-salt-change-me
+      # v3 要求 64 位十六进制加密密钥；生产用 openssl rand -hex 32 生成
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?请设置64位十六进制LANGFUSE_ENCRYPTION_KEY}
+      TELEMETRY_ENABLED: "false"
+      # ── 存储连接 ──
+      DATABASE_URL: postgresql://langfuse:langfuse-db-password-change-me@postgres:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse:langfuse-ch-password-change-me@clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse:langfuse-ch-password-change-me@clickhouse:9000/langfuse
+      REDIS_URL: redis://redis:6379
+      # 关闭用量邮件等外呼，保持自托管离线可用
+      LANGFUSE_INIT_ORG_ID: ai-commerce-org
+      LANGFUSE_INIT_PROJECT_ID: ai-commerce-project
+      LANGFUSE_INIT_PROJECT_NAME: AI 电商情报平台
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local-dev
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-dev
+    command: ["node", "server.js", "start", "web"]
+
+  langfuse-worker:
+    image: langfuse/langfuse:3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse-db-password-change-me@postgres:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse:langfuse-ch-password-change-me@clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse:langfuse-ch-password-change-me@clickhouse:9000/langfuse
+      REDIS_URL: redis://redis:6379
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?请设置64位十六进制LANGFUSE_ENCRYPTION_KEY}
+      TELEMETRY_ENABLED: "false"
+    command: ["node", "server.js", "start", "worker"]
+
+volumes:
+  langfuse_postgres_data:
+  langfuse_clickhouse_data:

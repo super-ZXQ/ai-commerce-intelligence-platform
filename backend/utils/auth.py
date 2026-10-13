@@ -55,6 +55,8 @@ def create_access_token(username: str, expires_delta: timedelta | None = None) -
 
 
 def decode_token(token: str) -> TokenData | None:
+    if not token or len(token) > 8192:
+        return None
     try:
         payload = jwt.decode(
             token,
@@ -67,7 +69,7 @@ def decode_token(token: str) -> TokenData | None:
         if username is None:
             return None
         return TokenData(username=username, exp=exp)
-    except (PyJWTError, TypeError, ValueError):
+    except (PyJWTError, TypeError, ValueError, RecursionError):
         return None
 
 

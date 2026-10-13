@@ -9,10 +9,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from backend.config import get_settings
 from backend.database import check_db_connection
+from backend.utils.auth import decode_token
 from backend.utils.cache import check_redis_health
 from backend.utils.cache import stats as cache_stats
 from backend.utils.cache import operational_snapshot
@@ -22,6 +25,25 @@ from agent_core.operational_metrics import snapshot as agent_metrics_snapshot
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/monitor", tags=["监控"])
+
+# 监控端点访问保护开关（MONITOR_AUTH_REQUIRED，默认关闭）。
+# 关闭时放行，保持导航页/监控面板/健康面板的免登录调用向后兼容；
+# 开启后（建议公网部署）所有监控端点与其他业务接口一样要求 JWT。
+_security = HTTPBearer(auto_error=False)
+
+
+async def optional_monitor_auth(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_security),
+) -> dict | None:
+    """监控端点可选鉴权：开关开启时校验 JWT，关闭时直接放行。"""
+    if not get_settings().monitor_auth_required:
+        return None
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="未提供认证令牌", headers={"WWW-Authenticate": "Bearer"})
+    token_data = decode_token(credentials.credentials)
+    if token_data is None:
+        raise HTTPException(status_code=401, detail="认证令牌无效或已过期", headers={"WWW-Authenticate": "Bearer"})
+    return {"username": token_data.username}
 
 # 注意：以下统计变量为进程级状态，在多 worker 部署时每个 worker 进程各自独立计数，
 # 不会跨进程聚合。如需全局统计，请使用 Redis 或外部存储进行汇总。
@@ -67,7 +89,7 @@ def record_request(endpoint: str, status_code: int, duration_ms: float):
         ep["errors"] += 1
 
 
-@router.get("/metrics", summary="监控指标")
+@router.get("/metrics", summary="监控指标", dependencies=[Depends(optional_monitor_auth)])
 async def get_metrics():
     uptime_sec = int(time.time() - _start_time)
     top_endpoints = sorted(
@@ -106,7 +128,7 @@ async def get_metrics():
     }
 
 
-@router.get("/health/detailed", summary="详细健康检查")
+@router.get("/health/detailed", summary="详细健康检查", dependencies=[Depends(optional_monitor_auth)])
 async def detailed_health():
     checks = {}
     try:
@@ -138,7 +160,7 @@ _EXTERNAL_SERVICES = {
 }
 
 
-@router.get("/services-status", summary="外部服务状态")
+@router.get("/services-status", summary="外部服务状态", dependencies=[Depends(optional_monitor_auth)])
 async def get_services_status():
     async def _check(client: httpx.AsyncClient, name: str, url: str):
         try:
@@ -227,7 +249,7 @@ def render_backend_prometheus() -> str:
     ] + [""])
 
 
-@router.get("/rag-stats", summary="RAG 检索统计")
+@router.get("/rag-stats", summary="RAG 检索统计", dependencies=[Depends(optional_monitor_auth)])
 async def get_rag_stats():
     """RAG 业务知识检索的实时统计（命中率、延迟、TopK 分布）。
 
@@ -247,7 +269,7 @@ async def get_rag_stats():
     return {"status": "ok", "stats": stats}
 
 
-@router.get("/rag-stats.prom", response_class=PlainTextResponse, summary="RAG 指标 Prometheus 格式")
+@router.get("/rag-stats.prom", response_class=PlainTextResponse, summary="RAG 指标 Prometheus 格式", dependencies=[Depends(optional_monitor_auth)])
 async def get_rag_stats_prom():
     """把 RAG stats 渲染为 Prometheus exposition 格式，便于 Grafana / 监控系统抓取。"""
     stats = _load_rag_stats()

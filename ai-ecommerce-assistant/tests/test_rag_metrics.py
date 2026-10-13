@@ -93,7 +93,8 @@ def test_log_event_emits_json(monkeypatch):
     msg = next(c for c in captured if "retrieval" in c)
     payload = json.loads(msg)
     assert payload["event"] == "retrieval"
-    assert payload["query"] == "复购率"
+    assert payload["query"] == "[redacted]"
+    assert payload["query_length"] == 3
     assert payload["top1_score"] == 0.82
     assert "ts" in payload
 
@@ -219,7 +220,7 @@ def test_enable_event_file_logging_writes_jsonl(tmp_path):
     assert len(lines) >= 2
     first = json.loads(lines[0])
     assert first["event"] == "retrieval"
-    assert first["query"] == "复购率"
+    assert first["query"] == "[redacted]"
     assert first["top1_score"] == 0.82
     second = json.loads(lines[1])
     assert second["event"] == "tool_call"
@@ -276,7 +277,8 @@ def test_record_feedback_writes_jsonl(tmp_path, monkeypatch):
     assert len(lines) == 2
     p1 = json.loads(lines[0])
     assert p1["rating"] == "up"
-    assert p1["question"] == "什么是复购率？"
+    assert p1["question_length"] == len("什么是复购率？")
+    assert "question" not in p1 and "answer_preview" not in p1
     assert p1["rag_sources_count"] == 2
     assert p1["rag_filenames"] == ["a.md", "b.md"]
     p2 = json.loads(lines[1])

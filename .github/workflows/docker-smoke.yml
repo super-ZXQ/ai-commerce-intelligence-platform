@@ -70,7 +70,7 @@ jobs:
             -uroot -pci-root-password -Nse \
             'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
           echo "alembic_version=$version"
-          test "$version" = "0001_baseline"
+          test "$version" = "0002_order_auto_increment"
 
           for t in orders order_events app_metadata alembic_version; do
             docker compose exec -T mysql mysql \
@@ -90,14 +90,32 @@ jobs:
           echo "db-migrate: $migrate_status"
           echo "$migrate_status" | grep -q 'exited 0'
 
+          # 页面保护是验收项：匿名必须401；授权请求沿用同一JWT Cookie。
+          for path in /BI/ /ai/; do
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost${path}")" = "401"
+          done
+          cookie_file="$(mktemp)"
+          curl --fail --silent --cookie-jar "$cookie_file" \
+            --header 'Content-Type: application/json' \
+            --data '{"username":"admin","password":"admin123"}' \
+            http://localhost/api/auth/login >/dev/null
+          # Nginx健康不代表助手已完成知识库构建，先等页面服务实际可用。
+          for i in {1..90}; do
+            if curl --fail --silent --cookie "$cookie_file" --max-time 5 http://localhost/ai/ >/dev/null; then
+              break
+            fi
+            sleep 10
+          done
           for path in / /BI/ /ai/ /docs /demo /monitor /health-panel; do
             status="$(curl --location --silent --output /dev/null \
+              --cookie "$cookie_file" \
               --write-out '%{http_code}' --max-time 20 "http://localhost${path}")"
             echo "$path -> $status"
             test "$status" = "200"
           done
 
           ws_status="$(curl --http1.1 --silent --output /dev/null \
+            --cookie "$cookie_file" \
             --write-out '%{http_code}' --max-time 3 \
             --header 'Connection: Upgrade' \
             --header 'Upgrade: websocket' \
@@ -108,6 +126,7 @@ jobs:
             http://localhost/BI/_stcore/stream || true)"
           echo "WebSocket handshake -> $ws_status"
           test "$ws_status" = "101"
+          rm -f "$cookie_file"
 
       - name: 输出失败诊断
         if: failure()
