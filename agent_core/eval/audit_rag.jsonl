@@ -1,0 +1,18 @@
+{"id":"k01","query":"平均每笔交易实付金额怎么算","filename":"kpi_formulas.md","section":"3. 客单价 / 订单相关"}
+{"id":"k02","query":"回来消费两次以上的用户占比定义","filename":"business_glossary.md","section":"二、用户行为指标"}
+{"id":"k03","query":"退款率过高通常排查哪些问题","filename":"business_rules.md","section":"一、指标健康区间"}
+{"id":"k04","query":"订单表字段payment_amount的单位与含义","filename":"data_dictionary.md","section":"orders 表字段说明"}
+{"id":"k05","query":"RFM的R值低意味着什么","filename":"business_glossary.md","section":"五、RFM 客户分层（与 BI 看板一致）"}
+{"id":"k06","query":"访问Swagger文档应该去哪个地址","filename":"api_docs.md","section":"二、访问地址"}
+{"id":"k07","query":"怎么比较本月与上月销售额增幅","filename":"kpi_formulas.md","section":"10. 同比环比"}
+{"id":"k08","query":"次日留存的分母该怎么算","filename":"kpi_formulas.md","section":"9. 留存与转化"}
+{"id":"k09","query":"数据库查询耗时过长有哪些性能约束","filename":"business_rules.md","section":"六、查询性能约束"}
+{"id":"k10","query":"用户隐私数据能够查询吗","filename":"business_rules.md","section":"七、数据隐私"}
+{"id":"k11","query":"SQL只读查询有哪些安全规则","filename":"business_rules.md","section":"八、SQL 安全规则"}
+{"id":"k12","query":"什么时候是订单高峰时段","filename":"business_rules.md","section":"三、时间分布异常"}
+{"id":"k13","query":"火星仓库的反重力运输补贴规则是什么","no_answer":true}
+{"id":"k14","query":"2027年公司董事会批准的融资条款","no_answer":true}
+{"id":"k15","query":"供应商青藤科技合同第十九条原文","no_answer":true}
+{"id":"k16","query":"医疗器械注册备案的法定流程","no_answer":true}
+{"id":"k17","query":"吴经理昨晚给团队口头承诺的奖金金额","no_answer":true}
+{"id":"k18","query":"北极航线台风保险理赔电话","no_answer":true}
