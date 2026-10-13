@@ -7,7 +7,7 @@ WORKDIR /app/ai-ecommerce-assistant
 # 安装的 torch==2.13.0+cpu 互斥（会把 CUDA 全家桶拖进镜像）。
 # requirements.txt 的直接依赖本身已全部 == 钉死，CPU 镜像构建可复现。
 COPY ai-ecommerce-assistant/requirements.txt .
-RUN --network=host python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
     && pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu \
         "torch==2.13.0+cpu" \

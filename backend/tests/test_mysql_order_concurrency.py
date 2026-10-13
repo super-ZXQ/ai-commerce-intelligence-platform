@@ -159,7 +159,8 @@ async def test_api_ai_and_bi_effective_metrics_agree_after_events(sessions, mysq
         sync_engine.dispose()
 
 
-def test_ai_account_actual_grants_allow_aggregates_and_deny_writes(mysql_audit_url):
+@pytest.mark.parametrize("grant_kind", ["columns", "table", "extra_column", "write"])
+def test_ai_account_actual_grants_allow_aggregates_and_deny_writes(mysql_audit_url, grant_kind):
     import secrets
     from sqlalchemy.exc import DBAPIError
     from agent_core.db_permissions import verify_ai_permissions
@@ -172,9 +173,24 @@ def test_ai_account_actual_grants_allow_aggregates_and_deny_writes(mysql_audit_u
         with admin.begin() as connection:
             connection.execute(text(f"CREATE USER '{user}'@'%' IDENTIFIED BY :password"), {"password": password})
             fields = ",".join(sorted(ORDER_COLUMNS))
-            connection.execute(text(f"GRANT SELECT ({fields}) ON `{mysql_audit_url.database}`.orders TO '{user}'@'%'"))
+            if grant_kind == "table":
+                connection.execute(text(f"GRANT SELECT ON `{mysql_audit_url.database}`.orders TO '{user}'@'%'"))
+            else:
+                if grant_kind == "extra_column":
+                    # 在隔离schema模拟未来新增的敏感列，业务库不受影响。
+                    connection.execute(text("ALTER TABLE orders ADD COLUMN private_note TEXT"))
+                    fields += ",private_note"
+                connection.execute(text(f"GRANT SELECT ({fields}) ON `{mysql_audit_url.database}`.orders TO '{user}'@'%'"))
+            if grant_kind == "write":
+                connection.execute(text(f"GRANT UPDATE ON `{mysql_audit_url.database}`.orders TO '{user}'@'%'"))
         reader = create_engine(mysql_audit_url.set(username=user, password=password), hide_parameters=True)
+        if grant_kind != "columns":
+            with pytest.raises(ValueError):
+                verify_ai_permissions(reader)
+            return
         verify_ai_permissions(reader)
+        from agent_core.db_schema import describe_table
+        assert "payment_amount" in describe_table(reader, "orders")
         with reader.connect() as connection:
             assert connection.execute(text("SELECT COUNT(DISTINCT order_id),SUM(payment_amount) FROM orders")).one()
             for sql in ("UPDATE orders SET payment_amount=0", "SELECT payload FROM order_events", "DELETE FROM orders", "CREATE TABLE denied(id INT)"):
@@ -191,3 +207,12 @@ def test_ai_account_actual_grants_allow_aggregates_and_deny_writes(mysql_audit_u
         with admin.begin() as connection:
             connection.execute(text(f"DROP USER IF EXISTS '{user}'@'%'"))
         admin.dispose()
+
+
+def test_ci_migration_entry_accepts_current_head(mysql_audit_url, monkeypatch):
+    """实际执行CI入口，防止迁移成功却被旧版本号校验误报失败。"""
+    from backend.scripts.run_alembic_upgrade import main
+
+    settings = get_settings().model_copy(update={"db_name": mysql_audit_url.database})
+    monkeypatch.setattr("backend.config.get_settings", lambda: settings)
+    assert main() == 0

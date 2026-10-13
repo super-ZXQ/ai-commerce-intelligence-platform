@@ -149,9 +149,8 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           set -o pipefail
-          cd backend
-          python -m pytest tests/ -v --tb=short \
-            -p no:cacheprovider 2>&1 | tee pytest-output.txt
+          python -m pytest backend/tests/ -v --tb=short \
+            -p no:cacheprovider 2>&1 | tee backend/pytest-output.txt
 
       - name: 上传测试报告
         if: always()
@@ -186,7 +185,9 @@ jobs:
         run: ruff check agent_core backend ai-ecommerce-assistant streamlit_app.py scripts
 
       - name: Agent 离线路由评测
-        run: python -m agent_core.evaluation
+        run: |
+          pip install -r backend/requirements.lock
+          python -m agent_core.evaluation
 
       - name: 编译检查所有 .py 文件
         run: |

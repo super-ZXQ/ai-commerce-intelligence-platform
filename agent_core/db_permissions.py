@@ -19,7 +19,9 @@ def verify_ai_permissions(engine) -> None:
         match = re.match(r"GRANT SELECT(?: \(([^)]+)\))? ON (.+?) TO ", grant, re.IGNORECASE)
         if not match or match[2].lower() != target:
             raise ValueError("AI账号权限超出orders业务表只读范围（含角色授权）")
-        if match[1] and {name.strip().strip("`").lower() for name in match[1].split(",")} - ORDER_COLUMNS:
+        if not match[1]:
+            raise ValueError("AI账号必须使用列级SELECT授权，不能读取整个orders表")
+        if {name.strip().strip("`").lower() for name in match[1].split(",")} - ORDER_COLUMNS:
             raise ValueError("AI账号包含未许可字段的读取权限")
         has_select = True
     if not has_select:

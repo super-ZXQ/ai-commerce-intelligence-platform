@@ -204,8 +204,6 @@ services:
     build:
       context: .
       dockerfile: ai-ecommerce-assistant/Dockerfile
-      entitlements:
-        - network.host
     container_name: ea-ai-assistant
     restart: unless-stopped
     environment:

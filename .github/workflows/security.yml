@@ -29,10 +29,17 @@ jobs:
         with:
           # 需要完整 git 历史：仅扫 PR diff 会漏掉历史提交中的密钥
           fetch-depth: 0
-      - name: Gitleaks 扫描（全历史）
+      - name: Gitleaks 扫描（事件提交范围）
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Gitleaks 扫描（当前分支完整历史）
+        # action 在 PR 事件默认只扫新增提交，完整 checkout 不会改变其扫描范围。
+        if: ${{ !cancelled() }}
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo \
+            --log-opts=HEAD --redact=100 --no-banner --exit-code=1
 
   # ─────────── 2. 依赖漏洞审计：后端（dev 含运行） ───────────
   pip-audit-backend:

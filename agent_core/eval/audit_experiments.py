@@ -173,9 +173,13 @@ async def sql_experiment(settings, live):
             connection.execute(text("INSERT INTO orders(order_id,user_name,product_id,payment_amount,platform_type,channel_id,order_date,is_refund,order_status) VALUES(:order_id,:user_name,:product_id,:payment_amount,:platform_type,:channel_id,:order_date,:is_refund,:order_status)"), fixture)
         with admin.begin() as connection:
             connection.execute(text(f"CREATE USER '{user}'@'%' IDENTIFIED BY :password"), {"password": password})
-            connection.execute(text(f"GRANT SELECT ON `{schema}`.orders TO '{user}'@'%'"))
+            from agent_core.sql_safety import ORDER_COLUMNS
+            fields = ",".join(sorted(ORDER_COLUMNS))
+            connection.execute(text(f"GRANT SELECT ({fields}) ON `{schema}`.orders TO '{user}'@'%'"))
         reader = create_engine(admin.url.set(database=schema, username=user, password=password), hide_parameters=True,
                                connect_args={"connect_timeout": 5, "read_timeout": 15})
+        from agent_core.db_permissions import verify_ai_permissions
+        verify_ai_permissions(reader)
         schema_text = describe_table(reader, "orders") + "\n" + describe_data_range(reader)
         adapter = OpenAIModelAdapter(api_key=settings.llm_api_key, base_url=settings.llm_base_url,
                                      model=settings.llm_model, business_context=BUSINESS_CONTEXT)
