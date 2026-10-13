@@ -24,6 +24,8 @@
 
 ## 在线演示
 
+以下为本地 Docker 一键部署后的访问入口（公网演示地址待真实部署后补充，部署流程见 [docs/deploy-vps.md](docs/deploy-vps.md)，演示脚本见 [docs/demo_script.md](docs/demo_script.md)）：
+
 | 应用 | 链接 | 说明 |
 |------|------|------|
 | **Docker 统一入口** | `http://localhost/` | 导航页（默认入口） |
