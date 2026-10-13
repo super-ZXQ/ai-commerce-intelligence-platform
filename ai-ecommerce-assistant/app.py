@@ -668,11 +668,18 @@ def render_live_steps(steps: list[dict]) -> str:
     return ''.join(parts)
 
 
-def render_sql_block(sql: str, query_time: float | None = None):
-    escaped_sql = sql.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    copy_id = f"sql_{hashlib.md5(sql.encode()).hexdigest()[:8]}"
+def render_sql_block(sql: str | None, query_time: float | None = None):
+    """展示 SQL；空内容时不画深色空框，避免用户以为显示坏了。"""
+    raw = (sql or "").strip()
     time_str = f'<div class="query-time">查询耗时：{query_time:.2f} 秒</div>' if query_time else ''
+    if not raw:
+        st.caption("本次没有可展示的 SQL（查询未生成或执行失败）。")
+        if time_str:
+            st.markdown(time_str, unsafe_allow_html=True)
+        return
 
+    escaped_sql = raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    copy_id = f"sql_{hashlib.md5(raw.encode()).hexdigest()[:8]}"
     st.markdown(f"""
     <div class="sql-block">
         <button class="sql-copy-btn" onclick="
@@ -707,9 +714,9 @@ def render_result_block(
         供消息/缓存存储的 records；单值结果或无数据时为 None。
     """
     if result_df is None or len(result_df) == 0:
-        if warn_empty and sql:
+        if warn_empty and (sql or "").strip():
             st.warning("SQL 执行无结果")
-        if sql:
+        if sql is not None:
             render_sql_block(sql, query_time)
         return None
 
@@ -746,7 +753,7 @@ def render_result_block(
         mime="text/csv",
         key=f"{key_prefix}_dl",
     )
-    if sql:
+    if sql is not None:
         render_sql_block(sql, query_time)
     return stored_records
 

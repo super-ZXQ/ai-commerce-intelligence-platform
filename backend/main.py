@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import get_settings
@@ -88,6 +89,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
+    # 默认 /docs 布局在宽屏下整体贴左；改为自定义路由 + 居中 CSS（见下文）
+    docs_url=None,
     description="""
 ## AI Commerce Intelligence Platform API v1.0.3
 
@@ -225,6 +228,17 @@ _FAVICON_PATH = os.path.join(_STATIC_DIR, "favicon.svg")
 
 # 挂载静态资源目录：图标与首页所需的数据快照（如 data/agent-trace-snapshot.json）由此提供。
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    """Swagger UI：使用本地覆盖 CSS，在宽屏下水平居中。"""
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{settings.app_name} - API 文档",
+        swagger_css_url="/static/css/swagger.css",
+        swagger_favicon_url="/static/favicon.svg",
+    )
 
 
 @app.get("/", tags=["系统"])
