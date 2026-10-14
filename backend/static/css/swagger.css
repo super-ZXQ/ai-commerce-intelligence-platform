@@ -1,0 +1,41 @@
+/* Swagger UI 覆盖样式：宽屏下内容水平居中，避免整页贴左 */
+@import url("https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css");
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #fafafa;
+}
+
+.swagger-ui {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+  box-sizing: border-box;
+}
+
+.swagger-ui .wrapper {
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+}
+
+.swagger-ui .information-container {
+  margin: 0 0 20px 0;
+}
+
+.swagger-ui section.models {
+  margin: 20px 0 0 0;
+}
+
+.swagger-ui .scheme-container {
+  margin: 0 0 16px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.swagger-ui table thead tr th,
+.swagger-ui table thead tr td {
+  padding-left: 8px;
+}

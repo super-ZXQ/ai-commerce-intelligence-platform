@@ -1,0 +1,55 @@
+{
+  "dependencies": [
+    {
+      "name": "pandas",
+      "version": "3.0.3",
+      "vulns": []
+    },
+    {
+      "name": "pyarrow",
+      "version": "24.0.0",
+      "vulns": []
+    },
+    {
+      "name": "numpy",
+      "version": "2.4.6",
+      "vulns": []
+    },
+    {
+      "name": "plotly",
+      "version": "6.8.0",
+      "vulns": []
+    },
+    {
+      "name": "streamlit",
+      "version": "1.58.0",
+      "vulns": []
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "vulns": []
+    },
+    {
+      "name": "sqlalchemy",
+      "version": "2.0.51",
+      "vulns": []
+    },
+    {
+      "name": "pymysql",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.2",
+      "vulns": []
+    },
+    {
+      "name": "msgpack",
+      "version": "1.2.2",
+      "vulns": []
+    }
+  ],
+  "fixes": []
+}

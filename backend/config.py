@@ -40,9 +40,10 @@ class Settings(BaseSettings):
     db_pool_recycle: int = 3600
 
     # AI Text-to-SQL 专用只读数据库账户（部署环境为 ea_ai，仅 SELECT 权限）。
-    # 未配置时回落主库账户；配置后即使 SQL 黑名单被绕过也无法写入数据库。
+    # 仅显式启用的开发模式允许回退，生产环境禁止使用主账号。
     ai_db_user: str = ""
     ai_db_password: str = ""
+    ai_db_allow_main_fallback: bool = False
 
     # 订单事件摄入专用写账号。Docker 中为 ea_events，只授予 orders/order_events
     # 的 SELECT/INSERT/UPDATE；绝不能传给 Agent 或 AI 助手。
@@ -81,6 +82,11 @@ class Settings(BaseSettings):
     # 直接对公网暴露时保持 False：XFF 第一个 IP 由客户端可控，开启可被伪造绕过限流。
     trust_proxy_headers: bool = False
 
+    # 监控端点访问保护开关（/metrics、/api/monitor/*、/health/detailed）。
+    # 默认 False 免鉴权：本地开发与导航页/监控面板/健康面板调用保持向后兼容；
+    # 公网部署建议设为 true，此时这些端点与其他业务接口一样要求 JWT Bearer 令牌。
+    monitor_auth_required: bool = False
+
     default_page_size: int = 20
     max_page_size: int = 100
 
@@ -113,6 +119,8 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 ADMIN_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
             if self.analyst_password and not self.analyst_password.startswith(("$2a$", "$2b$", "$2y$")):
                 raise ValueError("生产环境 ANALYST_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
+            if not self.ai_db_user or not self.ai_db_password or self.ai_db_user in {self.db_user, "root"}:
+                raise ValueError("生产环境必须配置独立 AI_DB_USER / AI_DB_PASSWORD，只授予必要 SELECT 权限")
 
     @property
     def database_url(self) -> str:
@@ -132,7 +140,9 @@ class Settings(BaseSettings):
 
     @property
     def ai_database_url(self) -> str:
-        """AI Text-to-SQL 专用连接串：优先只读账户，未配置时回落主库账户。"""
+        """缺失只读账号时默认失败；主账号回退必须同时显式开启 DEBUG 和开关。"""
+        if not self.ai_db_user and not (self.debug and self.ai_db_allow_main_fallback):
+            raise ValueError("必须配置 AI_DB_USER；仅本地开发可显式启用 AI_DB_ALLOW_MAIN_FALLBACK")
         user = self.ai_db_user or self.db_user
         password = self.ai_db_password if self.ai_db_user else self.db_password
         return (

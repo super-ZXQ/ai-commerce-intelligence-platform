@@ -24,9 +24,9 @@ from agent_core.sql_safety import validate_and_limit_sql  # noqa: E402
 
 GOLD_SQL = {
     "d01": 'SELECT SUM(payment_amount) AS total_sales FROM orders WHERE order_date >= \'2025-12-25\'',
-    "d02": 'SELECT platform, COUNT(DISTINCT order_id) AS cnt FROM orders WHERE platform IN (\'APP\', \'微信公众号\') GROUP BY platform ORDER BY cnt DESC',
+    "d02": 'SELECT platform_type, COUNT(DISTINCT order_id) AS cnt FROM orders WHERE platform_type IN (\'APP\', \'微信公众号\') GROUP BY platform_type ORDER BY cnt DESC',
     "d03": 'SELECT product_id, SUM(CASE WHEN is_refund = \'是\' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS refund_rate FROM orders GROUP BY product_id ORDER BY refund_rate DESC LIMIT 3',
-    "d06": 'SELECT COUNT(DISTINCT CASE WHEN order_count >= 2 THEN user_id END) * 1.0 / COUNT(DISTINCT user_id) AS repurchase_rate FROM (SELECT user_id, COUNT(DISTINCT order_id) AS order_count FROM orders GROUP BY user_id) t',
+    "d06": 'SELECT SUM(CASE WHEN order_count >= 2 THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS repurchase_rate FROM (SELECT COUNT(DISTINCT order_id) AS order_count FROM orders GROUP BY user_name) t',
 }
 
 
@@ -64,7 +64,7 @@ def test_gold_sql_keywords_hit():
         "d01": ["SUM(payment_amount)", "order_date"],
         "d02": ["platform", "COUNT", "ORDER BY"],
         "d03": ["is_refund", "GROUP BY", "LIMIT 3"],
-        "d06": ["COUNT(DISTINCT", "user_id"],
+        "d06": ["COUNT(DISTINCT", "user_name"],
     }
     for case_id, keywords in expected.items():
         assert check_sql_keywords(GOLD_SQL[case_id], keywords) == [], case_id

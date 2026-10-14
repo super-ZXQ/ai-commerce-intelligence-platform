@@ -1,0 +1,3849 @@
+{
+  "date": "2026-10-13",
+  "python": "3.12.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "model": "deepseek-v4-flash",
+  "model_enabled": true,
+  "datasets": {
+    "audit_routing.jsonl": "5b216624dc7579dc5558d53edbb61c787e142737c77f254be35ced2a9bd0cd3c",
+    "audit_rag.jsonl": "050d759700508d7c0617d8fe51879d797fb78a49f3ce696c5a114cb2bf156302",
+    "audit_sql.jsonl": "8565120512cecef84999c50a48fa8f8441399be50a53b9afdf0b35f54b4585fa"
+  },
+  "routing": {
+    "curated": {
+      "A": {
+        "n": 100,
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "mean_latency_ms": 0.042618999973456084,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usage_missing": 0,
+        "errors": {},
+        "details": [
+          {
+            "id": "basic_sql-01",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 1.9148999999742955,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-02",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02770000037344289,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-03",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023999999939405825,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.031600000056641875,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-05",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02500000027794158,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-06",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02280000035170815,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-07",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023399999918183312,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-08",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024200000098062446,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-09",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023099999907572055,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-10",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02390000008745119,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-11",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02170000016121776,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-12",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025399999685760122,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-13",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026199999865639256,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-14",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024500000108673703,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-15",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0289999998130952,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-16",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024000000394153176,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-17",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023599999622092582,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-18",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02319999975952669,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-19",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023799999780749204,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-20",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022599999738304177,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-21",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02679999988686177,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-22",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.03389999983482994,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-23",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02410000024610781,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-24",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.028199999633216066,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-25",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023799999780749204,
+            "model_called": false
+          },
+          {
+            "id": "analysis-01",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022599999738304177,
+            "model_called": false
+          },
+          {
+            "id": "analysis-02",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0227999998969608,
+            "model_called": false
+          },
+          {
+            "id": "analysis-03",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0227999998969608,
+            "model_called": false
+          },
+          {
+            "id": "analysis-04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02319999975952669,
+            "model_called": false
+          },
+          {
+            "id": "analysis-05",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02369999992879457,
+            "model_called": false
+          },
+          {
+            "id": "analysis-06",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026700000034907134,
+            "model_called": false
+          },
+          {
+            "id": "analysis-07",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022400000034394907,
+            "model_called": false
+          },
+          {
+            "id": "analysis-08",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02880000010918593,
+            "model_called": false
+          },
+          {
+            "id": "analysis-09",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023999999939405825,
+            "model_called": false
+          },
+          {
+            "id": "analysis-10",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022599999738304177,
+            "model_called": false
+          },
+          {
+            "id": "analysis-11",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023999999939405825,
+            "model_called": false
+          },
+          {
+            "id": "analysis-12",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.03130000004603062,
+            "model_called": false
+          },
+          {
+            "id": "analysis-13",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.031100000342121348,
+            "model_called": false
+          },
+          {
+            "id": "analysis-14",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023399999918183312,
+            "model_called": false
+          },
+          {
+            "id": "analysis-15",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026599999728205148,
+            "model_called": false
+          },
+          {
+            "id": "analysis-16",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.038300000142044155,
+            "model_called": false
+          },
+          {
+            "id": "analysis-17",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022400000034394907,
+            "model_called": false
+          },
+          {
+            "id": "analysis-18",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025100000129896216,
+            "model_called": false
+          },
+          {
+            "id": "analysis-19",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02189999986512703,
+            "model_called": false
+          },
+          {
+            "id": "analysis-20",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024199999643315095,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-01",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02499999982319423,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-02",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02700000004551839,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-03",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02480000011928496,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-04",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02719999974942766,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-05",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02390000008745119,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-06",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024899999971239595,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-07",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.028500000098574674,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-08",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.035799999750452116,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-09",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025299999833805487,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-10",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025600000299164094,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-11",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.03400000014153193,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-12",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.033400000120309414,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-13",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.026300000172341242,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-14",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024599999960628338,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-15",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.027099999897473026,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-01",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.03479999986666371,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-02",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02570000015111873,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-03",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.029199999971751822,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-04",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.024899999971239595,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-05",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028500000098574674,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-06",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02610000001368462,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-07",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.025800000003073364,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-08",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.03210000022590975,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-09",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028399999791872688,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-10",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02610000001368462,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-11",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028699999802483944,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-12",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.025100000129896216,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-13",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028699999802483944,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-14",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.027100000352220377,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-15",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.029399999675661093,
+            "model_called": false
+          },
+          {
+            "id": "conversation-01",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.018799999907059828,
+            "model_called": false
+          },
+          {
+            "id": "conversation-02",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.02009999980145949,
+            "model_called": false
+          },
+          {
+            "id": "conversation-03",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.018899999759014463,
+            "model_called": false
+          },
+          {
+            "id": "conversation-04",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.019100000372418435,
+            "model_called": false
+          },
+          {
+            "id": "conversation-05",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.018199999885837315,
+            "model_called": false
+          },
+          {
+            "id": "conversation-06",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.016399999822169775,
+            "model_called": false
+          },
+          {
+            "id": "conversation-07",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.015699999948992627,
+            "model_called": false
+          },
+          {
+            "id": "conversation-08",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.01720000000204891,
+            "model_called": false
+          },
+          {
+            "id": "conversation-09",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.021299999843904516,
+            "model_called": false
+          },
+          {
+            "id": "conversation-10",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025999999706982635,
+            "model_called": false
+          },
+          {
+            "id": "conversation-11",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02210000002378365,
+            "model_called": false
+          },
+          {
+            "id": "conversation-12",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024200000098062446,
+            "model_called": false
+          },
+          {
+            "id": "conversation-13",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02569999969637138,
+            "model_called": false
+          },
+          {
+            "id": "conversation-14",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022000000171829015,
+            "model_called": false
+          },
+          {
+            "id": "conversation-15",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02479999966453761,
+            "model_called": false
+          },
+          {
+            "id": "safety-01",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.019699999938893598,
+            "model_called": false
+          },
+          {
+            "id": "safety-02",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0038000002859917004,
+            "model_called": false
+          },
+          {
+            "id": "safety-03",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.002100000074278796,
+            "model_called": false
+          },
+          {
+            "id": "safety-04",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.012299999980314169,
+            "model_called": false
+          },
+          {
+            "id": "safety-05",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.009200000022246968,
+            "model_called": false
+          },
+          {
+            "id": "safety-06",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.02189999986512703,
+            "model_called": false
+          },
+          {
+            "id": "safety-07",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.006600000233447645,
+            "model_called": false
+          },
+          {
+            "id": "safety-08",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.006499999926745659,
+            "model_called": false
+          },
+          {
+            "id": "safety-09",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0038000002859917004,
+            "model_called": false
+          },
+          {
+            "id": "safety-10",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0021999999262334313,
+            "model_called": false
+          }
+        ],
+        "status": "RUN",
+        "cost_cny": 0
+      },
+      "B": {
+        "n": 100,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 1364.9160919999986,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 90,
+        "errors": {
+          "AuthenticationError": 90
+        },
+        "details": [
+          {
+            "id": "basic_sql-04",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 604.9619000000348,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-02",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1690.31780000023,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-03",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1329.529999999977,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-01",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 3111.197899999752,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-06",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1302.139299999908,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-08",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 596.8392999998287,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-05",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2381.596299999728,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-07",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1658.719800000199,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-12",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 635.2506000002904,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-10",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1680.6154000000788,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-09",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2032.2121999997762,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-11",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1696.431500000017,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-13",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1676.1333000004015,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-15",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 961.279900000136,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-16",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1292.675700000018,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-14",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2369.3425999999818,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-17",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1577.3028999997223,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-19",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1232.6831000000311,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-18",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1574.7489999998834,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-20",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 878.7115999998605,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-24",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 598.8505999998779,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-21",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2004.9963999999818,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-22",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1660.3895000002922,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-23",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1309.502000000066,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-01",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1271.3258000003407,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-03",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 943.1439999998474,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-02",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1286.3695000000916,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-25",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2726.7495000000963,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-07",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 610.6908000001567,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-06",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1325.569799999812,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-04",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2409.454900000128,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-05",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2048.5991000000467,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-08",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1643.8530999998875,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-10",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1289.7425000001022,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-11",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1283.8165999996818,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-09",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2354.9681000004057,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-14",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 931.4584999997351,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-13",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1276.5331000000515,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-12",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2308.7055999999393,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-15",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1251.7180999998345,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-17",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1319.2730999999185,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-18",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1333.838999999898,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-19",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 991.0846000002493,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-16",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2019.9997999998232,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-01",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1293.4204999996837,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-20",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1995.573499999864,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-02",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1291.3100000000668,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-03",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 930.7558999998946,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-06",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 970.1848999998219,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-07",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 612.209299999904,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-04",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 2375.082999999904,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-05",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 2031.7589000001135,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-09",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1280.1648999998179,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-08",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1978.8756999996622,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-10",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1273.665599999731,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-11",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1615.1546999999482,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-15",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 772.2340999998778,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-13",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1467.0264999999745,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-12",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 2519.752100000005,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-14",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1828.7890999999945,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-04",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 725.1685999999609,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-02",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1448.7849000001916,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-01",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 2494.1721999998663,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-03",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1787.8919999998288,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-06",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1762.4021999999968,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-07",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1405.9111999999914,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-08",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1741.9532000003528,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-05",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 3146.7093000001114,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-10",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1311.7812000000413,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-09",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 2015.0911000000633,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-12",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 974.2943999999625,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-11",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1679.0203000000474,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-13",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1654.871099999582,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-01",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 924.4579999999587,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-15",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1284.8696999999447,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "hybrid-14",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1640.907700000298,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-02",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1606.9451000003028,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-05",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 913.5212999999567,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-03",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1974.4787999998152,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-04",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1621.2939000001825,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-07",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1321.249600000101,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-06",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 2051.4745000000403,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-09",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 986.2583000003724,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-08",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 2047.3722000001544,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-11",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1250.8982999997897,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-10",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1977.245099999891,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-13",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 882.0553000000473,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-12",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1581.3311000001704,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "safety-01",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.019699999938893598,
+            "model_called": false
+          },
+          {
+            "id": "safety-02",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0038000002859917004,
+            "model_called": false
+          },
+          {
+            "id": "safety-03",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.002100000074278796,
+            "model_called": false
+          },
+          {
+            "id": "safety-04",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.012299999980314169,
+            "model_called": false
+          },
+          {
+            "id": "safety-05",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.009200000022246968,
+            "model_called": false
+          },
+          {
+            "id": "safety-06",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.02189999986512703,
+            "model_called": false
+          },
+          {
+            "id": "safety-07",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.006600000233447645,
+            "model_called": false
+          },
+          {
+            "id": "safety-08",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.006499999926745659,
+            "model_called": false
+          },
+          {
+            "id": "safety-09",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0038000002859917004,
+            "model_called": false
+          },
+          {
+            "id": "safety-10",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0021999999262334313,
+            "model_called": false
+          },
+          {
+            "id": "conversation-15",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 605.6287000001248,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-14",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 954.1989999997895,
+            "model_called": true,
+            "error": "AuthenticationError"
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      },
+      "C": {
+        "n": 100,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 283.31049599999005,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 18,
+        "errors": {
+          "AuthenticationError": 18
+        },
+        "details": [
+          {
+            "id": "basic_sql-04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.031600000056641875,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-02",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02770000037344289,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-03",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023999999939405825,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-01",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 3111.197899999752,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-06",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02280000035170815,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-08",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024200000098062446,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-05",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02500000027794158,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-07",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023399999918183312,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-12",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025399999685760122,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-10",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1680.6154000000788,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-09",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023099999907572055,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-11",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1696.431500000017,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-13",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1676.1333000004015,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-15",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 961.279900000136,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-16",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024000000394153176,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-14",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2369.3425999999818,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-17",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023599999622092582,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-19",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1232.6831000000311,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-18",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02319999975952669,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-20",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 878.7115999998605,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-24",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 598.8505999998779,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "basic_sql-21",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02679999988686177,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-22",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.03389999983482994,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-23",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02410000024610781,
+            "model_called": false
+          },
+          {
+            "id": "analysis-01",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022599999738304177,
+            "model_called": false
+          },
+          {
+            "id": "analysis-03",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0227999998969608,
+            "model_called": false
+          },
+          {
+            "id": "analysis-02",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0227999998969608,
+            "model_called": false
+          },
+          {
+            "id": "basic_sql-25",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2726.7495000000963,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-07",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022400000034394907,
+            "model_called": false
+          },
+          {
+            "id": "analysis-06",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026700000034907134,
+            "model_called": false
+          },
+          {
+            "id": "analysis-04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02319999975952669,
+            "model_called": false
+          },
+          {
+            "id": "analysis-05",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02369999992879457,
+            "model_called": false
+          },
+          {
+            "id": "analysis-08",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1643.8530999998875,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-10",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022599999738304177,
+            "model_called": false
+          },
+          {
+            "id": "analysis-11",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023999999939405825,
+            "model_called": false
+          },
+          {
+            "id": "analysis-09",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2354.9681000004057,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "analysis-14",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.023399999918183312,
+            "model_called": false
+          },
+          {
+            "id": "analysis-13",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.031100000342121348,
+            "model_called": false
+          },
+          {
+            "id": "analysis-12",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.03130000004603062,
+            "model_called": false
+          },
+          {
+            "id": "analysis-15",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026599999728205148,
+            "model_called": false
+          },
+          {
+            "id": "analysis-17",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022400000034394907,
+            "model_called": false
+          },
+          {
+            "id": "analysis-18",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025100000129896216,
+            "model_called": false
+          },
+          {
+            "id": "analysis-19",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02189999986512703,
+            "model_called": false
+          },
+          {
+            "id": "analysis-16",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2019.9997999998232,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "knowledge-01",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02499999982319423,
+            "model_called": false
+          },
+          {
+            "id": "analysis-20",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024199999643315095,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-02",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02700000004551839,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-03",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02480000011928496,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-06",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024899999971239595,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-07",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.028500000098574674,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-04",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02719999974942766,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-05",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02390000008745119,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-09",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025299999833805487,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-08",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.035799999750452116,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-10",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025600000299164094,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-11",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.03400000014153193,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-15",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.027099999897473026,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-13",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.026300000172341242,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-12",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.033400000120309414,
+            "model_called": false
+          },
+          {
+            "id": "knowledge-14",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024599999960628338,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-04",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.024899999971239595,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-02",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02570000015111873,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-01",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.03479999986666371,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-03",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.029199999971751822,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-06",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02610000001368462,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-07",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.025800000003073364,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-08",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.03210000022590975,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-05",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028500000098574674,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-10",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02610000001368462,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-09",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028399999791872688,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-12",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.025100000129896216,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-11",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028699999802483944,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-13",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028699999802483944,
+            "model_called": false
+          },
+          {
+            "id": "conversation-01",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.018799999907059828,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-15",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.029399999675661093,
+            "model_called": false
+          },
+          {
+            "id": "hybrid-14",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.027100000352220377,
+            "model_called": false
+          },
+          {
+            "id": "conversation-02",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.02009999980145949,
+            "model_called": false
+          },
+          {
+            "id": "conversation-05",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.018199999885837315,
+            "model_called": false
+          },
+          {
+            "id": "conversation-03",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.018899999759014463,
+            "model_called": false
+          },
+          {
+            "id": "conversation-04",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.019100000372418435,
+            "model_called": false
+          },
+          {
+            "id": "conversation-07",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.015699999948992627,
+            "model_called": false
+          },
+          {
+            "id": "conversation-06",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.016399999822169775,
+            "model_called": false
+          },
+          {
+            "id": "conversation-09",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 986.2583000003724,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-08",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.01720000000204891,
+            "model_called": false
+          },
+          {
+            "id": "conversation-11",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1250.8982999997897,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-10",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025999999706982635,
+            "model_called": false
+          },
+          {
+            "id": "conversation-13",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02569999969637138,
+            "model_called": false
+          },
+          {
+            "id": "conversation-12",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1581.3311000001704,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "safety-01",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.019699999938893598,
+            "model_called": false
+          },
+          {
+            "id": "safety-02",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0038000002859917004,
+            "model_called": false
+          },
+          {
+            "id": "safety-03",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.002100000074278796,
+            "model_called": false
+          },
+          {
+            "id": "safety-04",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.012299999980314169,
+            "model_called": false
+          },
+          {
+            "id": "safety-05",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.009200000022246968,
+            "model_called": false
+          },
+          {
+            "id": "safety-06",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.02189999986512703,
+            "model_called": false
+          },
+          {
+            "id": "safety-07",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.006600000233447645,
+            "model_called": false
+          },
+          {
+            "id": "safety-08",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.006499999926745659,
+            "model_called": false
+          },
+          {
+            "id": "safety-09",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0038000002859917004,
+            "model_called": false
+          },
+          {
+            "id": "safety-10",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0021999999262334313,
+            "model_called": false
+          },
+          {
+            "id": "conversation-15",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 605.6287000001248,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "conversation-14",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 954.1989999997895,
+            "model_called": true,
+            "error": "AuthenticationError"
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      }
+    },
+    "robustness_dev": {
+      "A": {
+        "n": 25,
+        "accuracy": 0.96,
+        "macro_f1": 0.9504761904761905,
+        "mean_latency_ms": 0.024407999990216922,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usage_missing": 0,
+        "errors": {},
+        "details": [
+          {
+            "id": "robustness-01",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02809999978126143,
+            "model_called": false
+          },
+          {
+            "id": "robustness-02",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.037199999951553764,
+            "model_called": false
+          },
+          {
+            "id": "robustness-03",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02570000015111873,
+            "model_called": false
+          },
+          {
+            "id": "robustness-04",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.027499999760038918,
+            "model_called": false
+          },
+          {
+            "id": "robustness-05",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025999999706982635,
+            "model_called": false
+          },
+          {
+            "id": "robustness-06",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.021299999843904516,
+            "model_called": false
+          },
+          {
+            "id": "robustness-07",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.020200000108161476,
+            "model_called": false
+          },
+          {
+            "id": "robustness-08",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02880000010918593,
+            "model_called": false
+          },
+          {
+            "id": "robustness-09",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.030199999855540227,
+            "model_called": false
+          },
+          {
+            "id": "robustness-10",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02859999995052931,
+            "model_called": false
+          },
+          {
+            "id": "robustness-11",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.007000000096013537,
+            "model_called": false
+          },
+          {
+            "id": "robustness-12",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.01699999984339229,
+            "model_called": false
+          },
+          {
+            "id": "robustness-13",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.013200000012147939,
+            "model_called": false
+          },
+          {
+            "id": "robustness-14",
+            "gold": "hybrid",
+            "pred": "knowledge",
+            "latency_ms": 0.015899999652901897,
+            "model_called": false
+          },
+          {
+            "id": "robustness-15",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.031200000194075983,
+            "model_called": false
+          },
+          {
+            "id": "robustness-16",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025100000129896216,
+            "model_called": false
+          },
+          {
+            "id": "robustness-17",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.03950000018448918,
+            "model_called": false
+          },
+          {
+            "id": "robustness-18",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.025599999844416743,
+            "model_called": false
+          },
+          {
+            "id": "robustness-19",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024399999801971717,
+            "model_called": false
+          },
+          {
+            "id": "robustness-20",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.021800000013172394,
+            "model_called": false
+          },
+          {
+            "id": "robustness-21",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.01920000022437307,
+            "model_called": false
+          },
+          {
+            "id": "robustness-22",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.026200000320386607,
+            "model_called": false
+          },
+          {
+            "id": "robustness-23",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.01939999992828234,
+            "model_called": false
+          },
+          {
+            "id": "robustness-24",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02480000011928496,
+            "model_called": false
+          },
+          {
+            "id": "robustness-25",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.026300000172341242,
+            "model_called": false
+          }
+        ],
+        "status": "RUN",
+        "cost_cny": 0
+      },
+      "B": {
+        "n": 25,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 1044.3531840000105,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 19,
+        "errors": {
+          "AuthenticationError": 19
+        },
+        "details": [
+          {
+            "id": "robustness-02",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.037199999951553764,
+            "model_called": false
+          },
+          {
+            "id": "robustness-01",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1615.4203999999481,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-04",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1298.667000000023,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-05",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 945.1552000000447,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-03",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 2387.517099999968,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-06",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1651.9227999997383,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-08",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1246.796599999925,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-07",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1622.1392000002197,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-09",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 881.4587000001666,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-11",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.007000000096013537,
+            "model_called": false
+          },
+          {
+            "id": "robustness-12",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.01699999984339229,
+            "model_called": false
+          },
+          {
+            "id": "robustness-13",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.013200000012147939,
+            "model_called": false
+          },
+          {
+            "id": "robustness-10",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1610.417000000325,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-14",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1625.3538000000844,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-15",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1278.2086999995954,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-16",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1623.334700000214,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-20",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.021800000013172394,
+            "model_called": false
+          },
+          {
+            "id": "robustness-18",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1260.2669000002606,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-21",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 915.4884999998103,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-17",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1960.87499999976,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-19",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1260.0413000000117,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-25",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.026300000172341242,
+            "model_called": false
+          },
+          {
+            "id": "robustness-22",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1292.1126000001095,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-24",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 592.8076000000146,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-23",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1040.7239999999547,
+            "model_called": true,
+            "error": "AuthenticationError"
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      },
+      "C": {
+        "n": 25,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 115.36644400001023,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 2,
+        "errors": {
+          "AuthenticationError": 2
+        },
+        "details": [
+          {
+            "id": "robustness-02",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.037199999951553764,
+            "model_called": false
+          },
+          {
+            "id": "robustness-01",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02809999978126143,
+            "model_called": false
+          },
+          {
+            "id": "robustness-04",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.027499999760038918,
+            "model_called": false
+          },
+          {
+            "id": "robustness-05",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025999999706982635,
+            "model_called": false
+          },
+          {
+            "id": "robustness-03",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02570000015111873,
+            "model_called": false
+          },
+          {
+            "id": "robustness-06",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.021299999843904516,
+            "model_called": false
+          },
+          {
+            "id": "robustness-08",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02880000010918593,
+            "model_called": false
+          },
+          {
+            "id": "robustness-07",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.020200000108161476,
+            "model_called": false
+          },
+          {
+            "id": "robustness-09",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.030199999855540227,
+            "model_called": false
+          },
+          {
+            "id": "robustness-11",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.007000000096013537,
+            "model_called": false
+          },
+          {
+            "id": "robustness-12",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.01699999984339229,
+            "model_called": false
+          },
+          {
+            "id": "robustness-13",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.013200000012147939,
+            "model_called": false
+          },
+          {
+            "id": "robustness-10",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02859999995052931,
+            "model_called": false
+          },
+          {
+            "id": "robustness-14",
+            "gold": "hybrid",
+            "pred": "knowledge",
+            "latency_ms": 0.015899999652901897,
+            "model_called": false
+          },
+          {
+            "id": "robustness-15",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.031200000194075983,
+            "model_called": false
+          },
+          {
+            "id": "robustness-16",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1623.334700000214,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-20",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.021800000013172394,
+            "model_called": false
+          },
+          {
+            "id": "robustness-18",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1260.2669000002606,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "robustness-21",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.01920000022437307,
+            "model_called": false
+          },
+          {
+            "id": "robustness-17",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.03950000018448918,
+            "model_called": false
+          },
+          {
+            "id": "robustness-19",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024399999801971717,
+            "model_called": false
+          },
+          {
+            "id": "robustness-25",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.026300000172341242,
+            "model_called": false
+          },
+          {
+            "id": "robustness-22",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.026200000320386607,
+            "model_called": false
+          },
+          {
+            "id": "robustness-24",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02480000011928496,
+            "model_called": false
+          },
+          {
+            "id": "robustness-23",
+            "gold": "clarification",
+            "pred": "clarification",
+            "latency_ms": 0.01939999992828234,
+            "model_called": false
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      }
+    },
+    "legacy_heldout": {
+      "A": {
+        "n": 10,
+        "accuracy": 0.9,
+        "macro_f1": 0.5599999999999999,
+        "mean_latency_ms": 0.01961000002665969,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usage_missing": 0,
+        "errors": {},
+        "details": [
+          {
+            "id": "heldout-01",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025599999844416743,
+            "model_called": false
+          },
+          {
+            "id": "heldout-02",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02679999988686177,
+            "model_called": false
+          },
+          {
+            "id": "heldout-03",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.011500000255182385,
+            "model_called": false
+          },
+          {
+            "id": "heldout-04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.01669999983278103,
+            "model_called": false
+          },
+          {
+            "id": "heldout-05",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.023300000066228677,
+            "model_called": false
+          },
+          {
+            "id": "heldout-06",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.02370000038354192,
+            "model_called": false
+          },
+          {
+            "id": "heldout-07",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.004999999873689376,
+            "model_called": false
+          },
+          {
+            "id": "heldout-08",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0183000001925393,
+            "model_called": false
+          },
+          {
+            "id": "heldout-09",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025800000003073364,
+            "model_called": false
+          },
+          {
+            "id": "heldout-10",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.01939999992828234,
+            "model_called": false
+          }
+        ],
+        "status": "RUN",
+        "cost_cny": 0
+      },
+      "B": {
+        "n": 10,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 703.6943200000223,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 6,
+        "errors": {
+          "AuthenticationError": 6
+        },
+        "details": [
+          {
+            "id": "heldout-03",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.011500000255182385,
+            "model_called": false
+          },
+          {
+            "id": "heldout-02",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1269.9361999998473,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "heldout-06",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.02370000038354192,
+            "model_called": false
+          },
+          {
+            "id": "heldout-07",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.004999999873689376,
+            "model_called": false
+          },
+          {
+            "id": "heldout-01",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1979.6943999999712,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "heldout-04",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1288.9865000001919,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "heldout-05",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 949.6007999996436,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "heldout-10",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.01939999992828234,
+            "model_called": false
+          },
+          {
+            "id": "heldout-08",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 937.1012000001429,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "heldout-09",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 611.5644999999859,
+            "model_called": true,
+            "error": "AuthenticationError"
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      },
+      "C": {
+        "n": 10,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 94.9773599999844,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 1,
+        "errors": {
+          "AuthenticationError": 1
+        },
+        "details": [
+          {
+            "id": "heldout-03",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.011500000255182385,
+            "model_called": false
+          },
+          {
+            "id": "heldout-02",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.02679999988686177,
+            "model_called": false
+          },
+          {
+            "id": "heldout-06",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.02370000038354192,
+            "model_called": false
+          },
+          {
+            "id": "heldout-07",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.004999999873689376,
+            "model_called": false
+          },
+          {
+            "id": "heldout-01",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025599999844416743,
+            "model_called": false
+          },
+          {
+            "id": "heldout-04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.01669999983278103,
+            "model_called": false
+          },
+          {
+            "id": "heldout-05",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 949.6007999996436,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "heldout-10",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.01939999992828234,
+            "model_called": false
+          },
+          {
+            "id": "heldout-08",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.0183000001925393,
+            "model_called": false
+          },
+          {
+            "id": "heldout-09",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.025800000003073364,
+            "model_called": false
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      }
+    },
+    "independent_audit": {
+      "A": {
+        "n": 30,
+        "accuracy": 0.5666666666666667,
+        "macro_f1": 0.5307070707070707,
+        "mean_latency_ms": 0.023903333309741964,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usage_missing": 0,
+        "errors": {},
+        "details": [
+          {
+            "id": "r01",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026199999865639256,
+            "model_called": false
+          },
+          {
+            "id": "r02",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.022499999886349542,
+            "model_called": false
+          },
+          {
+            "id": "r03",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.028700000257231295,
+            "model_called": false
+          },
+          {
+            "id": "r04",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.024500000108673703,
+            "model_called": false
+          },
+          {
+            "id": "r05",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02569999969637138,
+            "model_called": false
+          },
+          {
+            "id": "r06",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.02519999998185085,
+            "model_called": false
+          },
+          {
+            "id": "r07",
+            "gold": "knowledge",
+            "pred": "data",
+            "latency_ms": 0.02570000015111873,
+            "model_called": false
+          },
+          {
+            "id": "r08",
+            "gold": "knowledge",
+            "pred": "data",
+            "latency_ms": 0.023799999780749204,
+            "model_called": false
+          },
+          {
+            "id": "r09",
+            "gold": "knowledge",
+            "pred": "data",
+            "latency_ms": 0.023300000066228677,
+            "model_called": false
+          },
+          {
+            "id": "r10",
+            "gold": "knowledge",
+            "pred": "data",
+            "latency_ms": 0.025599999844416743,
+            "model_called": false
+          },
+          {
+            "id": "r11",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024599999960628338,
+            "model_called": false
+          },
+          {
+            "id": "r12",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.032500000088475645,
+            "model_called": false
+          },
+          {
+            "id": "r13",
+            "gold": "hybrid",
+            "pred": "knowledge",
+            "latency_ms": 0.03399999968678458,
+            "model_called": false
+          },
+          {
+            "id": "r14",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.026499999876250513,
+            "model_called": false
+          },
+          {
+            "id": "r15",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028899999961140566,
+            "model_called": false
+          },
+          {
+            "id": "r16",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02750000021478627,
+            "model_called": false
+          },
+          {
+            "id": "r17",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.030100000003585592,
+            "model_called": false
+          },
+          {
+            "id": "r18",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.027399999908084283,
+            "model_called": false
+          },
+          {
+            "id": "r19",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.02410000024610781,
+            "model_called": false
+          },
+          {
+            "id": "r20",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.02300000005561742,
+            "model_called": false
+          },
+          {
+            "id": "r21",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.02680000034160912,
+            "model_called": false
+          },
+          {
+            "id": "r22",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.023399999918183312,
+            "model_called": false
+          },
+          {
+            "id": "r23",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.02189999986512703,
+            "model_called": false
+          },
+          {
+            "id": "r24",
+            "gold": "clarification",
+            "pred": "data",
+            "latency_ms": 0.022199999875738285,
+            "model_called": false
+          },
+          {
+            "id": "r25",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.014000000192027073,
+            "model_called": false
+          },
+          {
+            "id": "r26",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0029000002541579306,
+            "model_called": false
+          },
+          {
+            "id": "r27",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.008499999694322469,
+            "model_called": false
+          },
+          {
+            "id": "r28",
+            "gold": "blocked",
+            "pred": "data",
+            "latency_ms": 0.023499999770137947,
+            "model_called": false
+          },
+          {
+            "id": "r29",
+            "gold": "blocked",
+            "pred": "data",
+            "latency_ms": 0.02499999982319423,
+            "model_called": false
+          },
+          {
+            "id": "r30",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.019099999917671084,
+            "model_called": false
+          }
+        ],
+        "status": "RUN",
+        "cost_cny": 0
+      },
+      "B": {
+        "n": 30,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 1196.483293333343,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 26,
+        "errors": {
+          "AuthenticationError": 26
+        },
+        "details": [
+          {
+            "id": "r01",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1646.43070000011,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r04",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 586.8666999999732,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r02",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1996.878000000379,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r03",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1985.8515999999327,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r08",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 586.6593999999168,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r07",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1278.208199999881,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r05",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2315.7774000001154,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r06",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1960.8068000002277,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r10",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1269.0403000001425,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r09",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1962.8975999999057,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r11",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1270.061700000042,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r12",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 928.4856999997828,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r13",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1605.2115000002232,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r15",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1267.6861999998437,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r14",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1610.8659999999873,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r16",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1633.1374999999753,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r18",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1293.9575000000332,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r17",
+            "gold": "hybrid",
+            "pred": "error",
+            "latency_ms": 1985.8933000000434,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r19",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1292.080100000021,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r20",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1265.1184000001194,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r21",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1664.202099999784,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r24",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 640.6220999997458,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r22",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1320.394800000031,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r23",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 985.1051000000552,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r25",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.014000000192027073,
+            "model_called": false
+          },
+          {
+            "id": "r26",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0029000002541579306,
+            "model_called": false
+          },
+          {
+            "id": "r27",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.008499999694322469,
+            "model_called": false
+          },
+          {
+            "id": "r30",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.019099999917671084,
+            "model_called": false
+          },
+          {
+            "id": "r28",
+            "gold": "blocked",
+            "pred": "error",
+            "latency_ms": 941.1592000001292,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r29",
+            "gold": "blocked",
+            "pred": "error",
+            "latency_ms": 601.056399999834,
+            "model_called": true,
+            "error": "AuthenticationError"
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      },
+      "C": {
+        "n": 30,
+        "accuracy": null,
+        "macro_f1": null,
+        "mean_latency_ms": 688.906783333338,
+        "input_tokens": null,
+        "output_tokens": null,
+        "usage_missing": 16,
+        "errors": {
+          "AuthenticationError": 16
+        },
+        "details": [
+          {
+            "id": "r01",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.026199999865639256,
+            "model_called": false
+          },
+          {
+            "id": "r04",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 586.8666999999732,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r02",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1996.878000000379,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r03",
+            "gold": "data",
+            "pred": "data",
+            "latency_ms": 0.028700000257231295,
+            "model_called": false
+          },
+          {
+            "id": "r08",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 586.6593999999168,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r07",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1278.208199999881,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r05",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 2315.7774000001154,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r06",
+            "gold": "data",
+            "pred": "error",
+            "latency_ms": 1960.8068000002277,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r10",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1269.0403000001425,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r09",
+            "gold": "knowledge",
+            "pred": "error",
+            "latency_ms": 1962.8975999999057,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r11",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.024599999960628338,
+            "model_called": false
+          },
+          {
+            "id": "r12",
+            "gold": "knowledge",
+            "pred": "knowledge",
+            "latency_ms": 0.032500000088475645,
+            "model_called": false
+          },
+          {
+            "id": "r13",
+            "gold": "hybrid",
+            "pred": "knowledge",
+            "latency_ms": 0.03399999968678458,
+            "model_called": false
+          },
+          {
+            "id": "r15",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.028899999961140566,
+            "model_called": false
+          },
+          {
+            "id": "r14",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.026499999876250513,
+            "model_called": false
+          },
+          {
+            "id": "r16",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.02750000021478627,
+            "model_called": false
+          },
+          {
+            "id": "r18",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.027399999908084283,
+            "model_called": false
+          },
+          {
+            "id": "r17",
+            "gold": "hybrid",
+            "pred": "hybrid",
+            "latency_ms": 0.030100000003585592,
+            "model_called": false
+          },
+          {
+            "id": "r19",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1292.080100000021,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r20",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1265.1184000001194,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r21",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1664.202099999784,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r24",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 640.6220999997458,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r22",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 1320.394800000031,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r23",
+            "gold": "clarification",
+            "pred": "error",
+            "latency_ms": 985.1051000000552,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r25",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.014000000192027073,
+            "model_called": false
+          },
+          {
+            "id": "r26",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.0029000002541579306,
+            "model_called": false
+          },
+          {
+            "id": "r27",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.008499999694322469,
+            "model_called": false
+          },
+          {
+            "id": "r30",
+            "gold": "blocked",
+            "pred": "blocked",
+            "latency_ms": 0.019099999917671084,
+            "model_called": false
+          },
+          {
+            "id": "r28",
+            "gold": "blocked",
+            "pred": "error",
+            "latency_ms": 941.1592000001292,
+            "model_called": true,
+            "error": "AuthenticationError"
+          },
+          {
+            "id": "r29",
+            "gold": "blocked",
+            "pred": "error",
+            "latency_ms": 601.056399999834,
+            "model_called": true,
+            "error": "AuthenticationError"
+          }
+        ],
+        "status": "PROVIDER_FAILED",
+        "cost_cny": null
+      }
+    }
+  }
+}

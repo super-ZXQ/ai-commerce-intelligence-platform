@@ -47,6 +47,20 @@ _cache_key_tags: dict[str, set[str]] = {}
 _cache_tag_key_expiry: dict[str, float] = {}
 _cache_metrics = {"hits": 0, "rebuilds": 0}
 _cache_tag_generated_at: dict[str, float] = {}
+_cache_tag_versions: dict[str, int] = defaultdict(int)
+
+
+async def _tag_generation(tags: tuple[str, ...]) -> tuple:
+    generations = []
+    for tag in tags:
+        shared = "0"
+        if _redis_available and _redis_client:
+            try:
+                shared = str(await _redis_client.get(f"_cache_generation:{tag}") or "0")
+            except Exception:
+                pass
+        generations.append((tag, _cache_tag_versions[tag], shared))
+    return tuple(generations)
 
 
 def _release_lock_if_idle(key: str) -> None:
@@ -105,7 +119,7 @@ async def check_redis_health() -> dict:
 
 def _make_key(*args, **kwargs) -> str:
     raw = json.dumps({"a": args, "k": kwargs}, sort_keys=True, default=str)
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -284,12 +298,15 @@ async def invalidate_tags(*tags: str) -> int:
     normalized = tuple(dict.fromkeys(tag for tag in tags if tag))
     keys: set[str] = builtins.set()
     for tag in normalized:
+        _cache_tag_versions[tag] += 1
         keys.update(_cache_tag_keys.pop(tag, builtins.set()))
         _cache_tag_generated_at.pop(tag, None)
 
     if _redis_available and _redis_client and normalized:
         try:
             for tag in normalized:
+                # 版本进入Key，失效前启动的计算即使稍后完成也无法污染新版本。
+                await _redis_client.incr(f"_cache_generation:{tag}")
                 tag_key = f"_cache_tag:{tag}"
                 await _redis_client.zremrangebyscore(tag_key, "-inf", time.time())
                 keys.update(await _redis_client.zrangebyscore(tag_key, time.time(), "+inf"))
@@ -348,6 +365,8 @@ def cached(ttl: int = DEFAULT_TTL, *, tags: tuple[str, ...] = ()):
         async def wrapper(*args, **kwargs):
             cache_args, cache_kwargs = _cache_key_args(args, kwargs)
             cache_key = f"{func.__module__}.{func.__name__}:{_make_key(*cache_args, **cache_kwargs)}"
+            if tags:
+                cache_key += ":" + _make_key(await _tag_generation(tags))
             cached_result = await get(cache_key)
             if cached_result is not None:
                 logger.debug(f"缓存命中: {cache_key}")

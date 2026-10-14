@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import pandas as pd
 from sqlglot import transpile
@@ -161,8 +162,8 @@ async def evaluate_live_model(
         for case in cases:
             started = time.perf_counter()
             detail: dict[str, Any] = {"id": case.id, "kind": case.kind, "query": case.query}
+            responses = []
             try:
-                responses = []
                 if case.kind == "sql":
                     previous_error = None
                     candidate_rows: list[tuple[Any, ...]] = []
@@ -204,11 +205,6 @@ async def evaluate_live_model(
                     detail["source_count"] = len(sources)
                     detail["answer_preview"] = response.content[:300]
                     responses.append(response)
-                for model_response in responses:
-                    for key in usage:
-                        value = getattr(model_response, key)
-                        if value is not None:
-                            usage[key] += value
                 detail["passed"] = bool(
                     detail.get("result_correct")
                     if case.kind == "sql"
@@ -217,6 +213,12 @@ async def evaluate_live_model(
             except Exception as exc:  # noqa: BLE001 - 报告只记录错误类别
                 detail["passed"] = False
                 detail["error_type"] = type(exc).__name__
+            # SQL被安全门拒绝仍已发生模型调用，失败及重试用量也必须计入。
+            for model_response in responses:
+                for key in usage:
+                    value = getattr(model_response, key)
+                    if value is not None:
+                        usage[key] += value
             latency_ms = round((time.perf_counter() - started) * 1000)
             detail["latency_ms"] = latency_ms
             latencies.append(latency_ms)
@@ -286,7 +288,7 @@ def main() -> int:
             request_delay_seconds=max(0, args.delay),
         )
     )
-    report["provider"] = "Zhipu BigModel"
+    report["provider"] = urlparse(os.environ.get("LLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")).hostname
     report["model"] = os.environ.get("LLM_MODEL", "glm-4.7-flash")
     rendered = json.dumps(report, ensure_ascii=False, indent=2)
     print(rendered)

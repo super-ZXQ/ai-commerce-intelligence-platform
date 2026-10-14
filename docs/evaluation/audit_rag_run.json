@@ -1,0 +1,1205 @@
+{
+  "date": "2026-10-13",
+  "python": "3.12.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "model": null,
+  "model_enabled": false,
+  "datasets": {
+    "audit_routing.jsonl": "5b216624dc7579dc5558d53edbb61c787e142737c77f254be35ced2a9bd0cd3c",
+    "audit_rag.jsonl": "050d759700508d7c0617d8fe51879d797fb78a49f3ce696c5a114cb2bf156302",
+    "audit_sql.jsonl": "8565120512cecef84999c50a48fa8f8441399be50a53b9afdf0b35f54b4585fa"
+  },
+  "packages": {
+    "langgraph": "1.2.11",
+    "langchain-openai": "1.3.2",
+    "sqlglot": "30.17.0",
+    "chromadb": "1.5.9",
+    "sentence-transformers": "5.6.0",
+    "PyJWT": "2.15.1"
+  },
+  "source_sha256": {
+    "agent_core/routing.py": "1656931cc7cf0b5cc47a5ed868820214e287863834a6b6bfc016ffd134ac4cb8",
+    "agent_core/rag/retriever.py": "e9a243ac24558b041c1d954304f36c6e693efae98a0b67c45f4b15bb0e0794ab",
+    "agent_core/sql_safety.py": "a720a13df7b41b12e09fdeb71f28292a7b56f1d96609d3fdfb158b3ac8ece62f",
+    "agent_core/model_adapter.py": "5760ec56dc11b1b2bd8bb35b1ac22d706b8d5ab563ac624c4ba34e984ae00684",
+    "agent_core/eval/audit_experiments.py": "07a2e4f01a487a95dc366c37caeaac7f62ac3b763d22f6360e12094ca636fe33",
+    "ai-ecommerce-assistant/rag/vector_store.py": "c3f42c22fa2a24b036577b26801aadc767ae4b7445c117bdbb7eb8707c1b7221",
+    "ai-ecommerce-assistant/build_knowledge_base.py": "40892dd5d23f2d384186df033246887223358d3a7f1813127a08eb0c0e99d5a4"
+  },
+  "rag": {
+    "lexical": {
+      "n": 18,
+      "answerable": 12,
+      "unanswerable": 6,
+      "recall_at_3": 0.6666666666666666,
+      "mrr": 0.5277777777777778,
+      "no_answer_accuracy": 0.6666666666666666,
+      "mean_latency_ms": 3.368649999881907,
+      "details": [
+        {
+          "id": "k01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 4.812000000129046,
+          "sources": [
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ]
+          ]
+        },
+        {
+          "id": "k02",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 3.667400000267662,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "api_docs.md",
+              "三、BI 看板功能"
+            ]
+          ]
+        },
+        {
+          "id": "k03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 3.3512999998492887,
+          "sources": [
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ]
+          ]
+        },
+        {
+          "id": "k04",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 3.3388000001650653,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "business_glossary.md",
+              "三、退款与风控指标"
+            ]
+          ]
+        },
+        {
+          "id": "k05",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 3.3075000001190347,
+          "sources": [
+            [
+              "api_docs.md",
+              "三、BI 看板功能"
+            ],
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ],
+            [
+              "api_docs.md",
+              "五、RESTful API 速查"
+            ]
+          ]
+        },
+        {
+          "id": "k06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 3.2581999994363287,
+          "sources": [
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "api_docs.md",
+              "五、RESTful API 速查"
+            ]
+          ]
+        },
+        {
+          "id": "k07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 3.4798999995473423,
+          "sources": [
+            [
+              "api_docs.md",
+              "三、BI 看板功能"
+            ],
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ],
+            [
+              "kpi_formulas.md",
+              "1. 销售额相关"
+            ]
+          ]
+        },
+        {
+          "id": "k08",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.5,
+          "refused": false,
+          "latency_ms": 3.2257000002573477,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "9. 留存与转化"
+            ],
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ]
+          ]
+        },
+        {
+          "id": "k09",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 3.1074999997144914,
+          "sources": [
+            [
+              "business_rules.md",
+              "六、查询性能约束"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ]
+          ]
+        },
+        {
+          "id": "k10",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.5,
+          "refused": false,
+          "latency_ms": 3.2635999996273313,
+          "sources": [
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "business_rules.md",
+              "七、数据隐私"
+            ],
+            [
+              "api_docs.md",
+              "api_docs"
+            ]
+          ]
+        },
+        {
+          "id": "k11",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 3.3520999995744205,
+          "sources": [
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "gold_queries.md",
+              "gold_queries"
+            ]
+          ]
+        },
+        {
+          "id": "k12",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.3333333333333333,
+          "refused": false,
+          "latency_ms": 3.291400000307476,
+          "sources": [
+            [
+              "gold_queries.md",
+              "时段类"
+            ],
+            [
+              "business_glossary.md",
+              "四、流量与渠道指标"
+            ],
+            [
+              "business_rules.md",
+              "三、时间分布异常"
+            ]
+          ]
+        },
+        {
+          "id": "k13",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 3.218400000150723,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ],
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ],
+            [
+              "business_rules.md",
+              "business_rules"
+            ]
+          ]
+        },
+        {
+          "id": "k14",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 3.3048999994207406,
+          "sources": []
+        },
+        {
+          "id": "k15",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 3.143599999930302,
+          "sources": []
+        },
+        {
+          "id": "k16",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 3.203699999176024,
+          "sources": []
+        },
+        {
+          "id": "k17",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 3.225899999961257,
+          "sources": [
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "business_glossary.md",
+              "三、退款与风控指标"
+            ]
+          ]
+        },
+        {
+          "id": "k18",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": true,
+          "latency_ms": 3.083800000240444,
+          "sources": []
+        }
+      ]
+    },
+    "bge_chroma": {
+      "n": 18,
+      "answerable": 12,
+      "unanswerable": 6,
+      "recall_at_3": 0.5,
+      "mrr": 0.3611111111111111,
+      "no_answer_accuracy": 0.0,
+      "mean_latency_ms": 37.2117722224377,
+      "details": [
+        {
+          "id": "k01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 105.45390000061161,
+          "sources": [
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ],
+            [
+              "gold_queries.md",
+              "客单价类"
+            ]
+          ]
+        },
+        {
+          "id": "k02",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 112.45589999998629,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "gold_queries.md",
+              "用户类"
+            ]
+          ]
+        },
+        {
+          "id": "k03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 15.363999999863154,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "gold_queries.md",
+              "异常检测类"
+            ],
+            [
+              "gold_queries.md",
+              "退款类"
+            ]
+          ]
+        },
+        {
+          "id": "k04",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 67.16119999964576,
+          "sources": [
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "data_dictionary.md",
+              "表结构概览"
+            ],
+            [
+              "data_dictionary.md",
+              "已知陷阱"
+            ]
+          ]
+        },
+        {
+          "id": "k05",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.5,
+          "refused": false,
+          "latency_ms": 23.39650000067195,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "8. RFM 分析（参考 BI 看板逻辑）"
+            ],
+            [
+              "business_glossary.md",
+              "五、RFM 客户分层（与 BI 看板一致）"
+            ],
+            [
+              "business_glossary.md",
+              "三、退款与风控指标"
+            ]
+          ]
+        },
+        {
+          "id": "k06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.5,
+          "refused": false,
+          "latency_ms": 9.899600000608189,
+          "sources": [
+            [
+              "api_docs.md",
+              "六、认证方式"
+            ],
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ],
+            [
+              "kpi_formulas.md",
+              "9. 留存与转化"
+            ]
+          ]
+        },
+        {
+          "id": "k07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 96.32959999999002,
+          "sources": [
+            [
+              "gold_queries.md",
+              "同比环比"
+            ],
+            [
+              "kpi_formulas.md",
+              "1. 销售额相关"
+            ],
+            [
+              "gold_queries.md",
+              "销售类"
+            ]
+          ]
+        },
+        {
+          "id": "k08",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 11.174100000062026,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "9. 留存与转化"
+            ],
+            [
+              "business_glossary.md",
+              "七、货币与单位"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "k09",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 10.6857000000673,
+          "sources": [
+            [
+              "business_rules.md",
+              "六、查询性能约束"
+            ],
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ]
+          ]
+        },
+        {
+          "id": "k10",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 127.73620000007213,
+          "sources": [
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ],
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ]
+          ]
+        },
+        {
+          "id": "k11",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.3333333333333333,
+          "refused": false,
+          "latency_ms": 18.88500000040949,
+          "sources": [
+            [
+              "business_rules.md",
+              "六、查询性能约束"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ]
+          ]
+        },
+        {
+          "id": "k12",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 10.359199999584234,
+          "sources": [
+            [
+              "gold_queries.md",
+              "时段类"
+            ],
+            [
+              "business_glossary.md",
+              "四、流量与渠道指标"
+            ],
+            [
+              "business_rules.md",
+              "五、季节性规律（2025 数据）"
+            ]
+          ]
+        },
+        {
+          "id": "k13",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 11.097300000074029,
+          "sources": [
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "k14",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 12.181500000224332,
+          "sources": [
+            [
+              "business_glossary.md",
+              "前言/概述"
+            ],
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ],
+            [
+              "business_glossary.md",
+              "五、RFM 客户分层（与 BI 看板一致）"
+            ]
+          ]
+        },
+        {
+          "id": "k15",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 9.230000000570726,
+          "sources": [
+            [
+              "business_glossary.md",
+              "前言/概述"
+            ],
+            [
+              "kpi_formulas.md",
+              "7. TOP N"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "k16",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 8.932800000366115,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "business_glossary.md",
+              "前言/概述"
+            ],
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ]
+          ]
+        },
+        {
+          "id": "k17",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 9.243500000593485,
+          "sources": [
+            [
+              "business_rules.md",
+              "三、时间分布异常"
+            ],
+            [
+              "gold_queries.md",
+              "占比类"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ]
+          ]
+        },
+        {
+          "id": "k18",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 10.22590000047785,
+          "sources": [
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ]
+          ]
+        }
+      ],
+      "temporary_vector_dir": "C:\\Users\\26811\\AppData\\Local\\Temp\\audit-bge-_icnm0qy"
+    },
+    "hybrid_rrf": {
+      "n": 18,
+      "answerable": 12,
+      "unanswerable": 6,
+      "recall_at_3": 0.6666666666666666,
+      "mrr": 0.513888888888889,
+      "no_answer_accuracy": 0.0,
+      "mean_latency_ms": 40.58042222231961,
+      "details": [
+        {
+          "id": "k01",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 110.26590000074066,
+          "sources": [
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "gold_queries.md",
+              "商品 / 类目类（商品表未引入前的占位）"
+            ]
+          ]
+        },
+        {
+          "id": "k02",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 116.12330000025395,
+          "sources": [
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "kpi_formulas.md",
+              "2. 用户相关"
+            ],
+            [
+              "api_docs.md",
+              "三、BI 看板功能"
+            ]
+          ]
+        },
+        {
+          "id": "k03",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 18.715299999712443,
+          "sources": [
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "kpi_formulas.md",
+              "4. 退款相关"
+            ],
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ]
+          ]
+        },
+        {
+          "id": "k04",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.5,
+          "refused": false,
+          "latency_ms": 70.49999999981083,
+          "sources": [
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ],
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "data_dictionary.md",
+              "表结构概览"
+            ]
+          ]
+        },
+        {
+          "id": "k05",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 26.704000000790984,
+          "sources": [
+            [
+              "api_docs.md",
+              "三、BI 看板功能"
+            ],
+            [
+              "kpi_formulas.md",
+              "8. RFM 分析（参考 BI 看板逻辑）"
+            ],
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ]
+          ]
+        },
+        {
+          "id": "k06",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 13.157800000044517,
+          "sources": [
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ],
+            [
+              "api_docs.md",
+              "六、认证方式"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ]
+          ]
+        },
+        {
+          "id": "k07",
+          "no_answer": false,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 99.80949999953737,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "1. 销售额相关"
+            ],
+            [
+              "api_docs.md",
+              "三、BI 看板功能"
+            ],
+            [
+              "gold_queries.md",
+              "同比环比"
+            ]
+          ]
+        },
+        {
+          "id": "k08",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 14.399800000319374,
+          "sources": [
+            [
+              "kpi_formulas.md",
+              "9. 留存与转化"
+            ],
+            [
+              "business_glossary.md",
+              "二、用户行为指标"
+            ],
+            [
+              "business_glossary.md",
+              "七、货币与单位"
+            ]
+          ]
+        },
+        {
+          "id": "k09",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 13.793199999781791,
+          "sources": [
+            [
+              "business_rules.md",
+              "六、查询性能约束"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ]
+          ]
+        },
+        {
+          "id": "k10",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.3333333333333333,
+          "refused": false,
+          "latency_ms": 130.99979999969946,
+          "sources": [
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ],
+            [
+              "api_docs.md",
+              "前言/概述"
+            ],
+            [
+              "business_rules.md",
+              "七、数据隐私"
+            ]
+          ]
+        },
+        {
+          "id": "k11",
+          "no_answer": false,
+          "hit": true,
+          "rr": 1.0,
+          "refused": false,
+          "latency_ms": 22.23709999998391,
+          "sources": [
+            [
+              "business_rules.md",
+              "八、SQL 安全规则"
+            ],
+            [
+              "business_rules.md",
+              "六、查询性能约束"
+            ],
+            [
+              "api_docs.md",
+              "四、AI 助手功能（当前页）"
+            ]
+          ]
+        },
+        {
+          "id": "k12",
+          "no_answer": false,
+          "hit": true,
+          "rr": 0.3333333333333333,
+          "refused": false,
+          "latency_ms": 13.65059999989171,
+          "sources": [
+            [
+              "gold_queries.md",
+              "时段类"
+            ],
+            [
+              "business_glossary.md",
+              "四、流量与渠道指标"
+            ],
+            [
+              "business_rules.md",
+              "三、时间分布异常"
+            ]
+          ]
+        },
+        {
+          "id": "k13",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 14.315700000224751,
+          "sources": [
+            [
+              "api_docs.md",
+              "七、限流规则"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ],
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ]
+          ]
+        },
+        {
+          "id": "k14",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 15.486399999645073,
+          "sources": [
+            [
+              "business_glossary.md",
+              "前言/概述"
+            ],
+            [
+              "business_glossary.md",
+              "六、统计时间范围约定"
+            ],
+            [
+              "business_glossary.md",
+              "五、RFM 客户分层（与 BI 看板一致）"
+            ]
+          ]
+        },
+        {
+          "id": "k15",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 12.373600000501028,
+          "sources": [
+            [
+              "business_glossary.md",
+              "前言/概述"
+            ],
+            [
+              "kpi_formulas.md",
+              "7. TOP N"
+            ],
+            [
+              "gold_queries.md",
+              "前言/概述"
+            ]
+          ]
+        },
+        {
+          "id": "k16",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 12.136499999542139,
+          "sources": [
+            [
+              "data_dictionary.md",
+              "orders 表字段说明"
+            ],
+            [
+              "business_glossary.md",
+              "前言/概述"
+            ],
+            [
+              "api_docs.md",
+              "二、访问地址"
+            ]
+          ]
+        },
+        {
+          "id": "k17",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 12.469400000554742,
+          "sources": [
+            [
+              "api_docs.md",
+              "九、常见问题"
+            ],
+            [
+              "business_rules.md",
+              "三、时间分布异常"
+            ],
+            [
+              "business_glossary.md",
+              "一、销售与财务指标"
+            ]
+          ]
+        },
+        {
+          "id": "k18",
+          "no_answer": true,
+          "hit": false,
+          "rr": 0,
+          "refused": false,
+          "latency_ms": 13.309700000718294,
+          "sources": [
+            [
+              "business_rules.md",
+              "二、平台渠道诊断"
+            ],
+            [
+              "business_rules.md",
+              "四、用户行为预警"
+            ],
+            [
+              "business_rules.md",
+              "一、指标健康区间"
+            ]
+          ]
+        }
+      ]
+    },
+    "reranker": {
+      "status": "NOT_RUN",
+      "reason": "可选组件；无收益证据，未引入"
+    }
+  }
+}

@@ -274,10 +274,16 @@ class TestAiDatabaseUrl:
             db_password="rootpw",
             ai_db_user="",
             ai_db_password="",
+            ai_db_allow_main_fallback=True,
         )
         url = s.ai_database_url
         assert "root" in url
         assert "rootpw" in url
+
+    def test_missing_ai_account_fails_without_explicit_dev_opt_in(self):
+        s = Settings(_env_file=None, ai_db_user="", ai_db_password="", ai_db_allow_main_fallback=False)
+        with pytest.raises(ValueError, match="AI_DB_USER"):
+            _ = s.ai_database_url
 
 
 # ─── 明文密码生产环境拒绝 ───────────────────────────────

@@ -31,6 +31,6 @@ def sanitize_error(exc: BaseException) -> str:
     """异常文本脱敏后再展示到 UI，避免带密码的数据库连接串（DSN）外泄。
 
     SQLAlchemy 部分异常会携带完整 DSN（mysql+pymysql://user:password@host），
-    完整异常只进日志，页面只展示抹掉凭据的版本。
+    页面只展示抹掉凭据的版本；调用端日志默认仅记录异常类别。
     """
     return _DSN_CREDENTIALS_RE.sub(r"\1://\2:***@", str(exc))

@@ -36,16 +36,20 @@ class _IntentPlan(BaseModel):
 
 def _build_client():
     from langchain_openai import ChatOpenAI
+    from agent_core.model_network import model_http_clients
 
     api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         raise RuntimeError("LLM_API_KEY 未配置，无法运行 LLM 路由（A/B 的 B 侧需要 key）")
+    http_client, http_async_client = model_http_clients()
     return ChatOpenAI(
         api_key=api_key,
         base_url=os.environ.get("LLM_BASE_URL", "https://api.deepseek.com"),
         model=os.environ.get("LLM_MODEL", "deepseek-chat"),
         temperature=0,
         timeout=30,
+        http_client=http_client,
+        http_async_client=http_async_client,
         max_retries=1,
     )
 
@@ -59,9 +63,17 @@ async def classify_intent_llm(query: str) -> AgentIntent:
 async def classify_intent_llm_detailed(query: str) -> dict:
     """返回意图及用量/延迟，供评测统计。"""
     t0 = time.perf_counter()
-    resp = await _build_client().with_structured_output(
-        _IntentPlan, method="json_mode", include_raw=True
-    ).ainvoke(_SYSTEM + "\n用户问题：" + query)
+    client = _build_client()
+    try:
+        resp = await client.with_structured_output(
+            _IntentPlan, method="json_mode", include_raw=True
+        ).ainvoke(_SYSTEM + "\n用户问题：" + query)
+    finally:
+        sync, asynchronous = getattr(client, "http_client", None), getattr(client, "http_async_client", None)
+        if sync is not None:
+            sync.close()
+        if asynchronous is not None:
+            await asynchronous.aclose()
     raw = resp.get("raw") if isinstance(resp, dict) else None
     parsed = resp.get("parsed") if isinstance(resp, dict) else None
     if parsed is None:

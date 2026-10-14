@@ -13,3 +13,38 @@
 {"id":"answer-003","kind":"answer","query":"RFM 分析包含哪三个维度？","expected_keywords":["Recency","Frequency","Monetary"]}
 {"id":"answer-004","kind":"answer","query":"payment_amount 字段代表什么？","expected_keywords":["实付金额"]}
 {"id":"answer-005","kind":"answer","query":"退款率超过警戒值后应该排查什么？","expected_keywords":["商品质量","物流"]}
+{"id": "sql-016", "kind": "sql", "query": "2025年每个月的销售额分别是多少，按月份升序", "reference_sql": "SELECT DATE_FORMAT(order_date, '%Y-%m') AS month, ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 GROUP BY DATE_FORMAT(order_date, '%Y-%m') ORDER BY month ASC"}
+{"id": "sql-017", "kind": "sql", "query": "总用户数是多少", "reference_sql": "SELECT COUNT(DISTINCT user_name) AS total_users FROM orders"}
+{"id": "sql-018", "kind": "sql", "query": "下单次数达到2次及以上的用户有多少个", "reference_sql": "SELECT COUNT(*) AS repeat_users FROM (SELECT user_name FROM orders GROUP BY user_name HAVING COUNT(DISTINCT order_id) >= 2) AS t"}
+{"id": "sql-019", "kind": "sql", "query": "各渠道的订单量分别是多少，按订单量降序", "reference_sql": "SELECT channel_id, COUNT(DISTINCT order_id) AS orders FROM orders GROUP BY channel_id ORDER BY orders DESC"}
+{"id": "sql-020", "kind": "sql", "query": "APP平台的总销售额是多少", "reference_sql": "SELECT ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 AND platform_type = 'APP'"}
+{"id": "sql-021", "kind": "sql", "query": "2025年3月的销售额是多少", "reference_sql": "SELECT ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 AND order_date >= '2025-03-01' AND order_date <= '2025-03-31'"}
+{"id": "sql-022", "kind": "sql", "query": "销售额最高的前10个用户及其销售额", "reference_sql": "SELECT user_name, ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 GROUP BY user_name ORDER BY sales DESC LIMIT 10"}
+{"id": "sql-023", "kind": "sql", "query": "各客单价区间（0-50、50-100、100-200、200以上）的用户数分布", "reference_sql": "SELECT CASE WHEN aov < 50 THEN '0-50' WHEN aov < 100 THEN '50-100' WHEN aov < 200 THEN '100-200' ELSE '200+' END AS aov_range, COUNT(*) AS user_count FROM (SELECT user_name, SUM(payment_amount) / COUNT(DISTINCT order_id) AS aov FROM orders WHERE payment_amount > 0 GROUP BY user_name) AS t GROUP BY aov_range ORDER BY aov_range"}
+{"id": "sql-024", "kind": "sql", "query": "各平台的退款率分别是多少，按百分比表示保留2位小数", "reference_sql": "SELECT platform_type, ROUND(SUM(CASE WHEN is_refund = '是' THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT order_id), 2) AS refund_rate FROM orders GROUP BY platform_type ORDER BY platform_type"}
+{"id": "sql-025", "kind": "sql", "query": "退款金额占总付款金额的比例是多少，以百分比表示保留2位小数", "reference_sql": "SELECT ROUND(SUM(CASE WHEN is_refund = '是' THEN payment_amount ELSE 0 END) * 100.0 / SUM(payment_amount), 2) AS refund_amount_ratio FROM orders WHERE payment_amount > 0"}
+{"id": "sql-026", "kind": "sql", "query": "每个星期几的销售额分布，按销售额降序", "reference_sql": "SELECT weekday, ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 GROUP BY weekday ORDER BY sales DESC"}
+{"id": "sql-027", "kind": "sql", "query": "一天24个小时中各个小时的订单量分布", "reference_sql": "SELECT order_hour, COUNT(DISTINCT order_id) AS orders FROM orders GROUP BY order_hour ORDER BY order_hour"}
+{"id": "sql-028", "kind": "sql", "query": "订单量最高的前10个用户及其订单数", "reference_sql": "SELECT user_name, COUNT(DISTINCT order_id) AS orders FROM orders GROUP BY user_name ORDER BY orders DESC LIMIT 10"}
+{"id": "sql-029", "kind": "sql", "query": "平均支付耗时是多少秒", "reference_sql": "SELECT ROUND(AVG(payment_duration_sec), 2) AS avg_payment_duration FROM orders WHERE payment_duration_sec IS NOT NULL"}
+{"id": "sql-030", "kind": "sql", "query": "优惠金额总额是多少", "reference_sql": "SELECT ROUND(SUM(discount_amount), 2) AS total_discount FROM orders WHERE discount_amount > 0"}
+{"id": "sql-031", "kind": "sql", "query": "哪个平台的客单价最高，给出平台和客单价", "reference_sql": "SELECT platform_type, ROUND(SUM(payment_amount) / COUNT(DISTINCT order_id), 2) AS aov FROM orders WHERE payment_amount > 0 GROUP BY platform_type ORDER BY aov DESC LIMIT 1"}
+{"id": "sql-032", "kind": "sql", "query": "发生过退款的订单有多少笔", "reference_sql": "SELECT COUNT(DISTINCT order_id) AS refunded_orders FROM orders WHERE is_refund = '是'"}
+{"id": "sql-033", "kind": "sql", "query": "2025年下半年各平台的销售额分别是多少", "reference_sql": "SELECT platform_type, ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 AND order_date >= '2025-07-01' AND order_date <= '2025-12-31' GROUP BY platform_type ORDER BY platform_type"}
+{"id": "sql-034", "kind": "sql", "query": "平均每天产生多少笔订单", "reference_sql": "SELECT ROUND(COUNT(DISTINCT order_id) * 1.0 / COUNT(DISTINCT order_date), 2) AS avg_daily_orders FROM orders"}
+{"id": "sql-035", "kind": "sql", "query": "2025年1月1日之前的销售额是多少", "reference_sql": "SELECT ROUND(SUM(payment_amount), 2) AS sales FROM orders WHERE payment_amount > 0 AND order_date < '2025-01-01'"}
+{"id": "ans-006", "kind": "answer", "query": "GMV和销售额有什么区别", "expected_keywords": ["GMV", "销售额"]}
+{"id": "ans-007", "kind": "answer", "query": "复购率是怎么定义的，怎么计算", "expected_keywords": ["复购率"]}
+{"id": "ans-008", "kind": "answer", "query": "客单价的计算口径是什么", "expected_keywords": ["客单价"]}
+{"id": "ans-009", "kind": "answer", "query": "退款率怎么统计，注意什么", "expected_keywords": ["退款率"]}
+{"id": "ans-010", "kind": "answer", "query": "订单数的统计口径是什么，为什么不能直接COUNT(*)", "expected_keywords": ["订单数"]}
+{"id": "ans-011", "kind": "answer", "query": "活跃用户是怎么定义的", "expected_keywords": ["活跃用户"]}
+{"id": "ans-012", "kind": "answer", "query": "RFM模型三个维度分别是什么", "expected_keywords": ["RFM"]}
+{"id": "ans-013", "kind": "answer", "query": "新客和老客怎么划分", "expected_keywords": ["新客"]}
+{"id": "ans-014", "kind": "answer", "query": "次日留存怎么计算", "expected_keywords": ["留存"]}
+{"id": "ans-015", "kind": "answer", "query": "平台类型这个字段有哪些取值", "expected_keywords": ["平台类型"]}
+{"id": "ans-016", "kind": "answer", "query": "渠道编号是什么含义", "expected_keywords": ["渠道"]}
+{"id": "ans-017", "kind": "answer", "query": "月度同比怎么计算", "expected_keywords": ["同比"]}
+{"id": "ans-018", "kind": "answer", "query": "用户复购频次分布怎么算", "expected_keywords": ["复购"]}
+{"id": "ans-019", "kind": "answer", "query": "下单时段分布有什么用，怎么看", "expected_keywords": ["下单时段"]}
+{"id": "ans-020", "kind": "answer", "query": "退款金额占比高说明什么风险", "expected_keywords": ["退款金额占比"]}

@@ -20,6 +20,8 @@ def pytest_configure(config):
     os.environ["ADMIN_PASSWORD"] = "admin123"
     os.environ["ANALYST_USERNAME"] = "analyst"
     os.environ["ANALYST_PASSWORD"] = "analyst123"
+    # 仅测试环境显式允许CI主账号；生产配置仍默认拒绝回退。
+    os.environ.setdefault("AI_DB_ALLOW_MAIN_FALLBACK", "true")
 
 
 @pytest.fixture(autouse=True)

@@ -25,7 +25,7 @@ async def natural_language_query(
     - **query**: 自然语言查询，如"查询最近7天的销售额"
     - **Authorization**: Bearer <token> (通过 /api/auth/login 获取)
     """
-    logger.info(f"AI查询请求 [用户:{user['username']}]: {request.query}")
+    logger.info("AI查询请求 question_length=%d", len(request.query))
     return await ai_service.process_natural_language_query(
         request.query,
         request.thread_id,

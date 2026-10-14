@@ -54,7 +54,7 @@ def get_embeddings(model_name: str = DEFAULT_MODEL,
         logger.info("加载 Embedding 模型: %s (device=%s)", model_name, device)
         kwargs = {
             "model_name": model_name,
-            "model_kwargs": {"device": device},
+            "model_kwargs": {"device": device, "trust_remote_code": False},
             "encode_kwargs": {"normalize_embeddings": True, "batch_size": 32},
         }
         if cache_folder:

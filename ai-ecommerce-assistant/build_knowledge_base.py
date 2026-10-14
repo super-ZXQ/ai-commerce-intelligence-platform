@@ -26,6 +26,7 @@ import logging
 import re
 import sys
 import time
+import unicodedata
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -38,6 +39,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from langchain_core.documents import Document
+from filelock import FileLock
 from rag import DEFAULT_PERSIST_DIR, VectorStore, get_embeddings, metrics
 
 logging.basicConfig(
@@ -73,8 +75,11 @@ def _doc_type(filename: str) -> str:
 
 
 def _make_doc_id(source: str, section: str, content: str) -> str:
-    raw = f"{source}::{section}::{content[:200]}"
-    return hashlib.md5(raw.encode()).hexdigest()[:16]
+    # 仅规范化Unicode和换行/行尾空格，保留Markdown中有意义的段落与缩进。
+    normalized = unicodedata.normalize("NFC", content.replace("\r\n", "\n").replace("\r", "\n"))
+    normalized = "\n".join(line.rstrip() for line in normalized.splitlines()).strip()
+    raw = json.dumps([source, section, normalized], ensure_ascii=False)
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def _split_by_sections(text: str) -> Iterator[tuple[str, str]]:
@@ -153,8 +158,6 @@ def load_kb_files(kb_dir: str) -> list[Document]:
         raise FileNotFoundError(f"知识库目录不存在: {kb_dir}")
 
     md_files = sorted(kb_path.glob("*.md"))
-    if not md_files:
-        raise ValueError(f"知识库目录无 .md 文件: {kb_dir}")
 
     documents: list[Document] = []
     for fp in md_files:
@@ -182,12 +185,21 @@ def load_kb_files(kb_dir: str) -> list[Document]:
 
 
 def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
+    """同一持久化目录的构建串行化，避免并发增量删除彼此的Chunk。"""
+    Path(persist_dir).mkdir(parents=True, exist_ok=True)
+    with FileLock(str(Path(persist_dir) / ".kb-build.lock"), timeout=60):
+        return _build(kb_dir, persist_dir, rebuild)
+
+
+def _build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
     """构建（或增量更新）向量库。
 
     Returns:
         构建报告 dict。
     """
     t0 = time.time()
+    # 先检查源目录，避免错误路径在--rebuild时先清空有效向量库。
+    documents = load_kb_files(kb_dir)
     store = VectorStore(persist_dir=persist_dir, embedding=get_embeddings())
 
     if rebuild:
@@ -196,10 +208,6 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
 
     existing_count = store.count()
     logger.info("当前向量库文档数: %d", existing_count)
-
-    documents = load_kb_files(kb_dir)
-    if not documents:
-        return {"status": "empty", "chunks": 0}
 
     # 增量：仅写入 / 更新新增或变更的 doc
     existing_ids = set(store.get_all_ids())
@@ -210,25 +218,22 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
     new_ids: set[str] = set()
     for doc in documents:
         doc_id = doc.metadata["doc_id"]
-        new_ids.add(doc_id)
-        if doc_id not in existing_ids:
+        if doc_id not in new_ids and doc_id not in existing_ids:
             to_write.append(doc)
             to_write_ids.append(doc_id)
+        new_ids.add(doc_id)
 
     # 找出已删除的 doc（源文档已无此 chunk）
     deleted_ids = existing_ids - new_ids
-    if deleted_ids:
-        logger.info("🗑️  清理 %d 个废弃 doc", len(deleted_ids))
-        try:
-            store._store.delete(ids=list(deleted_ids))
-        except Exception as e:
-            logger.warning("废弃 doc 清理失败（可忽略）: %s", e)
-
     if to_write:
         logger.info("✏️  写入 %d 个新 chunk...", len(to_write))
         store.add_documents(to_write, ids=to_write_ids)
     else:
         logger.info("✅ 无变更，跳过写入")
+    # 先完成新内容写入再删旧向量，写入失败时保留上次有效知识。
+    if deleted_ids:
+        logger.info("🗑️  清理 %d 个废弃 doc", len(deleted_ids))
+        store.delete_documents(list(deleted_ids))
 
     elapsed = time.time() - t0
     final_count = store.count()

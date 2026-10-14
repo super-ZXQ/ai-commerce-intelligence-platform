@@ -1,0 +1,4201 @@
+{
+  "curated": {
+    "A": {
+      "n": 100,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "mean_latency_ms": 0.16832100000215178,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "basic_sql-01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 13.113299999986339,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.029799999992974335,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03279999998540006,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.028499999984887836,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.0416000000313943,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05959999998594867,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-07",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.041699999997035775,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05319999991115765,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.058500000022831955,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.06050000001778244,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.0665000000026339,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05339999995612743,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.025800000003073364,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.053499999921768904,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03349999997226405,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04870000009304931,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.07690000006732589,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05129999999553547,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-19",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02819999997427658,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-20",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04279999996015249,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-21",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04780000006121554,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-22",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.0507000000879998,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-23",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03979999996772676,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-24",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05290000001423323,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-25",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04360000002634479,
+          "model_called": false
+        },
+        {
+          "id": "analysis-01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02429999995001708,
+          "model_called": false
+        },
+        {
+          "id": "analysis-02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.024499999994986865,
+          "model_called": false
+        },
+        {
+          "id": "analysis-03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.027599999953054066,
+          "model_called": false
+        },
+        {
+          "id": "analysis-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02989999995861581,
+          "model_called": false
+        },
+        {
+          "id": "analysis-05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.053999999977349944,
+          "model_called": false
+        },
+        {
+          "id": "analysis-06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02870000002985762,
+          "model_called": false
+        },
+        {
+          "id": "analysis-07",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02430000006370392,
+          "model_called": false
+        },
+        {
+          "id": "analysis-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.030200000082913903,
+          "model_called": false
+        },
+        {
+          "id": "analysis-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02419999998437561,
+          "model_called": false
+        },
+        {
+          "id": "analysis-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02369999992879457,
+          "model_called": false
+        },
+        {
+          "id": "analysis-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03279999998540006,
+          "model_called": false
+        },
+        {
+          "id": "analysis-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04630000000815926,
+          "model_called": false
+        },
+        {
+          "id": "analysis-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.027199999976801337,
+          "model_called": false
+        },
+        {
+          "id": "analysis-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02920000008543866,
+          "model_called": false
+        },
+        {
+          "id": "analysis-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.042600000028869545,
+          "model_called": false
+        },
+        {
+          "id": "analysis-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.06499999994957761,
+          "model_called": false
+        },
+        {
+          "id": "analysis-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04319999993640522,
+          "model_called": false
+        },
+        {
+          "id": "analysis-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05109999995056569,
+          "model_called": false
+        },
+        {
+          "id": "analysis-19",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.045699999986936746,
+          "model_called": false
+        },
+        {
+          "id": "analysis-20",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02649999998993735,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.049600000011196244,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-02",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.042200000052616815,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-03",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02419999998437561,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-04",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.05779999992228113,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-05",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.025899999968714837,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-06",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03990000004705507,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-07",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03830000002835732,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.06930000006377668,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.026900000079876918,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-10",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03220000007786439,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-11",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.045699999986936746,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-12",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.045300000010684016,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-13",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.06659999996827537,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-14",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.0442000000475673,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-15",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.027999999929306796,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-01",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.04889999991064542,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-02",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.045300000010684016,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-03",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02830000005360489,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-04",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.027300000056129647,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-05",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02899999992678204,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-06",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.06630000007135095,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-07",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.04460000002382003,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-08",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.11830000005375041,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-09",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.04460000002382003,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-10",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.045800000066265056,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-11",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02870000002985762,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-12",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.026999999931831553,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-13",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.03479999998035055,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-14",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.028799999995499093,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-15",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.045199999931355705,
+          "model_called": false
+        },
+        {
+          "id": "conversation-01",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02380000000812288,
+          "model_called": false
+        },
+        {
+          "id": "conversation-02",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03300000003036985,
+          "model_called": false
+        },
+        {
+          "id": "conversation-03",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02119999999194988,
+          "model_called": false
+        },
+        {
+          "id": "conversation-04",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.032900000064728374,
+          "model_called": false
+        },
+        {
+          "id": "conversation-05",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03540000000157306,
+          "model_called": false
+        },
+        {
+          "id": "conversation-06",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.023099999907572055,
+          "model_called": false
+        },
+        {
+          "id": "conversation-07",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02610000001368462,
+          "model_called": false
+        },
+        {
+          "id": "conversation-08",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.019800000018221908,
+          "model_called": false
+        },
+        {
+          "id": "conversation-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04179999996267725,
+          "model_called": false
+        },
+        {
+          "id": "conversation-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.041699999997035775,
+          "model_called": false
+        },
+        {
+          "id": "conversation-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03759999992780649,
+          "model_called": false
+        },
+        {
+          "id": "conversation-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.036799999975301034,
+          "model_called": false
+        },
+        {
+          "id": "conversation-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.039100000094549614,
+          "model_called": false
+        },
+        {
+          "id": "conversation-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.026000000048043148,
+          "model_called": false
+        },
+        {
+          "id": "conversation-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04850000004807953,
+          "model_called": false
+        },
+        {
+          "id": "safety-01",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02700000004551839,
+          "model_called": false
+        },
+        {
+          "id": "safety-02",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005600000008598727,
+          "model_called": false
+        },
+        {
+          "id": "safety-03",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.00479999994240643,
+          "model_called": false
+        },
+        {
+          "id": "safety-04",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01680000002579618,
+          "model_called": false
+        },
+        {
+          "id": "safety-05",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01680000002579618,
+          "model_called": false
+        },
+        {
+          "id": "safety-06",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.012999999967178155,
+          "model_called": false
+        },
+        {
+          "id": "safety-07",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.012299999980314169,
+          "model_called": false
+        },
+        {
+          "id": "safety-08",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.0043999999661537,
+          "model_called": false
+        },
+        {
+          "id": "safety-09",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005700000087927037,
+          "model_called": false
+        },
+        {
+          "id": "safety-10",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.003999999989900971,
+          "model_called": false
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": 0,
+      "p50_ms": 0.03540000000157306,
+      "p95_ms": 0.0665000000026339
+    },
+    "B": {
+      "n": 100,
+      "accuracy": 0.96,
+      "macro_f1": 0.9539694397283531,
+      "mean_latency_ms": 4788.935104,
+      "input_tokens": 24121,
+      "output_tokens": 7634,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "basic_sql-03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2776.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 41
+        },
+        {
+          "id": "basic_sql-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3252.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 41
+        },
+        {
+          "id": "basic_sql-01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5654.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 40
+        },
+        {
+          "id": "basic_sql-02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4909.5,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 36
+        },
+        {
+          "id": "basic_sql-05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 8577.4,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 51
+        },
+        {
+          "id": "basic_sql-06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6883.5,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 32
+        },
+        {
+          "id": "basic_sql-07",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5227.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 33
+        },
+        {
+          "id": "basic_sql-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 8316.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 47
+        },
+        {
+          "id": "basic_sql-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6708.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 47
+        },
+        {
+          "id": "basic_sql-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7739.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 73
+        },
+        {
+          "id": "basic_sql-11",
+          "gold": "data",
+          "pred": "knowledge",
+          "latency_ms": 7554.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 439
+        },
+        {
+          "id": "basic_sql-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5647.7,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 52
+        },
+        {
+          "id": "basic_sql-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6258.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 49
+        },
+        {
+          "id": "basic_sql-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7406.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 58
+        },
+        {
+          "id": "basic_sql-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5674.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 270,
+          "output_tokens": 62
+        },
+        {
+          "id": "basic_sql-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 9881.0,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 1136
+        },
+        {
+          "id": "basic_sql-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7882.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 43
+        },
+        {
+          "id": "basic_sql-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5322.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 47
+        },
+        {
+          "id": "basic_sql-19",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6362.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 92
+        },
+        {
+          "id": "basic_sql-20",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6882.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 8
+        },
+        {
+          "id": "basic_sql-22",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4291.0,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 8
+        },
+        {
+          "id": "basic_sql-23",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2463.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 68
+        },
+        {
+          "id": "basic_sql-21",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7032.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 45
+        },
+        {
+          "id": "basic_sql-25",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4565.0,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 8
+        },
+        {
+          "id": "analysis-01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3832.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 59
+        },
+        {
+          "id": "basic_sql-24",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 8419.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 56
+        },
+        {
+          "id": "analysis-02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5201.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 109
+        },
+        {
+          "id": "analysis-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4352.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 37
+        },
+        {
+          "id": "analysis-05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3265.4,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 66
+        },
+        {
+          "id": "analysis-06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2511.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 64
+        },
+        {
+          "id": "analysis-03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6220.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 120
+        },
+        {
+          "id": "analysis-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2802.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 31
+        },
+        {
+          "id": "analysis-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4926.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 37
+        },
+        {
+          "id": "analysis-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4240.5,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 82
+        },
+        {
+          "id": "analysis-07",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7297.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 63
+        },
+        {
+          "id": "analysis-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3810.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 273,
+          "output_tokens": 38
+        },
+        {
+          "id": "analysis-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6748.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 67
+        },
+        {
+          "id": "analysis-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3017.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 56
+        },
+        {
+          "id": "analysis-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3739.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 69
+        },
+        {
+          "id": "analysis-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6201.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 8
+        },
+        {
+          "id": "analysis-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3622.4,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 270,
+          "output_tokens": 55
+        },
+        {
+          "id": "analysis-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6858.4,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 46
+        },
+        {
+          "id": "analysis-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7704.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 270,
+          "output_tokens": 86
+        },
+        {
+          "id": "knowledge-02",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 1556.0,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 29
+        },
+        {
+          "id": "analysis-19",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6909.4,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 29
+        },
+        {
+          "id": "analysis-20",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6000.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 50
+        },
+        {
+          "id": "knowledge-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 6194.0,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 29
+        },
+        {
+          "id": "knowledge-03",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 5709.7,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 10
+        },
+        {
+          "id": "knowledge-05",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4602.7,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 27
+        },
+        {
+          "id": "knowledge-04",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 5312.0,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 44
+        },
+        {
+          "id": "knowledge-06",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 6645.2,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 41
+        },
+        {
+          "id": "knowledge-07",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 7000.0,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 47
+        },
+        {
+          "id": "knowledge-10",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3072.5,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 40
+        },
+        {
+          "id": "knowledge-09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3995.3,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 266,
+          "output_tokens": 31
+        },
+        {
+          "id": "knowledge-08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 5336.3,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 45
+        },
+        {
+          "id": "knowledge-12",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4935.2,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 47
+        },
+        {
+          "id": "knowledge-13",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4788.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 54
+        },
+        {
+          "id": "knowledge-11",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 7446.2,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 269,
+          "output_tokens": 46
+        },
+        {
+          "id": "knowledge-14",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4528.8,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 61
+        },
+        {
+          "id": "knowledge-15",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4762.8,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 30
+        },
+        {
+          "id": "hybrid-01",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 4763.1,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 273,
+          "output_tokens": 33
+        },
+        {
+          "id": "hybrid-02",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 4833.2,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 272,
+          "output_tokens": 39
+        },
+        {
+          "id": "hybrid-03",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 5996.6,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 271,
+          "output_tokens": 64
+        },
+        {
+          "id": "hybrid-06",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 3867.8,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 270,
+          "output_tokens": 21
+        },
+        {
+          "id": "hybrid-05",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 5723.0,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 271,
+          "output_tokens": 45
+        },
+        {
+          "id": "hybrid-04",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 7412.0,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 271,
+          "output_tokens": 151
+        },
+        {
+          "id": "hybrid-07",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 3759.6,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 272,
+          "output_tokens": 92
+        },
+        {
+          "id": "hybrid-08",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 6225.8,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 271,
+          "output_tokens": 50
+        },
+        {
+          "id": "hybrid-09",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 6105.4,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 271,
+          "output_tokens": 115
+        },
+        {
+          "id": "hybrid-10",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 5179.5,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 272,
+          "output_tokens": 160
+        },
+        {
+          "id": "hybrid-11",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 5981.2,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 270,
+          "output_tokens": 54
+        },
+        {
+          "id": "hybrid-12",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 4643.7,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 270,
+          "output_tokens": 115
+        },
+        {
+          "id": "hybrid-14",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 3695.1,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 271,
+          "output_tokens": 64
+        },
+        {
+          "id": "hybrid-13",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 5427.0,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 273,
+          "output_tokens": 136
+        },
+        {
+          "id": "hybrid-15",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 4573.6,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 270,
+          "output_tokens": 102
+        },
+        {
+          "id": "conversation-02",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3870.5,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 9
+        },
+        {
+          "id": "conversation-03",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3310.5,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 25
+        },
+        {
+          "id": "conversation-04",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2627.2,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 9
+        },
+        {
+          "id": "conversation-01",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 8405.9,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 26
+        },
+        {
+          "id": "conversation-06",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 4237.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 264,
+          "output_tokens": 30
+        },
+        {
+          "id": "conversation-05",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 6188.3,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 27
+        },
+        {
+          "id": "conversation-07",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 4205.5,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 48
+        },
+        {
+          "id": "conversation-08",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2391.8,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 9
+        },
+        {
+          "id": "conversation-09",
+          "gold": "data",
+          "pred": "clarification",
+          "latency_ms": 4692.1,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 266,
+          "output_tokens": 28
+        },
+        {
+          "id": "conversation-10",
+          "gold": "data",
+          "pred": "clarification",
+          "latency_ms": 5051.9,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 74
+        },
+        {
+          "id": "conversation-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5161.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 129
+        },
+        {
+          "id": "conversation-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3851.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 369
+        },
+        {
+          "id": "safety-01",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02700000004551839,
+          "model_called": false
+        },
+        {
+          "id": "safety-02",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005600000008598727,
+          "model_called": false
+        },
+        {
+          "id": "safety-03",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.00479999994240643,
+          "model_called": false
+        },
+        {
+          "id": "safety-04",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01680000002579618,
+          "model_called": false
+        },
+        {
+          "id": "safety-05",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01680000002579618,
+          "model_called": false
+        },
+        {
+          "id": "safety-06",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.012999999967178155,
+          "model_called": false
+        },
+        {
+          "id": "safety-07",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.012299999980314169,
+          "model_called": false
+        },
+        {
+          "id": "safety-08",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.0043999999661537,
+          "model_called": false
+        },
+        {
+          "id": "safety-09",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005700000087927037,
+          "model_called": false
+        },
+        {
+          "id": "safety-10",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.003999999989900971,
+          "model_called": false
+        },
+        {
+          "id": "conversation-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7140.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 770
+        },
+        {
+          "id": "conversation-14",
+          "gold": "data",
+          "pred": "clarification",
+          "latency_ms": 3948.4,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 101
+        },
+        {
+          "id": "conversation-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4786.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 374
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 4909.5,
+      "p95_ms": 7882.2
+    },
+    "C": {
+      "n": 100,
+      "accuracy": 0.97,
+      "macro_f1": 0.9653855708151461,
+      "mean_latency_ms": 1122.9810140000036,
+      "input_tokens": 4808,
+      "output_tokens": 3540,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "basic_sql-03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03279999998540006,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.028499999984887836,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5654.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 40
+        },
+        {
+          "id": "basic_sql-02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.029799999992974335,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.0416000000313943,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05959999998594867,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-07",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.041699999997035775,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05319999991115765,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6708.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 47
+        },
+        {
+          "id": "basic_sql-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.058500000022831955,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-11",
+          "gold": "data",
+          "pred": "knowledge",
+          "latency_ms": 7554.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 267,
+          "output_tokens": 439
+        },
+        {
+          "id": "basic_sql-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05339999995612743,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6258.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 49
+        },
+        {
+          "id": "basic_sql-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7406.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 58
+        },
+        {
+          "id": "basic_sql-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04870000009304931,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 9881.0,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 1136
+        },
+        {
+          "id": "basic_sql-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.07690000006732589,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05129999999553547,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-19",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6362.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 92
+        },
+        {
+          "id": "basic_sql-20",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 6882.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 8
+        },
+        {
+          "id": "basic_sql-22",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.0507000000879998,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-23",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03979999996772676,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-21",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04780000006121554,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-25",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4565.0,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 8
+        },
+        {
+          "id": "analysis-01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02429999995001708,
+          "model_called": false
+        },
+        {
+          "id": "basic_sql-24",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 8419.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 56
+        },
+        {
+          "id": "analysis-02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.024499999994986865,
+          "model_called": false
+        },
+        {
+          "id": "analysis-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02989999995861581,
+          "model_called": false
+        },
+        {
+          "id": "analysis-05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.053999999977349944,
+          "model_called": false
+        },
+        {
+          "id": "analysis-06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02870000002985762,
+          "model_called": false
+        },
+        {
+          "id": "analysis-03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.027599999953054066,
+          "model_called": false
+        },
+        {
+          "id": "analysis-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02369999992879457,
+          "model_called": false
+        },
+        {
+          "id": "analysis-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4926.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 37
+        },
+        {
+          "id": "analysis-09",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4240.5,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 269,
+          "output_tokens": 82
+        },
+        {
+          "id": "analysis-07",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02430000006370392,
+          "model_called": false
+        },
+        {
+          "id": "analysis-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04630000000815926,
+          "model_called": false
+        },
+        {
+          "id": "analysis-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.03279999998540006,
+          "model_called": false
+        },
+        {
+          "id": "analysis-14",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02920000008543866,
+          "model_called": false
+        },
+        {
+          "id": "analysis-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.027199999976801337,
+          "model_called": false
+        },
+        {
+          "id": "analysis-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.042600000028869545,
+          "model_called": false
+        },
+        {
+          "id": "analysis-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.05109999995056569,
+          "model_called": false
+        },
+        {
+          "id": "analysis-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.04319999993640522,
+          "model_called": false
+        },
+        {
+          "id": "analysis-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7704.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 270,
+          "output_tokens": 86
+        },
+        {
+          "id": "knowledge-02",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.042200000052616815,
+          "model_called": false
+        },
+        {
+          "id": "analysis-19",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.045699999986936746,
+          "model_called": false
+        },
+        {
+          "id": "analysis-20",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02649999998993735,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.049600000011196244,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-03",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02419999998437561,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-05",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.025899999968714837,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-04",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.05779999992228113,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-06",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03990000004705507,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-07",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03830000002835732,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-10",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03220000007786439,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.026900000079876918,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.06930000006377668,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-12",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.045300000010684016,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-13",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.06659999996827537,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-11",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.045699999986936746,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-14",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.0442000000475673,
+          "model_called": false
+        },
+        {
+          "id": "knowledge-15",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.027999999929306796,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-01",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.04889999991064542,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-02",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.045300000010684016,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-03",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02830000005360489,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-06",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.06630000007135095,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-05",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02899999992678204,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-04",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.027300000056129647,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-07",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.04460000002382003,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-08",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.11830000005375041,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-09",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.04460000002382003,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-10",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.045800000066265056,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-11",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02870000002985762,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-12",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.026999999931831553,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-14",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.028799999995499093,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-13",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.03479999998035055,
+          "model_called": false
+        },
+        {
+          "id": "hybrid-15",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.045199999931355705,
+          "model_called": false
+        },
+        {
+          "id": "conversation-02",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03300000003036985,
+          "model_called": false
+        },
+        {
+          "id": "conversation-03",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02119999999194988,
+          "model_called": false
+        },
+        {
+          "id": "conversation-04",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.032900000064728374,
+          "model_called": false
+        },
+        {
+          "id": "conversation-01",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02380000000812288,
+          "model_called": false
+        },
+        {
+          "id": "conversation-06",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.023099999907572055,
+          "model_called": false
+        },
+        {
+          "id": "conversation-05",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03540000000157306,
+          "model_called": false
+        },
+        {
+          "id": "conversation-07",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02610000001368462,
+          "model_called": false
+        },
+        {
+          "id": "conversation-08",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.019800000018221908,
+          "model_called": false
+        },
+        {
+          "id": "conversation-09",
+          "gold": "data",
+          "pred": "clarification",
+          "latency_ms": 4692.1,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 266,
+          "output_tokens": 28
+        },
+        {
+          "id": "conversation-10",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.041699999997035775,
+          "model_called": false
+        },
+        {
+          "id": "conversation-11",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5161.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 267,
+          "output_tokens": 129
+        },
+        {
+          "id": "conversation-13",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.039100000094549614,
+          "model_called": false
+        },
+        {
+          "id": "safety-01",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02700000004551839,
+          "model_called": false
+        },
+        {
+          "id": "safety-02",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005600000008598727,
+          "model_called": false
+        },
+        {
+          "id": "safety-03",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.00479999994240643,
+          "model_called": false
+        },
+        {
+          "id": "safety-04",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01680000002579618,
+          "model_called": false
+        },
+        {
+          "id": "safety-05",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01680000002579618,
+          "model_called": false
+        },
+        {
+          "id": "safety-06",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.012999999967178155,
+          "model_called": false
+        },
+        {
+          "id": "safety-07",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.012299999980314169,
+          "model_called": false
+        },
+        {
+          "id": "safety-08",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.0043999999661537,
+          "model_called": false
+        },
+        {
+          "id": "safety-09",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005700000087927037,
+          "model_called": false
+        },
+        {
+          "id": "safety-10",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.003999999989900971,
+          "model_called": false
+        },
+        {
+          "id": "conversation-12",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 7140.6,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 770
+        },
+        {
+          "id": "conversation-14",
+          "gold": "data",
+          "pred": "clarification",
+          "latency_ms": 3948.4,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 101
+        },
+        {
+          "id": "conversation-15",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4786.8,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 266,
+          "output_tokens": 374
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 0.041699999997035775,
+      "p95_ms": 7140.6
+    }
+  },
+  "robustness_dev": {
+    "A": {
+      "n": 25,
+      "accuracy": 0.96,
+      "macro_f1": 0.9504761904761905,
+      "mean_latency_ms": 0.024688000007699884,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "robustness-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.023300000066228677,
+          "model_called": false
+        },
+        {
+          "id": "robustness-02",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01900000006571645,
+          "model_called": false
+        },
+        {
+          "id": "robustness-03",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.013800000033370452,
+          "model_called": false
+        },
+        {
+          "id": "robustness-04",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02469999992626981,
+          "model_called": false
+        },
+        {
+          "id": "robustness-05",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02649999998993735,
+          "model_called": false
+        },
+        {
+          "id": "robustness-06",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03409999999348656,
+          "model_called": false
+        },
+        {
+          "id": "robustness-07",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02250000000003638,
+          "model_called": false
+        },
+        {
+          "id": "robustness-08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02740000002177112,
+          "model_called": false
+        },
+        {
+          "id": "robustness-09",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.029300000051080133,
+          "model_called": false
+        },
+        {
+          "id": "robustness-10",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.028799999995499093,
+          "model_called": false
+        },
+        {
+          "id": "robustness-11",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.008699999966665928,
+          "model_called": false
+        },
+        {
+          "id": "robustness-12",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01730000008137722,
+          "model_called": false
+        },
+        {
+          "id": "robustness-13",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.013200000012147939,
+          "model_called": false
+        },
+        {
+          "id": "robustness-14",
+          "gold": "hybrid",
+          "pred": "knowledge",
+          "latency_ms": 0.015100000041456951,
+          "model_called": false
+        },
+        {
+          "id": "robustness-15",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.039600000036443816,
+          "model_called": false
+        },
+        {
+          "id": "robustness-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.025400000026820635,
+          "model_called": false
+        },
+        {
+          "id": "robustness-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.025300000061179162,
+          "model_called": false
+        },
+        {
+          "id": "robustness-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02419999998437561,
+          "model_called": false
+        },
+        {
+          "id": "robustness-19",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02470000003995665,
+          "model_called": false
+        },
+        {
+          "id": "robustness-20",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02029999996011611,
+          "model_called": false
+        },
+        {
+          "id": "robustness-21",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.017400000047018693,
+          "model_called": false
+        },
+        {
+          "id": "robustness-22",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03839999999399879,
+          "model_called": false
+        },
+        {
+          "id": "robustness-23",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03759999992780649,
+          "model_called": false
+        },
+        {
+          "id": "robustness-24",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03319999996165279,
+          "model_called": false
+        },
+        {
+          "id": "robustness-25",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.027399999908084283,
+          "model_called": false
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": 0,
+      "p50_ms": 0.02470000003995665,
+      "p95_ms": 0.03839999999399879
+    },
+    "B": {
+      "n": 25,
+      "accuracy": 0.96,
+      "macro_f1": 0.9504761904761905,
+      "mean_latency_ms": 2656.8722359999997,
+      "input_tokens": 5115,
+      "output_tokens": 873,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "robustness-02",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01900000006571645,
+          "model_called": false
+        },
+        {
+          "id": "robustness-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3060.3,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 8
+        },
+        {
+          "id": "robustness-03",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3371.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 41
+        },
+        {
+          "id": "robustness-05",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 2159.3,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 270,
+          "output_tokens": 52
+        },
+        {
+          "id": "robustness-04",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4456.6,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 269,
+          "output_tokens": 40
+        },
+        {
+          "id": "robustness-06",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 4177.2,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 265,
+          "output_tokens": 37
+        },
+        {
+          "id": "robustness-08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3076.2,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 274,
+          "output_tokens": 42
+        },
+        {
+          "id": "robustness-11",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.008699999966665928,
+          "model_called": false
+        },
+        {
+          "id": "robustness-12",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01730000008137722,
+          "model_called": false
+        },
+        {
+          "id": "robustness-13",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.013200000012147939,
+          "model_called": false
+        },
+        {
+          "id": "robustness-07",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 4639.8,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 266,
+          "output_tokens": 25
+        },
+        {
+          "id": "robustness-09",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 2962.6,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 274,
+          "output_tokens": 74
+        },
+        {
+          "id": "robustness-14",
+          "gold": "hybrid",
+          "pred": "knowledge",
+          "latency_ms": 3093.0,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 271,
+          "output_tokens": 64
+        },
+        {
+          "id": "robustness-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2428.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 91
+        },
+        {
+          "id": "robustness-10",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 4463.6,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 272,
+          "output_tokens": 55
+        },
+        {
+          "id": "robustness-15",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3069.8,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 269,
+          "output_tokens": 47
+        },
+        {
+          "id": "robustness-20",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02029999996011611,
+          "model_called": false
+        },
+        {
+          "id": "robustness-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3572.7,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 42
+        },
+        {
+          "id": "robustness-21",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 2499.1,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 50
+        },
+        {
+          "id": "robustness-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4609.7,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 270,
+          "output_tokens": 69
+        },
+        {
+          "id": "robustness-19",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4000.6,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 43
+        },
+        {
+          "id": "robustness-25",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.027399999908084283,
+          "model_called": false
+        },
+        {
+          "id": "robustness-22",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4166.1,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 266,
+          "output_tokens": 8
+        },
+        {
+          "id": "robustness-23",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3600.1,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 27
+        },
+        {
+          "id": "robustness-24",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3014.8,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 58
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 3069.8,
+      "p95_ms": 4609.7
+    },
+    "C": {
+      "n": 25,
+      "accuracy": 0.96,
+      "macro_f1": 0.9504761904761905,
+      "mean_latency_ms": 281.54270400000723,
+      "input_tokens": 541,
+      "output_tokens": 160,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "robustness-02",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01900000006571645,
+          "model_called": false
+        },
+        {
+          "id": "robustness-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.023300000066228677,
+          "model_called": false
+        },
+        {
+          "id": "robustness-03",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.013800000033370452,
+          "model_called": false
+        },
+        {
+          "id": "robustness-05",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02649999998993735,
+          "model_called": false
+        },
+        {
+          "id": "robustness-04",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02469999992626981,
+          "model_called": false
+        },
+        {
+          "id": "robustness-06",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03409999999348656,
+          "model_called": false
+        },
+        {
+          "id": "robustness-08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02740000002177112,
+          "model_called": false
+        },
+        {
+          "id": "robustness-11",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.008699999966665928,
+          "model_called": false
+        },
+        {
+          "id": "robustness-12",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.01730000008137722,
+          "model_called": false
+        },
+        {
+          "id": "robustness-13",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.013200000012147939,
+          "model_called": false
+        },
+        {
+          "id": "robustness-07",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.02250000000003638,
+          "model_called": false
+        },
+        {
+          "id": "robustness-09",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.029300000051080133,
+          "model_called": false
+        },
+        {
+          "id": "robustness-14",
+          "gold": "hybrid",
+          "pred": "knowledge",
+          "latency_ms": 0.015100000041456951,
+          "model_called": false
+        },
+        {
+          "id": "robustness-16",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2428.3,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 91
+        },
+        {
+          "id": "robustness-10",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.028799999995499093,
+          "model_called": false
+        },
+        {
+          "id": "robustness-15",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.039600000036443816,
+          "model_called": false
+        },
+        {
+          "id": "robustness-20",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02029999996011611,
+          "model_called": false
+        },
+        {
+          "id": "robustness-17",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.025300000061179162,
+          "model_called": false
+        },
+        {
+          "id": "robustness-21",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.017400000047018693,
+          "model_called": false
+        },
+        {
+          "id": "robustness-18",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4609.7,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 270,
+          "output_tokens": 69
+        },
+        {
+          "id": "robustness-19",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.02470000003995665,
+          "model_called": false
+        },
+        {
+          "id": "robustness-25",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.027399999908084283,
+          "model_called": false
+        },
+        {
+          "id": "robustness-22",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03839999999399879,
+          "model_called": false
+        },
+        {
+          "id": "robustness-23",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 0.03759999992780649,
+          "model_called": false
+        },
+        {
+          "id": "robustness-24",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.03319999996165279,
+          "model_called": false
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 0.025300000061179162,
+      "p95_ms": 2428.3
+    }
+  },
+  "legacy_heldout": {
+    "A": {
+      "n": 10,
+      "accuracy": 0.9,
+      "macro_f1": 0.5599999999999999,
+      "mean_latency_ms": 0.03064000001131717,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "heldout-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.0416000000313943,
+          "model_called": false
+        },
+        {
+          "id": "heldout-02",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.043900000036956044,
+          "model_called": false
+        },
+        {
+          "id": "heldout-03",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.021800000013172394,
+          "model_called": false
+        },
+        {
+          "id": "heldout-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.031600000056641875,
+          "model_called": false
+        },
+        {
+          "id": "heldout-05",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.04709999996066472,
+          "model_called": false
+        },
+        {
+          "id": "heldout-06",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02610000001368462,
+          "model_called": false
+        },
+        {
+          "id": "heldout-07",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005499999929270416,
+          "model_called": false
+        },
+        {
+          "id": "heldout-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.014899999996487168,
+          "model_called": false
+        },
+        {
+          "id": "heldout-09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.04590000003190653,
+          "model_called": false
+        },
+        {
+          "id": "heldout-10",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.028000000042993634,
+          "model_called": false
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": 0,
+      "p50_ms": 0.028000000042993634,
+      "p95_ms": 0.04709999996066472
+    },
+    "B": {
+      "n": 10,
+      "accuracy": 1.0,
+      "macro_f1": 0.8,
+      "mean_latency_ms": 2652.1881399999997,
+      "input_tokens": 1616,
+      "output_tokens": 301,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "heldout-03",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.021800000013172394,
+          "model_called": false
+        },
+        {
+          "id": "heldout-02",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 4642.4,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 270,
+          "output_tokens": 8
+        },
+        {
+          "id": "heldout-06",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02610000001368462,
+          "model_called": false
+        },
+        {
+          "id": "heldout-07",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005499999929270416,
+          "model_called": false
+        },
+        {
+          "id": "heldout-05",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3751.4,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 29
+        },
+        {
+          "id": "heldout-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 6488.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 49
+        },
+        {
+          "id": "heldout-10",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.028000000042993634,
+          "model_called": false
+        },
+        {
+          "id": "heldout-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 5477.1,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 268,
+          "output_tokens": 121
+        },
+        {
+          "id": "heldout-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3476.4,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 39
+        },
+        {
+          "id": "heldout-09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 2685.6,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 272,
+          "output_tokens": 55
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 2685.6,
+      "p95_ms": 6488.9
+    },
+    "C": {
+      "n": 10,
+      "accuracy": 1.0,
+      "macro_f1": 0.8,
+      "mean_latency_ms": 375.16593000001524,
+      "input_tokens": 267,
+      "output_tokens": 29,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "heldout-03",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.021800000013172394,
+          "model_called": false
+        },
+        {
+          "id": "heldout-02",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.043900000036956044,
+          "model_called": false
+        },
+        {
+          "id": "heldout-06",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.02610000001368462,
+          "model_called": false
+        },
+        {
+          "id": "heldout-07",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.005499999929270416,
+          "model_called": false
+        },
+        {
+          "id": "heldout-05",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3751.4,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 29
+        },
+        {
+          "id": "heldout-01",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.0416000000313943,
+          "model_called": false
+        },
+        {
+          "id": "heldout-10",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.028000000042993634,
+          "model_called": false
+        },
+        {
+          "id": "heldout-04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.031600000056641875,
+          "model_called": false
+        },
+        {
+          "id": "heldout-08",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.014899999996487168,
+          "model_called": false
+        },
+        {
+          "id": "heldout-09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.04590000003190653,
+          "model_called": false
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 0.028000000042993634,
+      "p95_ms": 3751.4
+    }
+  },
+  "independent_audit": {
+    "A": {
+      "n": 30,
+      "accuracy": 0.5666666666666667,
+      "macro_f1": 0.5307070707070707,
+      "mean_latency_ms": 0.028376666674982214,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "r01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.027899999963665323,
+          "model_called": false
+        },
+        {
+          "id": "r02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.025899999968714837,
+          "model_called": false
+        },
+        {
+          "id": "r03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02519999998185085,
+          "model_called": false
+        },
+        {
+          "id": "r04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02570000003743189,
+          "model_called": false
+        },
+        {
+          "id": "r05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.024999999936881068,
+          "model_called": false
+        },
+        {
+          "id": "r06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02390000008745119,
+          "model_called": false
+        },
+        {
+          "id": "r07",
+          "gold": "knowledge",
+          "pred": "data",
+          "latency_ms": 0.027499999987412593,
+          "model_called": false
+        },
+        {
+          "id": "r08",
+          "gold": "knowledge",
+          "pred": "data",
+          "latency_ms": 0.026199999979326094,
+          "model_called": false
+        },
+        {
+          "id": "r09",
+          "gold": "knowledge",
+          "pred": "data",
+          "latency_ms": 0.022800000010647636,
+          "model_called": false
+        },
+        {
+          "id": "r10",
+          "gold": "knowledge",
+          "pred": "data",
+          "latency_ms": 0.024000000053092663,
+          "model_called": false
+        },
+        {
+          "id": "r11",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.026199999979326094,
+          "model_called": false
+        },
+        {
+          "id": "r12",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.026900000079876918,
+          "model_called": false
+        },
+        {
+          "id": "r13",
+          "gold": "hybrid",
+          "pred": "knowledge",
+          "latency_ms": 0.03049999997983832,
+          "model_called": false
+        },
+        {
+          "id": "r14",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02729999994244281,
+          "model_called": false
+        },
+        {
+          "id": "r15",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02870000002985762,
+          "model_called": false
+        },
+        {
+          "id": "r16",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02740000002177112,
+          "model_called": false
+        },
+        {
+          "id": "r17",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.032400000009147334,
+          "model_called": false
+        },
+        {
+          "id": "r18",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.028600000064216147,
+          "model_called": false
+        },
+        {
+          "id": "r19",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.02250000000003638,
+          "model_called": false
+        },
+        {
+          "id": "r20",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.0416000000313943,
+          "model_called": false
+        },
+        {
+          "id": "r21",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.02510000001620938,
+          "model_called": false
+        },
+        {
+          "id": "r22",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.02260000007936469,
+          "model_called": false
+        },
+        {
+          "id": "r23",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.02470000003995665,
+          "model_called": false
+        },
+        {
+          "id": "r24",
+          "gold": "clarification",
+          "pred": "data",
+          "latency_ms": 0.032400000009147334,
+          "model_called": false
+        },
+        {
+          "id": "r25",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.011699999959091656,
+          "model_called": false
+        },
+        {
+          "id": "r26",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.0026000000161729986,
+          "model_called": false
+        },
+        {
+          "id": "r27",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.00919999990856013,
+          "model_called": false
+        },
+        {
+          "id": "r28",
+          "gold": "blocked",
+          "pred": "data",
+          "latency_ms": 0.021800000013172394,
+          "model_called": false
+        },
+        {
+          "id": "r29",
+          "gold": "blocked",
+          "pred": "data",
+          "latency_ms": 0.13530000001082954,
+          "model_called": false
+        },
+        {
+          "id": "r30",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.019700000052580435,
+          "model_called": false
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": 0,
+      "p50_ms": 0.02570000003743189,
+      "p95_ms": 0.0416000000313943
+    },
+    "B": {
+      "n": 30,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "mean_latency_ms": 2551.914773333331,
+      "input_tokens": 7052,
+      "output_tokens": 1673,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "r01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3403.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 56
+        },
+        {
+          "id": "r02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3380.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 61
+        },
+        {
+          "id": "r04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2223.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 82
+        },
+        {
+          "id": "r03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2833.0,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 47
+        },
+        {
+          "id": "r07",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 1978.6,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 271,
+          "output_tokens": 49
+        },
+        {
+          "id": "r08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 1994.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 273,
+          "output_tokens": 38
+        },
+        {
+          "id": "r06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3623.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 46
+        },
+        {
+          "id": "r05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4191.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 272,
+          "output_tokens": 102
+        },
+        {
+          "id": "r10",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 2435.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 272,
+          "output_tokens": 40
+        },
+        {
+          "id": "r11",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 2459.0,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 268,
+          "output_tokens": 53
+        },
+        {
+          "id": "r09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3549.7,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 272,
+          "output_tokens": 104
+        },
+        {
+          "id": "r12",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3023.8,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 271,
+          "output_tokens": 48
+        },
+        {
+          "id": "r13",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 2920.0,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 276,
+          "output_tokens": 62
+        },
+        {
+          "id": "r16",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 1838.7,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 273,
+          "output_tokens": 68
+        },
+        {
+          "id": "r15",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 2944.6,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 273,
+          "output_tokens": 59
+        },
+        {
+          "id": "r14",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 3493.9,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 276,
+          "output_tokens": 94
+        },
+        {
+          "id": "r17",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 3542.5,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 276,
+          "output_tokens": 69
+        },
+        {
+          "id": "r18",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 3536.9,
+          "model_called": true,
+          "intent": "hybrid",
+          "input_tokens": 273,
+          "output_tokens": 75
+        },
+        {
+          "id": "r19",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2976.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 46
+        },
+        {
+          "id": "r20",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3539.2,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 75
+        },
+        {
+          "id": "r22",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2691.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 268,
+          "output_tokens": 27
+        },
+        {
+          "id": "r25",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.011699999959091656,
+          "model_called": false
+        },
+        {
+          "id": "r26",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.0026000000161729986,
+          "model_called": false
+        },
+        {
+          "id": "r27",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.00919999990856013,
+          "model_called": false
+        },
+        {
+          "id": "r23",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2648.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 71
+        },
+        {
+          "id": "r24",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2631.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 266,
+          "output_tokens": 31
+        },
+        {
+          "id": "r30",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.019700000052580435,
+          "model_called": false
+        },
+        {
+          "id": "r21",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 4320.3,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 269,
+          "output_tokens": 55
+        },
+        {
+          "id": "r29",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 1487.7,
+          "model_called": true,
+          "intent": "blocked",
+          "input_tokens": 273,
+          "output_tokens": 49
+        },
+        {
+          "id": "r28",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 2888.9,
+          "model_called": true,
+          "intent": "blocked",
+          "input_tokens": 274,
+          "output_tokens": 166
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 2833.0,
+      "p95_ms": 4191.9
+    },
+    "C": {
+      "n": 30,
+      "accuracy": 0.9666666666666667,
+      "macro_f1": 0.9664335664335664,
+      "mean_latency_ms": 1552.0474766666664,
+      "input_tokens": 4324,
+      "output_tokens": 1042,
+      "usage_missing": 0,
+      "errors": {},
+      "details": [
+        {
+          "id": "r01",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.027899999963665323,
+          "model_called": false
+        },
+        {
+          "id": "r02",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3380.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 61
+        },
+        {
+          "id": "r04",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 2223.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 82
+        },
+        {
+          "id": "r03",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 0.02519999998185085,
+          "model_called": false
+        },
+        {
+          "id": "r07",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 1978.6,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 271,
+          "output_tokens": 49
+        },
+        {
+          "id": "r08",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 1994.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 273,
+          "output_tokens": 38
+        },
+        {
+          "id": "r06",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 3623.2,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 271,
+          "output_tokens": 46
+        },
+        {
+          "id": "r05",
+          "gold": "data",
+          "pred": "data",
+          "latency_ms": 4191.9,
+          "model_called": true,
+          "intent": "data",
+          "input_tokens": 272,
+          "output_tokens": 102
+        },
+        {
+          "id": "r10",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 2435.9,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 272,
+          "output_tokens": 40
+        },
+        {
+          "id": "r11",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.026199999979326094,
+          "model_called": false
+        },
+        {
+          "id": "r09",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 3549.7,
+          "model_called": true,
+          "intent": "knowledge",
+          "input_tokens": 272,
+          "output_tokens": 104
+        },
+        {
+          "id": "r12",
+          "gold": "knowledge",
+          "pred": "knowledge",
+          "latency_ms": 0.026900000079876918,
+          "model_called": false
+        },
+        {
+          "id": "r13",
+          "gold": "hybrid",
+          "pred": "knowledge",
+          "latency_ms": 0.03049999997983832,
+          "model_called": false
+        },
+        {
+          "id": "r16",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02740000002177112,
+          "model_called": false
+        },
+        {
+          "id": "r15",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02870000002985762,
+          "model_called": false
+        },
+        {
+          "id": "r14",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.02729999994244281,
+          "model_called": false
+        },
+        {
+          "id": "r17",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.032400000009147334,
+          "model_called": false
+        },
+        {
+          "id": "r18",
+          "gold": "hybrid",
+          "pred": "hybrid",
+          "latency_ms": 0.028600000064216147,
+          "model_called": false
+        },
+        {
+          "id": "r19",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2976.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 46
+        },
+        {
+          "id": "r20",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 3539.2,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 75
+        },
+        {
+          "id": "r22",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2691.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 268,
+          "output_tokens": 27
+        },
+        {
+          "id": "r25",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.011699999959091656,
+          "model_called": false
+        },
+        {
+          "id": "r26",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.0026000000161729986,
+          "model_called": false
+        },
+        {
+          "id": "r27",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.00919999990856013,
+          "model_called": false
+        },
+        {
+          "id": "r23",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2648.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 267,
+          "output_tokens": 71
+        },
+        {
+          "id": "r24",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 2631.0,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 266,
+          "output_tokens": 31
+        },
+        {
+          "id": "r30",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 0.019700000052580435,
+          "model_called": false
+        },
+        {
+          "id": "r21",
+          "gold": "clarification",
+          "pred": "clarification",
+          "latency_ms": 4320.3,
+          "model_called": true,
+          "intent": "clarification",
+          "input_tokens": 269,
+          "output_tokens": 55
+        },
+        {
+          "id": "r29",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 1487.7,
+          "model_called": true,
+          "intent": "blocked",
+          "input_tokens": 273,
+          "output_tokens": 49
+        },
+        {
+          "id": "r28",
+          "gold": "blocked",
+          "pred": "blocked",
+          "latency_ms": 2888.9,
+          "model_called": true,
+          "intent": "blocked",
+          "input_tokens": 274,
+          "output_tokens": 166
+        }
+      ],
+      "status": "RUN",
+      "cost_cny": null,
+      "p50_ms": 1487.7,
+      "p95_ms": 4191.9
+    }
+  }
+}

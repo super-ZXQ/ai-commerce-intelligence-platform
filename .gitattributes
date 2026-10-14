@@ -1,0 +1,2 @@
+# Linux容器直接挂载的脚本必须使用LF，避免Windows检出后set命令失败。
+deploy/mysql/*.sh text eol=lf

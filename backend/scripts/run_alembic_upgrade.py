@@ -51,7 +51,7 @@ def main() -> int:
         script = ScriptDirectory.from_config(cfg)
         heads = script.get_heads()
         print(f"alembic_heads={heads}")
-        if heads != ["0001_baseline"]:
+        if heads != ["0002_order_auto_increment"]:
             print(f"FAIL: unexpected heads {heads}")
             return 1
     except Exception:
@@ -76,7 +76,7 @@ def main() -> int:
                 print(f"FAIL: missing tables {sorted(missing)}; have={sorted(tables)}")
                 return 1
             ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            if ver != "0001_baseline":
+            if ver != heads[0]:
                 print(f"FAIL: unexpected alembic_version {ver!r}")
                 return 1
         eng.dispose()

@@ -5,9 +5,10 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import get_settings
@@ -16,6 +17,7 @@ from backend.routes import ai, analytics, auth, export, monitor, order_events, o
 from backend.routes.monitor import (
     _load_rag_stats,
     detailed_health,
+    optional_monitor_auth,
     record_request,
     render_backend_prometheus,
     render_rag_prometheus,
@@ -56,6 +58,9 @@ async def lifespan(app: FastAPI):
         # 生产 API 不应以“表面存活、业务接口全部失败”的状态继续运行。
         raise RuntimeError("数据库连接失败，终止后端启动")
     logger.info("✅ 数据库连接检查完成")
+    if not settings.debug:
+        # 启动即验证AI账户的实际授权，拒绝借用root或带写权限的遗留账号。
+        await asyncio.to_thread(ai.ai_service._get_sync_engine)
     if not await check_event_db_connection():
         raise RuntimeError("事件数据库连接失败，终止后端启动")
 
@@ -88,6 +93,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
+    # 默认 /docs 布局在宽屏下整体贴左；改为自定义路由 + 居中 CSS（见下文）
+    docs_url=None,
     description="""
 ## AI Commerce Intelligence Platform API v1.0.3
 
@@ -227,6 +234,17 @@ _FAVICON_PATH = os.path.join(_STATIC_DIR, "favicon.svg")
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    """Swagger UI：使用本地覆盖 CSS，在宽屏下水平居中。"""
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{settings.app_name} - API 文档",
+        swagger_css_url="/static/css/swagger.css",
+        swagger_favicon_url="/static/favicon.svg",
+    )
+
+
 @app.get("/", tags=["系统"])
 async def root() -> FileResponse:
     return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
@@ -254,15 +272,15 @@ async def health_check() -> dict:
     return {"status": "healthy" if db_ok else "degraded", "database": "connected" if db_ok else "disconnected"}
 
 
-@app.get("/health/detailed", tags=["系统"])
+@app.get("/health/detailed", tags=["系统"], dependencies=[Depends(optional_monitor_auth)])
 async def detailed_health_alias() -> dict:
-    """兼容运维工具的公开详细健康检查路径。"""
+    """兼容运维工具的详细健康检查路径（开关开启时需 JWT）。"""
     return await detailed_health()
 
 
-@app.get("/metrics", response_class=PlainTextResponse, tags=["系统"])
+@app.get("/metrics", response_class=PlainTextResponse, tags=["系统"], dependencies=[Depends(optional_monitor_auth)])
 async def metrics_alias() -> PlainTextResponse:
-    """公开的 Prometheus 指标路径。"""
+    """Prometheus 指标路径（开关开启时需 JWT）。"""
     return PlainTextResponse(
         content=(
             render_backend_prometheus()

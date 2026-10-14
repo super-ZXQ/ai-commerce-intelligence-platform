@@ -29,14 +29,12 @@ def _purge_app():
 
 def test_app_cold_import_does_not_load_rag():
     """模块冷启动：import app 后 rag/chromadb/sentence_transformers 不应在 sys.modules。"""
-    _purge_app()
-    import app  # noqa: F401
-    heavy = [
-        k for k in sys.modules
-        if k == "rag" or k.startswith("rag.")
-        or k.startswith("chromadb") or k.startswith("sentence_transformers")
-    ]
-    assert heavy == [], f"heavy RAG deps should not be loaded at import time, got: {heavy[:5]}"
+    import subprocess
+    from pathlib import Path
+
+    # 新增Chroma集成测试会先加载Rust扩展；真正冷启动必须用独立解释器验证。
+    code = "import sys; import app; assert not any(k == 'rag' or k.startswith(('rag.', 'chromadb', 'sentence_transformers')) for k in sys.modules)"
+    subprocess.run([sys.executable, "-c", code], cwd=Path(__file__).resolve().parents[1], check=True, capture_output=True)
 
 
 def test_lazy_retriever_initial_state():

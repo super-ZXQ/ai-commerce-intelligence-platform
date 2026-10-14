@@ -74,10 +74,11 @@ def test_alembic_ini_and_versions_tree_exist():
     assert _VERSIONS.is_dir()
 
 
-def test_alembic_single_head_is_baseline():
+def test_alembic_single_head_preserves_baseline_chain():
     script = _script()
     heads = script.get_heads()
-    assert heads == ["0001_baseline"], f"expect single head=0001_baseline, got {heads}"
+    assert heads == ["0002_order_auto_increment"]
+    assert script.get_revision(heads[0]).down_revision == "0001_baseline"
     revision = script.get_revision("0001_baseline")
     assert revision.down_revision is None
 
@@ -205,7 +206,7 @@ def test_alembic_upgrade_head_on_mysql_if_available():
         cols = {row[0] for row in c.execute(text("SHOW COLUMNS FROM orders")).fetchall()}
         assert {"order_seq_id", "order_id", "order_status", "event_version"} <= cols
         version = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert version == "0001_baseline"
+        assert version == "0002_order_auto_increment"
         event_cols = {
             row[0] for row in c.execute(text("SHOW COLUMNS FROM order_events")).fetchall()
         }
@@ -274,7 +275,7 @@ def test_migration_preserves_existing_rows_on_mysql_if_available():
         assert after == 1, "upgrade head must not delete existing rows"
         c.execute(text("DELETE FROM orders WHERE order_id = 'ALEMBIC_KEEP_ME'"))
         ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert ver == "0001_baseline"
+        assert ver == "0002_order_auto_increment"
     engine.dispose()
 
 
@@ -332,7 +333,7 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
             assert {"orders", "order_events", "app_metadata", "alembic_version"} <= tables
             assert (
                 c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-                == "0001_baseline"
+                == "0002_order_auto_increment"
             )
             assert c.execute(text("SELECT COUNT(*) FROM orders")).scalar() == 0
         engine.dispose()

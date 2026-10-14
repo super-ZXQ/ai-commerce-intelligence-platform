@@ -1,0 +1,16 @@
+{"id":"cal-p01","query":"新用户和老用户在报表里如何区分","filename":"business_glossary.md","section":"二、用户行为指标"}
+{"id":"cal-p02","query":"平台支持哪些客户端来源类型","filename":"data_dictionary.md","section":"orders 表字段说明"}
+{"id":"cal-p03","query":"订单优惠金额字段是哪两个金额的差","filename":"data_dictionary.md","section":"orders 表字段说明"}
+{"id":"cal-p04","query":"订单时间戳应采用哪种格式","filename":"data_dictionary.md","section":"数据质量"}
+{"id":"cal-p05","query":"API的每分钟请求数量限制在哪里说明","filename":"api_docs.md","section":"七、限流规则"}
+{"id":"cal-p06","query":"识别客户流失时有哪些预警信号","filename":"business_rules.md","section":"四、用户行为预警"}
+{"id":"cal-p07","query":"知识库对货币单位的约定是什么","filename":"business_glossary.md","section":"七、货币与单位"}
+{"id":"cal-p08","query":"查询订单分组聚合应使用什么SQL模式","filename":"data_dictionary.md","section":"常用 SQL 模式"}
+{"id":"cal-n01","query":"APP退款成功后银行到账承诺是几个小时","no_answer":true}
+{"id":"cal-n02","query":"Web网站订单的电子发票抬头怎样变更","no_answer":true}
+{"id":"cal-n03","query":"渠道C1今年的投放预算审批金额是多少","no_answer":true}
+{"id":"cal-n04","query":"平台与承运商签署的丢件赔偿条款是什么","no_answer":true}
+{"id":"cal-n05","query":"上海仓库春节期间发货值班名单","no_answer":true}
+{"id":"cal-n06","query":"骨折恢复期的康复训练安排怎么制定","no_answer":true}
+{"id":"cal-n07","query":"恒星光谱的吸收线为什么发生红移","no_answer":true}
+{"id":"cal-n08","query":"室内绿植叶片发黄应如何处理","no_answer":true}

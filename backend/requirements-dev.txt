@@ -5,3 +5,6 @@ pytest==9.1.0
 pytest-asyncio==1.4.0
 ruff==0.15.17
 alembic==1.16.4
+# 安全扫描（CI security.yml 使用；bandit 版本经本地预跑验证：中高危清零）
+bandit==1.9.4
+pip-audit==2.10.1

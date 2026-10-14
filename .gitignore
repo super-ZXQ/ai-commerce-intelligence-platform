@@ -38,15 +38,18 @@ output/
 
 # RAG 向量库持久化（Chroma，每个环境独立）
 ai-ecommerce-assistant/data/
-
 # 评估报告产物（保留 gold_qa.jsonl + run_eval.py 即可）
 ai-ecommerce-assistant/eval/report.md
 ai-ecommerce-assistant/eval/report.json
+# 运行时用户反馈日志（含真实提问内容，仅本地保留）
+ai-ecommerce-assistant/eval/feedback.jsonl
 
 # 本地运行与接口调试产物
 logs/
 test_*.json
--w
+
+# 设计工具内部产物（截图/决策记录，由工具在本地重新生成）
+.impeccable/
 
 # 工具内部计划文件（不入库）
 .zcode/
@@ -64,3 +67,7 @@ video-promo/out/
 video-promo/.cache/
 # 含真实凭据的轮换脚本（仅本地执行）
 deploy/sql/rotate_credentials.local.sql
+
+# 个人内部材料仅在本地保留
+IMPROVEMENT_REPORT.md
+docs/*_TECHNICAL_SUMMARY.md

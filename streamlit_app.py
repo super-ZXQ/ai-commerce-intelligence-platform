@@ -7,9 +7,15 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from dotenv import load_dotenv
 
+from agent_core.page_auth import require_page_user
+from agent_core.business_data import active_orders_frame, load_live_orders
+from agent_core.db_permissions import verify_ai_permissions
 from backend.utils.rfm_scoring import assign_segment, quantile_scores
 from bi_style import BI_DASHBOARD_CSS
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 # ══════════════════════════════════════════════════════════════
 # 全局样式
@@ -94,6 +100,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+require_page_user()
+
 st.markdown(BI_DASHBOARD_CSS, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
@@ -116,10 +124,28 @@ def load_data():
 
 with st.spinner("正在加载数据..."):
     try:
-        df = load_data()
+        if os.environ.get("BI_DATA_MODE", "static") == "database":
+            from sqlalchemy import URL, create_engine
+            connection_url = URL.create(
+                "mysql+pymysql", username=os.environ["AI_DB_USER"], password=os.environ["AI_DB_PASSWORD"],
+                host=os.getenv("DB_HOST", "localhost"), port=int(os.getenv("DB_PORT", "3306")),
+                database=os.getenv("DB_NAME", "ai_commerce_intelligence_platform"),
+            )
+            live_engine = create_engine(connection_url, pool_pre_ping=True)
+            try:
+                if os.getenv("DEBUG", "false").lower() != "true":
+                    verify_ai_permissions(live_engine)
+                df = load_live_orders(live_engine)
+            finally:
+                live_engine.dispose()
+            st.caption("实时数据库模式：刷新页面读取已提交订单；销售与RFM仅统计有效订单。")
+            st.sidebar.button("刷新订单数据")
+        else:
+            df = active_orders_frame(load_data())
+            st.warning("静态演示模式：CSV/Parquet快照，不包含后续订单事件；仅统计未退款订单。")
         st.success(f"成功加载 {len(df):,} 条订单数据")
     except Exception as e:
-        st.error(f"数据加载失败：{e}")
+        st.error(f"数据加载失败：{type(e).__name__}")
         st.stop()
 
 page = st.sidebar.selectbox("选择看板页面", ["销售总览", "RFM 客户分层"])

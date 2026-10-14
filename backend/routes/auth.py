@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config import get_settings
@@ -31,16 +31,33 @@ async def get_current_user(
 
 
 @router.post("/login", response_model=TokenResponse, summary="用户登录")
-async def login(credentials: UserCredentials) -> TokenResponse:
+async def login(credentials: UserCredentials, response: Response) -> TokenResponse:
     if not authenticate_user(credentials.username, credentials.password):
         logger.warning(f"登录失败: 用户 {credentials.username}")
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     access_token = create_access_token(credentials.username)
+    # 页面使用 HttpOnly 会话；业务 API 仍只接受 Bearer，避免引入 Cookie 写操作 CSRF。
+    response.set_cookie(
+        "ea_session", access_token, httponly=True, samesite="strict",
+        secure=not settings.debug, max_age=settings.jwt_expire_minutes * 60,
+    )
     logger.info(f"登录成功: {credentials.username}")
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.jwt_expire_minutes * 60,
     )
+
+
+@router.get("/page-session", summary="网关及页面服务端认证")
+async def page_session(request: Request) -> dict:
+    token = request.cookies.get("ea_session", "")
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:]
+    data = decode_token(token)
+    if data is None:
+        raise HTTPException(status_code=401, detail="请先在 /demo 登录；生产环境需 HTTPS")
+    return {"username": data.username, "authenticated": True}
 
 
 @router.post("/refresh", response_model=TokenResponse, summary="刷新令牌")

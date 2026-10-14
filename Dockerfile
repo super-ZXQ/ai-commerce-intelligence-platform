@@ -2,9 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY backend/requirements.txt ./backend/
+# 使用 requirements.lock 安装：传递依赖版本完全钉死，镜像构建可复现
+COPY backend/requirements.lock ./backend/
 RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
-    && pip install --no-cache-dir -r ./backend/requirements.txt
+    && pip install --no-cache-dir -r ./backend/requirements.lock
 
 COPY backend/ ./backend/
 COPY agent_core/ ./agent_core/

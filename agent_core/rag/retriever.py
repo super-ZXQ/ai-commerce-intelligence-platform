@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,15 +32,18 @@ class MarkdownKnowledgeRetriever:
     def __init__(self, knowledge_dir: str | Path):
         self.knowledge_dir = Path(knowledge_dir)
         self._chunks: list[_Chunk] | None = None
+        self._version: tuple = ()
 
     def _load(self) -> list[_Chunk]:
-        if self._chunks is not None:
+        documents = [(path, path.read_text(encoding="utf-8")) for path in sorted(self.knowledge_dir.glob("*.md"))]
+        version = tuple((path.name, hashlib.sha256(body.encode()).hexdigest()) for path, body in documents)
+        if self._chunks is not None and version == self._version:
             return self._chunks
         chunks: list[_Chunk] = []
-        for path in sorted(self.knowledge_dir.glob("*.md")):
+        for path, document in documents:
             section = path.stem
             body: list[str] = []
-            for line in path.read_text(encoding="utf-8").splitlines():
+            for line in document.splitlines():
                 if line.startswith("## "):
                     if body:
                         chunks.append(_Chunk(path.name, section, "\n".join(body).strip()))
@@ -50,6 +54,7 @@ class MarkdownKnowledgeRetriever:
             if body:
                 chunks.append(_Chunk(path.name, section, "\n".join(body).strip()))
         self._chunks = [chunk for chunk in chunks if chunk.content]
+        self._version = version
         return self._chunks
 
     async def retrieve(self, query: str, top_k: int = 3) -> list[AgentSource]:
