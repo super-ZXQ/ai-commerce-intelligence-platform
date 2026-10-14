@@ -105,7 +105,7 @@ README已统一旧10题历史60%、当前回归90%、新30题56.67%的口径。�
 
 ## 安全风险与所有者操作
 
-- 原Gitleaks action只扫事件提交，完整checkout不代表全历史扫描。现新增显式HEAD祖先扫描，保留失败。基线112提交发现4条：1条公开WebSocket nonce误报、3条旧材料access_token。原全部本地refs七条属于不同范围，不混用；后续提交只增加扫描提交数。
+- 原Gitleaks action只扫事件提交，完整checkout不代表全历史扫描。现新增显式HEAD祖先扫描，真实风险仍会使门禁失败。基线未分类时112提交发现4条：1条公开WebSocket nonce误报、3条旧材料access_token。原全部本地refs七条属于不同范围，不混用；后续提交只增加扫描提交数。
 - 旧三条token进一步核实为**截断JWT示例误报**：0390d620旧材料636/692/710行均处于/api/auth/login示例，值含字面量省略号，有4个片段；PyJWT在本地禁用签名验证也抛DecodeError，不是可用的三段JWT。证据premerge_credentials_review.json，没有输出原值或用其请求服务，因此无需撤销这些示例。
 - 对上述3条截断示例和1条RFC公开WebSocket nonce，仅在.gitleaksignore逐个加入历史精确指纹，附理由。没有按规则、文件路径或包名广泛豁免，也没有豁免真实漏洞；完整历史和事件扫描保留。初始“疑似凭据、需核实”结论已被进一步静态证据更新，未进行远端历史改写。
 - 本次聊天中出现的模型Key也应在控制台撤销并替换，仅更新本机root/backend env。临时评测文件在收尾删除；200不是旧Key已撤销的证据。
@@ -135,3 +135,21 @@ $env:RUN_DOCKER_AUTH_TESTS='1'
 ```
 
 模型命令须由环境提供匹配的LLM_API_KEY、LLM_BASE_URL与LLM_MODEL；旧env未更新仍会401。历史50题CLI默认提供方/模型并非本次DeepSeek，必须显式设置这两个环境变量。本次费用由独立HTTP记录计算，常规CLI不能自动重建提供方缓存命中明细，不应以其缺失字段宣称零费用。
+
+
+## 最后核实的远端状态（验收提交61ecc11）
+
+以下为61ecc11的真实运行结果；本次报告补交仅修改文档，后续提交的工作流不得据此自动标绿。
+
+| 工作流/检查 | 状态 | 运行 |
+|---|---|---|
+| CI（后端、AI3.12/3.13、静态/离线/编译） | PASS | [38487755795](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/runs/38487755795) |
+| Docker空卷冷启动Smoke | PASS | [38487755663](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/runs/38487755663) |
+| Gitleaks事件范围与完整历史 | PASS，4条已核实误报仅按精确指纹处理 | [Security 38487755660](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/runs/38487755660) |
+| Bandit / 后端pip-audit | PASS | 同上 |
+| AI助手pip-audit | FAIL，Chroma真实告警未豁免 | 同上 |
+| Release Docker Images | PENDING，前序多架构AI镜像构建未完成 | [38487755652](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/runs/38487755652) |
+
+本地116个祖先提交的全历史扫描按核实指纹处理后未发现其他泄露；没有新增真实凭据。测试项目容器/网络已收尾移除，保留测试卷和镜像；用户其他容器未停止。四份冻结数据文件哈希与实际评测记录一致，工作区临时模型Key文件已删除。
+
+仍待：Chroma可验证修复方案、所有者轮换暴露模型Key并更新本机配置、当前镜像工作流最终结果。没有关闭任何扫描或修改保护分支，仍不建议合并main。
