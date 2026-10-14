@@ -1,0 +1,9 @@
+# 仅豁免已核实的历史误报；不按规则或文件路径放宽扫描。
+# RFC公开WebSocket握手nonce，不是登录或模型凭据。
+e280c43c68ca55bf148f0a74a2e89b68154c720d:.github/workflows/docker-smoke.yml:generic-api-key:84
+# 登录文档中的截断JWT：字面量省略号、4片段，PyJWT本地解码失败；证据见premerge_credentials_review.json。
+0390d620d343fac6cf456b57725e1f8188af75bf:copyright_materials/软件操作说明书.txt:generic-api-key:636
+# 登录文档中的截断JWT：字面量省略号、4片段，PyJWT本地解码失败；证据见premerge_credentials_review.json。
+0390d620d343fac6cf456b57725e1f8188af75bf:copyright_materials/软件操作说明书.txt:generic-api-key:692
+# 登录文档中的截断JWT：字面量省略号、4片段，PyJWT本地解码失败；证据见premerge_credentials_review.json。
+0390d620d343fac6cf456b57725e1f8188af75bf:copyright_materials/软件操作说明书.txt:generic-api-key:710
