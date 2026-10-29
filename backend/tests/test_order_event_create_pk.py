@@ -3,6 +3,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+import asyncio
+import os
+from uuid import uuid4
+
+import pytest
 
 from backend.models.schemas import OrderCreatedPayload, OrderEventInput
 from backend.services.order_event_service import _new_order
@@ -38,6 +43,56 @@ def test_new_order_assigns_explicit_seq_id():
     assert order.payment_amount == Decimal("80.00")
     assert order.order_status == "ACTIVE"
     assert order.event_version == 1
+
+
+def test_new_order_uses_database_generated_id():
+    event = _event()
+    order = _new_order(event, OrderCreatedPayload.model_validate(event.payload), datetime.now(UTC))
+    assert order.id is None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_order_creation_on_isolated_mysql(monkeypatch):
+    """仅在明确指定隔离测试库时并发写入，并清理本测试的行。"""
+    if os.environ.get("TEST_ORDER_CONCURRENCY") != "1":
+        pytest.skip("仅在隔离 MySQL 测试库运行")
+    from sqlalchemy import delete, select
+
+    from backend.database import event_engine, event_session_factory
+    from backend.models.database_models import Order, OrderEvent
+    from backend.services import order_event_service
+
+    async def no_invalidation(*_args):
+        return None
+
+    monkeypatch.setattr(order_event_service, "invalidate_tags", no_invalidation)
+    monkeypatch.setattr(order_event_service, "clear_rfm_snapshot_cache", lambda: None)
+    events = []
+    for _ in range(6):
+        data = _event().model_dump()
+        data.update(event_id=uuid4(), order_id=f"TEST-{uuid4().hex}")
+        events.append(OrderEventInput.model_validate(data))
+
+    async def create(event):
+        async with event_session_factory() as session:
+            return await order_event_service.apply_order_event(session, event)
+
+    order_ids = [event.order_id for event in events]
+    event_ids = [str(event.event_id) for event in events]
+    try:
+        results = await asyncio.gather(*(create(event) for event in events), return_exceptions=True)
+        assert all(not isinstance(result, BaseException) and result.status == "processed" for result in results), results
+        async with event_session_factory() as session:
+            rows = (await session.execute(select(Order.id).where(Order.order_no.in_(order_ids)))).scalars().all()
+            assert len(rows) == len(events)
+            assert len(set(rows)) == len(events)
+    finally:
+        async with event_session_factory() as session:
+            async with session.begin():
+                await session.execute(delete(OrderEvent).where(OrderEvent.event_id.in_(event_ids)))
+                await session.execute(delete(Order).where(Order.order_no.in_(order_ids)))
+        # 在测试事件循环仍有效时释放连接，避免退出时 aiomysql 清理已关闭的循环。
+        await event_engine.dispose()
 
 
 def test_sql_bootstrap_defines_auto_increment_pk():

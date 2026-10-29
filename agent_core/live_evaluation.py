@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-from sqlglot import transpile
+from sqlglot import parse_one, transpile
 
 from agent_core.model_adapter import OpenAIModelAdapter
 from agent_core.rag import MarkdownKnowledgeRetriever
@@ -119,10 +119,10 @@ def _normalize_value(value: Any) -> str:
     return str(value)
 
 
-def canonical_rows(rows: list[tuple[Any, ...]]) -> list[tuple[str, ...]]:
-    """忽略列别名、列顺序和行顺序，比较实际结果值。"""
-    normalized = [tuple(sorted(_normalize_value(value) for value in row)) for row in rows]
-    return sorted(normalized)
+def canonical_rows(rows: list[tuple[Any, ...]], *, ordered: bool = False) -> list[tuple[str, ...]]:
+    """保留列位置；仅在结果无排序要求时忽略行顺序。"""
+    normalized = [tuple(_normalize_value(value) for value in row) for row in rows]
+    return normalized if ordered else sorted(normalized)
 
 
 def _to_sqlite(mysql_sql: str) -> str:
@@ -189,7 +189,11 @@ async def evaluate_live_model(
                                 raise
                             previous_error = f"{type(exc).__name__}：执行失败"
                     expected_rows = _execute(connection, case.reference_sql or "")
-                    detail["result_correct"] = canonical_rows(candidate_rows) == canonical_rows(expected_rows)
+                    # 以参考 SQL 的顶层 ORDER BY 判断顺序是否属于题目要求。
+                    ordered = parse_one(case.reference_sql or "", read="mysql").args.get("order") is not None
+                    detail["result_correct"] = canonical_rows(candidate_rows, ordered=ordered) == canonical_rows(
+                        expected_rows, ordered=ordered
+                    )
                     detail["candidate_row_count"] = len(candidate_rows)
                 else:
                     sources = await retriever.retrieve(case.query, top_k=3)

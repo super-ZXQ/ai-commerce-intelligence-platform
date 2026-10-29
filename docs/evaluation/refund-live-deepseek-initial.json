@@ -1,0 +1,372 @@
+{
+  "run_at_utc": "2026-10-29T14:15:35.765315+00:00",
+  "mode": "live_model",
+  "data": "人工合成、隔离 SQLite",
+  "note": "自动检查覆盖工具、查询次数、分子分母和错误处理；不判断回答的事实完整性或因果表述。",
+  "total": 6,
+  "automatic_checks_passed": 6,
+  "cases": [
+    {
+      "id": "rise-platform",
+      "query": "退款率为什么上升？请按平台分析",
+      "tools": [
+        "overall",
+        "platform"
+      ],
+      "query_attempts": 2,
+      "counts": [
+        2,
+        1,
+        2,
+        0
+      ],
+      "checks": {
+        "expected_tools": true,
+        "no_extra_tools_on_stop": true,
+        "counts": true,
+        "query_limit": true,
+        "expected_error": true,
+        "deterministic_answer": true
+      },
+      "automatic_checks_passed": true,
+      "answer": "数据分析只能反映关联，不能证明退款原因。\n\n整体退款率：当前窗口 **1/2=50%**，上一窗口 **0/2=0%**，上升 **50个百分点**。  \n比较窗口：当前 **2025-01-31 至 2025-03-01**；上期 **2025-01-01 至 2025-01-30**。退款率分子为退款订单数，分母为订单数。\n\n按平台：\n- **APP**：当前 **1/1=100%**，上期 **0/1=0%**，上升 **100个百分点**；当前唯一的1笔退款来自APP。\n- **Web**：当前 **0/1=0%**，上期 **0/1=0%**，持平。\n\n结论：从已验证数据看，整体退款率上升由 **APP当前窗口的1笔退款** 关联拉动，Web未上升。但样本量仅2单，数据只能显示关联，不能证明具体退款原因。",
+      "sql_error": null,
+      "token_usage": 4207,
+      "latency_ms": 11453,
+      "evidence": [
+        {
+          "tool": "overall",
+          "label": "整体退款率对比",
+          "sql": "SELECT \n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 2,
+              "current_refunds": 1,
+              "previous_orders": 2,
+              "previous_refunds": 0
+            }
+          ]
+        },
+        {
+          "tool": "platform",
+          "label": "按平台对比",
+          "sql": "SELECT o.platform_type,\n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY o.platform_type, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "platform_type": "APP",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "platform_type": "Web",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            }
+          ]
+        }
+      ],
+      "answer_quality": "需人工核验"
+    },
+    {
+      "id": "rise-product",
+      "query": "退款率为什么上升？请按商品分析",
+      "tools": [
+        "overall",
+        "product"
+      ],
+      "query_attempts": 2,
+      "counts": [
+        2,
+        1,
+        2,
+        0
+      ],
+      "checks": {
+        "expected_tools": true,
+        "no_extra_tools_on_stop": true,
+        "counts": true,
+        "query_limit": true,
+        "expected_error": true,
+        "deterministic_answer": true
+      },
+      "automatic_checks_passed": true,
+      "answer": "数据分析只能反映关联，不能证明退款原因。\n\n从已验证数据看，整体退款率上升：当前窗口 **2025-01-31 至 2025-03-01** 退款订单 **1/2=50%**，上一窗口 **2025-01-01 至 2025-01-30** 为 **0/2=0%**，上升 **50 个百分点**。\n\n按商品拆分：\n- **商品 A**：当前退款率 **1/1=100%**，上期 **0/1=0%**，上升 **100 个百分点**，是整体退款率上升的主要来源。\n- **商品 B**：当前退款率 **0/1=0%**，上期 **0/1=0%**，持平，未贡献新增退款。\n\n结论：退款率上升由 **商品 A 在当前窗口出现 1 笔退款** 拉动。但当前窗口整体仅 **2 笔订单**、商品 A 仅 **1 笔订单**，样本量很小，波动很大；现有数据只能显示商品 A 与退款率上升相关，**不能证明具体退款原因**，需结合退款原因、商品质量、物流、描述一致性等更多数据进一步分析。",
+      "sql_error": null,
+      "token_usage": 3869,
+      "latency_ms": 8835,
+      "evidence": [
+        {
+          "tool": "overall",
+          "label": "整体退款率对比",
+          "sql": "SELECT \n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 2,
+              "current_refunds": 1,
+              "previous_orders": 2,
+              "previous_refunds": 0
+            }
+          ]
+        },
+        {
+          "tool": "product",
+          "label": "按商品对比",
+          "sql": "SELECT o.product_id,\n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY o.product_id, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "product_id": "A",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "B",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            }
+          ]
+        }
+      ],
+      "answer_quality": "需人工核验"
+    },
+    {
+      "id": "rise-both",
+      "query": "退款率为什么上升？请分析平台和商品",
+      "tools": [
+        "overall",
+        "platform",
+        "product"
+      ],
+      "query_attempts": 3,
+      "counts": [
+        2,
+        1,
+        2,
+        0
+      ],
+      "checks": {
+        "expected_tools": true,
+        "no_extra_tools_on_stop": true,
+        "counts": true,
+        "query_limit": true,
+        "expected_error": true,
+        "deterministic_answer": true
+      },
+      "automatic_checks_passed": true,
+      "answer": "数据分析只能反映关联，不能证明退款原因。\n\n**比较窗口**：当前窗口为 **2025-01-31 至 2025-03-01**；上一窗口为 **2025-01-01 至 2025-01-30**。  \n**退款率公式**：退款订单数 / 订单数。\n\n### 1. 整体\n- 当前：退款 **1** 单 / 订单 **2** 单 = **50%**\n- 上期：退款 **0** 单 / 订单 **2** 单 = **0%**\n- 变化：**+50 个百分点**。订单数未变，退款订单数由 0 增至 1，导致整体退款率上升。\n\n### 2. 平台维度\n- **APP**：当前 **1/1=100%**；上期 **0/1=0%**，上升 **100 个百分点**。\n- **Web**：当前 **0/1=0%**；上期 **0/1=0%**，持平。\n\n平台上看，退款率上升集中在 **APP 平台**，Web 未变化。\n\n### 3. 商品维度\n- **商品 A**：当前 **1/1=100%**；上期 **0/1=0%**，上升 **100 个百分点**。\n- **商品 B**：当前 **0/1=0%**；上期 **0/1=0%**，持平。\n\n商品上看，退款率上升集中在 **商品 A**，商品 B 未变化。\n\n### 结论\n基于当前结果，整体退款率从 **0/2=0%** 升至 **1/2=50%**，主要表现是：**APP 平台和商品 A 各出现 1 笔退款，且上期均为 0 笔退款**。结合整体当前仅 1 笔退款，数据表现为 **APP 平台商品 A 相关退款**拉高退款率；Web 和商品 B 无变化。\n\n但样本非常小（整体仅 2 单，平台/商品各 1 单），且数据没有退款原因字段，因此**只能定位到平台和商品维度，不能证明具体退款原因**，也不能判断是否具有普遍性。",
+      "sql_error": null,
+      "token_usage": 5556,
+      "latency_ms": 15680,
+      "evidence": [
+        {
+          "tool": "overall",
+          "label": "整体退款率对比",
+          "sql": "SELECT \n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 2,
+              "current_refunds": 1,
+              "previous_orders": 2,
+              "previous_refunds": 0
+            }
+          ]
+        },
+        {
+          "tool": "platform",
+          "label": "按平台对比",
+          "sql": "SELECT o.platform_type,\n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY o.platform_type, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "platform_type": "APP",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "platform_type": "Web",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            }
+          ]
+        },
+        {
+          "tool": "product",
+          "label": "按商品对比",
+          "sql": "SELECT o.product_id,\n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY o.product_id, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "product_id": "A",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "B",
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            }
+          ]
+        }
+      ],
+      "answer_quality": "需人工核验"
+    },
+    {
+      "id": "no-increase",
+      "query": "退款率为什么上升？",
+      "tools": [
+        "overall"
+      ],
+      "query_attempts": 1,
+      "counts": [
+        2,
+        0,
+        2,
+        0
+      ],
+      "checks": {
+        "expected_tools": true,
+        "no_extra_tools_on_stop": true,
+        "counts": true,
+        "query_limit": true,
+        "expected_error": true,
+        "deterministic_answer": true
+      },
+      "automatic_checks_passed": true,
+      "answer": "最近窗口退款率为 0.00%，上一窗口为 0.00%，数据没有显示退款率上升。具体日期及分子分母见分析数据依据。",
+      "sql_error": null,
+      "token_usage": null,
+      "latency_ms": 11,
+      "evidence": [
+        {
+          "tool": "overall",
+          "label": "整体退款率对比",
+          "sql": "SELECT \n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "current_end": "2025-03-01",
+              "current_start": "2025-01-31",
+              "previous_start": "2025-01-01",
+              "previous_end": "2025-01-30",
+              "current_orders": 2,
+              "current_refunds": 0,
+              "previous_orders": 2,
+              "previous_refunds": 0
+            }
+          ]
+        }
+      ],
+      "answer_quality": "未评估模型回答"
+    },
+    {
+      "id": "empty",
+      "query": "退款率为什么上升？",
+      "tools": [
+        "overall"
+      ],
+      "query_attempts": 1,
+      "counts": null,
+      "checks": {
+        "expected_tools": true,
+        "no_extra_tools_on_stop": true,
+        "counts": true,
+        "query_limit": true,
+        "expected_error": true,
+        "deterministic_answer": true
+      },
+      "automatic_checks_passed": true,
+      "answer": "所选时间窗口没有订单数据，无法比较退款率。",
+      "sql_error": null,
+      "token_usage": null,
+      "latency_ms": 7,
+      "evidence": [
+        {
+          "tool": "overall",
+          "label": "整体退款率对比",
+          "sql": "SELECT \n        b.end_date AS current_end, DATE(b.end_date, '-29 days') AS current_start,\n        DATE(b.end_date, '-59 days') AS previous_start, DATE(b.end_date, '-30 days') AS previous_end,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') THEN o.order_id END) AS current_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date >= DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') THEN o.order_id END) AS previous_orders,\n        COUNT(DISTINCT CASE WHEN o.order_date < DATE(b.end_date, '-29 days') AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds\n        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b\n        WHERE o.order_date >= DATE(b.end_date, '-59 days') AND o.order_date <= b.end_date\n        GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": []
+        }
+      ],
+      "answer_quality": "未评估模型回答"
+    },
+    {
+      "id": "db-error",
+      "query": "退款率为什么上升？",
+      "tools": [],
+      "query_attempts": 1,
+      "counts": null,
+      "checks": {
+        "expected_tools": true,
+        "no_extra_tools_on_stop": true,
+        "counts": true,
+        "query_limit": true,
+        "expected_error": true,
+        "deterministic_answer": true
+      },
+      "automatic_checks_passed": true,
+      "answer": "⚠️ 多步分析中断：RuntimeError：执行失败。已完成的步骤可在分析数据依据中查看。",
+      "sql_error": "RuntimeError：执行失败",
+      "token_usage": null,
+      "latency_ms": 5,
+      "evidence": [],
+      "answer_quality": "未评估模型回答"
+    }
+  ],
+  "model": "deepseek-flash"
+}

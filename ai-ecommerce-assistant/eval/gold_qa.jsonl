@@ -13,8 +13,8 @@
 {"id": "d03", "category": "data", "expected_doc": null, "question": "退款率最高的前 3 个商品是哪些？", "expected_keywords": ["退款率", "商品"], "expected_sql_keywords": ["is_refund", "GROUP BY", "LIMIT 3"]}
 {"id": "d04", "category": "data", "expected_doc": null, "question": "哪个时间段的订单量最多？", "expected_keywords": ["时间段", "订单"], "expected_sql_keywords": ["order_hour", "GROUP BY"]}
 {"id": "d05", "category": "data", "expected_doc": null, "question": "客单价最高的前 5 个用户是谁？", "expected_keywords": ["客单价", "用户"], "expected_sql_keywords": ["AVG(payment_amount)", "GROUP BY", "LIMIT 5"]}
-{"id": "d06", "category": "data", "expected_doc": null, "question": "复购率是多少？", "expected_keywords": ["复购率"], "expected_sql_keywords": ["COUNT(DISTINCT", "user_id"]}
+{"id": "d06", "category": "data", "expected_doc": null, "question": "复购率是多少？", "expected_keywords": ["复购率"], "expected_sql_keywords": ["COUNT(DISTINCT", "user_name"]}
 {"id": "d07", "category": "data", "expected_doc": null, "question": "各平台的销售额占比", "expected_keywords": ["平台", "占比"], "expected_sql_keywords": ["platform", "SUM(payment_amount)"]}
 {"id": "d08", "category": "data", "expected_doc": null, "question": "最近 30 天的日均订单量", "expected_keywords": ["日均", "订单"], "expected_sql_keywords": ["COUNT", "AVG", "order_date"]}
 {"id": "d09", "category": "data", "expected_doc": null, "question": "周末和工作日的订单对比", "expected_keywords": ["周末", "工作日", "对比"], "expected_sql_keywords": ["weekday", "GROUP BY"]}
-{"id": "d10", "category": "data", "expected_doc": null, "question": "高价值用户的特征", "expected_keywords": ["高价值", "用户"], "expected_sql_keywords": ["Monetary", "RFM"]}
+{"id": "d10", "category": "data", "expected_doc": null, "question": "高价值用户的特征", "expected_keywords": ["高价值", "用户"], "expected_sql_keywords": ["user_name", "GROUP BY", "payment_amount"]}

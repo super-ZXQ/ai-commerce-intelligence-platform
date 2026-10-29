@@ -1,5 +1,6 @@
 from collections import Counter
 from pathlib import Path
+import sqlite3
 from types import SimpleNamespace
 
 import pandas as pd
@@ -26,10 +27,33 @@ def test_live_dataset_rejects_duplicate_ids(tmp_path: Path) -> None:
         load_live_cases(path)
 
 
-def test_canonical_rows_ignores_alias_column_and_row_order() -> None:
+def test_canonical_rows_preserves_column_order_and_respects_row_order() -> None:
     expected = [("APP", 10.001), ("Web", 20)]
-    actual = [(20.0, "Web"), (10, "APP")]
+    actual = [("Web", 20.0), ("APP", 10)]
     assert canonical_rows(actual) == canonical_rows(expected)
+    assert canonical_rows(actual, ordered=True) != canonical_rows(expected, ordered=True)
+    assert canonical_rows([(10, "APP"), (20, "Web")]) != canonical_rows(expected)
+
+
+@pytest.mark.asyncio
+async def test_live_evaluation_rejects_wrong_sort_order(monkeypatch, tmp_path: Path) -> None:
+    """通过完整评测流程检查排序错误不会被判为正确。"""
+    connection = sqlite3.connect(":memory:")
+    connection.execute("CREATE TABLE orders (platform_type TEXT, payment_amount REAL)")
+    connection.executemany("INSERT INTO orders VALUES (?, ?)", [("APP", 10), ("Web", 20)])
+    monkeypatch.setattr("agent_core.live_evaluation.build_sqlite_database", lambda _: connection)
+
+    class Adapter:
+        async def generate_sql(self, *_args):
+            return ModelResponse("SELECT platform_type, payment_amount FROM orders ORDER BY payment_amount ASC")
+
+    case = LiveCase(
+        id="sort", kind="sql", query="按金额降序",
+        reference_sql="SELECT platform_type, payment_amount FROM orders ORDER BY payment_amount DESC",
+    )
+    report = await evaluate_live_model(adapter=Adapter(), cases=[case], csv_path=tmp_path / "unused", request_delay_seconds=0)
+    assert report["details"][0]["execution_success"] is True
+    assert report["details"][0]["result_correct"] is False
 
 
 def test_describe_table_uses_sqlalchemy_inspection() -> None:

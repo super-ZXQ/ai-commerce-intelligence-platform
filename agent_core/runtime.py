@@ -21,6 +21,7 @@ from agent_core.sql_safety import (
     validate_and_limit_sql,
 )
 from agent_core.routing import classify_intent
+from agent_core.refund_analysis import LABELS, TOOLS, refund_sql, supports_refund_analysis
 from agent_core.streaming import reset_token_hook, set_token_hook
 
 Retriever = Callable[[str], Awaitable[list[AgentSource]]]
@@ -31,6 +32,7 @@ AnswerGenerator = Callable[
     [str, AgentIntent, list[Message], list[AgentSource], str | None, list[dict[str, Any]]],
     Awaitable[ModelResponse],
 ]
+AnalysisPlanner = Callable[[str, list[dict[str, Any]]], Awaitable[ModelResponse]]
 
 _INJECTION_PATTERNS = (
     r"忽略(?:以上|之前|系统).*(?:指令|提示词)",
@@ -64,6 +66,10 @@ class RuntimeState(TypedDict, total=False):
     has_usage: bool
     result: AgentResult
     started_at: float
+    analysis_evidence: list[dict[str, Any]]
+    analysis_action: str
+    analysis_note: str
+    analysis_error: bool
 
 
 def _public_error(exc: Exception) -> str:
@@ -86,6 +92,7 @@ class AgentRuntime:
         sql_generator: SQLGenerator,
         sql_executor: SQLExecutor,
         answer_generator: AnswerGenerator,
+        analysis_planner: AnalysisPlanner | None = None,
         conversations: ConversationStore | None = None,
         sql_timeout_seconds: float = 10,
         sql_dialect: str = "mysql",
@@ -95,6 +102,7 @@ class AgentRuntime:
         self._sql_generator = sql_generator
         self._sql_executor = sql_executor
         self._answer_generator = answer_generator
+        self._analysis_planner = analysis_planner
         self._conversations = conversations or MemoryConversationStore()
         self._sql_timeout_seconds = sql_timeout_seconds
         self._sql_dialect = sql_dialect
@@ -109,6 +117,8 @@ class AgentRuntime:
         graph.add_node("generate_sql", self._generate_sql)
         graph.add_node("validate_sql", self._validate_sql)
         graph.add_node("execute_sql", self._execute_sql)
+        graph.add_node("analysis_plan", self._analysis_plan)
+        graph.add_node("analysis_execute", self._analysis_execute)
         graph.add_node("synthesize", self._synthesize)
         graph.add_node("save_session", self._save_session)
         graph.add_node("finalize", self._finalize)
@@ -134,8 +144,10 @@ class AgentRuntime:
         )
         graph.add_conditional_edges(
             "load_schema",
-            lambda state: "answer" if state.get("sql_error") else "generate",
-            {"answer": "synthesize", "generate": "generate_sql"},
+            lambda state: "answer" if state.get("sql_error") else (
+                "analysis" if self._analysis_planner and supports_refund_analysis(state["query"]) else "generate"
+            ),
+            {"answer": "synthesize", "generate": "generate_sql", "analysis": "analysis_plan"},
         )
         graph.add_conditional_edges(
             "generate_sql",
@@ -151,6 +163,16 @@ class AgentRuntime:
             "execute_sql",
             self._after_execution,
             {"retry": "generate_sql", "answer": "synthesize"},
+        )
+        graph.add_conditional_edges(
+            "analysis_plan",
+            lambda state: "answer" if state.get("analysis_action") == "finish" else "execute",
+            {"answer": "synthesize", "execute": "analysis_execute"},
+        )
+        graph.add_conditional_edges(
+            "analysis_execute",
+            lambda state: "answer" if state.get("sql_error") else "plan",
+            {"answer": "synthesize", "plan": "analysis_plan"},
         )
         graph.add_edge("safe_response", "save_session")
         graph.add_edge("synthesize", "save_session")
@@ -281,6 +303,76 @@ class AgentRuntime:
         )
         return update
 
+    async def _analysis_plan(self, state: RuntimeState) -> dict[str, Any]:
+        """先查整体，之后仅允许选择未执行的固定分析工具。"""
+        started = time.perf_counter()
+        evidence = state.get("analysis_evidence", [])
+        if not evidence:
+            action = "overall"
+        elif len(evidence) >= 3:
+            action = "finish"
+        else:
+            overall_rows = evidence[0]["rows"]
+            if not overall_rows:
+                return {"analysis_action": "finish", "analysis_note": "所选时间窗口没有订单数据，无法比较退款率。",
+                        "steps": self._append(state, self._event("analysis_plan", started, "数据不足，结束分析"))}
+            else:
+                row = overall_rows[0]
+                current, previous = row.get("current_orders", 0), row.get("previous_orders", 0)
+                if not current or not previous:
+                    return {"analysis_action": "finish", "analysis_note": "一个或两个比较窗口没有订单，无法比较退款率。",
+                            "steps": self._append(state, self._event("analysis_plan", started, "数据不足，结束分析"))}
+                if row.get("current_refunds", 0) * previous <= row.get("previous_refunds", 0) * current:
+                    current_rate = row.get("current_refunds", 0) / current * 100
+                    previous_rate = row.get("previous_refunds", 0) / previous * 100
+                    return {"analysis_action": "finish",
+                            "analysis_note": f"最近窗口退款率为 {current_rate:.2f}%，上一窗口为 {previous_rate:.2f}%，数据没有显示退款率上升。具体日期及分子分母见分析数据依据。",
+                            "steps": self._append(state, self._event("analysis_plan", started, "未观察到上升，结束分析"))}
+                else:
+                    try:
+                        response = await self._analysis_planner(state["query"], evidence)
+                        action = response.content.strip()
+                        if action not in (*TOOLS[1:], "finish") or any(e["tool"] == action for e in evidence):
+                            raise ValueError("无效或重复的分析工具")
+                        update = self._usage_update(response, state)
+                        update.update({
+                            "analysis_action": action,
+                            "steps": self._append(state, self._event("analysis_plan", started, f"选择{LABELS.get(action, '结束分析')}")),
+                        })
+                        return update
+                    except Exception as exc:  # noqa: BLE001 - 规划失败时保留已完成证据
+                        record_llm_failure(type(exc).__name__)
+                        return {
+                            "analysis_action": "finish", "sql_error": _public_error(exc), "analysis_error": True,
+                            "steps": self._append(state, self._event("analysis_plan", started, "分析规划失败", "error")),
+                        }
+        return {
+            "analysis_action": action,
+            "steps": self._append(state, self._event("analysis_plan", started, f"选择{LABELS.get(action, '结束分析')}")),
+        }
+
+    async def _analysis_execute(self, state: RuntimeState) -> dict[str, Any]:
+        """执行固定聚合工具，仍经过 SQL AST 和数据库侧超时限制。"""
+        started = time.perf_counter()
+        action = state["analysis_action"]
+        try:
+            candidate = refund_sql(action, self._sql_dialect)
+            validated = validate_and_limit_sql(candidate, max_rows=50)
+            # 解析器使用 MySQL 方言；保留固定 SQLite 模板以免 DATE 修饰符被改写。
+            sql = candidate if self._sql_dialect == "sqlite" else validated
+            sql = apply_execution_guard(sql, int(self._sql_timeout_seconds * 1000), self._sql_dialect)
+            rows = await asyncio.wait_for(self._sql_executor(sql), timeout=self._sql_timeout_seconds * _TIMEOUT_GRACE_FACTOR)
+            evidence = [*state.get("analysis_evidence", []), {"tool": action, "label": LABELS[action], "sql": sql, "rows": rows}]
+            return {
+                "sql": sql, "rows": rows, "analysis_evidence": evidence, "sql_error": "",
+                "steps": self._append(state, self._event("analysis_execute", started, f"{LABELS[action]}：返回 {len(rows)} 行")),
+            }
+        except Exception as exc:  # noqa: BLE001 - 不隐藏已完成的数据和失败状态
+            return {
+                "sql_error": _public_error(exc), "analysis_error": True,
+                "steps": self._append(state, self._event("analysis_execute", started, f"{LABELS[action]}失败", "error")),
+            }
+
     @staticmethod
     def _after_generation(state: RuntimeState) -> str:
         if not state.get("sql_error"):
@@ -343,13 +435,20 @@ class AgentRuntime:
         started = time.perf_counter()
         if state.get("sql_error"):
             return {
-                "answer": f"⚠️ 查询执行失败：{state['sql_error']}。已停止自动重试，请调整问题后再试。",
+                "answer": (f"⚠️ 多步分析中断：{state['sql_error']}。已完成的步骤可在分析数据依据中查看。"
+                           if state.get("analysis_error") else
+                           f"⚠️ 查询执行失败：{state['sql_error']}。已停止自动重试，请调整问题后再试。"),
                 "steps": self._append(state, self._event("synthesize", started, "返回可控失败说明", "error")),
+            }
+        if state.get("analysis_note"):
+            return {
+                "answer": state["analysis_note"],
+                "steps": self._append(state, self._event("synthesize", started, "根据整体数据返回分析结论")),
             }
         try:
             response = await self._answer_generator(
                 state["query"], state["intent"], state.get("history", []), state.get("sources", []),
-                state.get("sql"), state.get("rows", []),
+                state.get("sql"), state.get("analysis_evidence") or state.get("rows", []),
             )
         except Exception as exc:  # noqa: BLE001 - 模型边界需可控降级
             record_llm_failure(type(exc).__name__)
@@ -360,7 +459,7 @@ class AgentRuntime:
         update = self._usage_update(response, state)
         update.update(
             {
-                "answer": response.content,
+                "answer": ("数据分析只能反映关联，不能证明退款原因。\n\n" if state.get("analysis_evidence") else "") + response.content,
                 "steps": self._append(state, self._event("synthesize", started, "根据工具结果合成回答")),
             }
         )
@@ -384,6 +483,7 @@ class AgentRuntime:
                 answer=state["answer"], sql=state.get("sql"), rows=state.get("rows", []),
                 intent=state["intent"], sources=state.get("sources", []), steps=state.get("steps", []),
                 usage=usage, sql_error=state.get("sql_error") or None,
+                analysis_evidence=state.get("analysis_evidence", []),
             )
         }
 

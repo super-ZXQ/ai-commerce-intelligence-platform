@@ -70,7 +70,7 @@ jobs:
             -uroot -pci-root-password -Nse \
             'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
           echo "alembic_version=$version"
-          test "$version" = "0001_baseline"
+          test "$version" = "0002_order_auto_increment"
 
           for t in orders order_events app_metadata alembic_version; do
             docker compose exec -T mysql mysql \

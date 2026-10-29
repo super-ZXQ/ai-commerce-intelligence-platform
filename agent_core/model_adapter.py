@@ -6,6 +6,7 @@ import json
 
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+from typing import Literal
 
 from agent_core.models import AgentIntent, AgentSource, ModelResponse
 from agent_core.session import Message
@@ -14,6 +15,10 @@ from agent_core.streaming import emit_token
 
 class _SQLPlan(BaseModel):
     sql: str = Field(description="一条只读 SQL SELECT 或 WITH 查询，不包含 Markdown")
+
+
+class _AnalysisChoice(BaseModel):
+    action: Literal["platform", "product", "finish"]
 
 
 def _response(message) -> ModelResponse:
@@ -45,6 +50,25 @@ class OpenAIModelAdapter:
             max_retries=1,
             stream_usage=stream_usage,
         )
+
+    async def choose_refund_analysis(self, query: str, evidence: list[dict]) -> ModelResponse:
+        """根据已完成的聚合结果选择下一项固定工具。"""
+        prompt = f"""你是电商退款分析助手。根据证据选择下一步，仅输出 JSON：{{"action":"platform|product|finish"}}。
+问题：{query}
+已完成工具及数据：{json.dumps(evidence, ensure_ascii=False, default=str)}
+整体对比已经完成。平台或商品可各查一次；已查过的工具不可重复。
+用户明确要求按平台或商品分析时，必须先选择尚未执行的对应工具；要求两者时依次执行两者，即使样本较少也应查询并说明局限。
+若未指定拆解维度且证据已足够或样本不足，选择 finish。不要把相关性表述为因果。"""
+        response = await self._client().with_structured_output(
+            _AnalysisChoice, method="json_mode", include_raw=True,
+        ).ainvoke(prompt)
+        parsed = response.get("parsed") if isinstance(response, dict) else None
+        if parsed is None:
+            raise ValueError("模型未返回合法的分析选择")
+        raw = response.get("raw")
+        result = _response(raw) if raw is not None else ModelResponse(content="")
+        result.content = parsed.action
+        return result
 
     async def generate_sql(
         self,
@@ -102,8 +126,9 @@ class OpenAIModelAdapter:
 最近会话：{json.dumps(history[-6:], ensure_ascii=False)}
 引用知识：{source_context or '无'}
 SQL：{sql or '未执行'}
-结果：{json.dumps(rows[:50], ensure_ascii=False)}
+结果：{json.dumps(rows[:50], ensure_ascii=False, default=str)}
 若结果为空，请明确说明。知识问答先用中文业务术语解释，再按需附公式；
+如果结果是多步退款分析，严格引用各步骤数据，说明比较窗口和分子分母；数据只能显示关联，不能证明退款原因；数据不足时明确说明。
 只要使用了引用知识，答案末尾必须使用“【来源】文件名 / 章节”列出至少一个实际来源。"""
 
     async def answer(

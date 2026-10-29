@@ -26,7 +26,7 @@ def main() -> None:
         if missing:
             raise SystemExit(f"schema sanity failed, missing tables: {sorted(missing)}")
         ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        if ver != "0001_baseline":
+        if ver != "0002_order_auto_increment":
             raise SystemExit(f"unexpected alembic_version: {ver!r}")
     eng.dispose()
     print("OK alembic schema sanity")

@@ -53,3 +53,4 @@ class AgentResult:
     steps: list[AgentStep] = field(default_factory=list)
     usage: AgentUsage | None = None
     sql_error: str | None = None
+    analysis_evidence: list[dict[str, Any]] = field(default_factory=list)

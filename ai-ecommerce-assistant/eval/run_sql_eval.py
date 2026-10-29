@@ -169,7 +169,10 @@ async def evaluate_case(adapter: OpenAIModelAdapter, schema: str, case: dict,
     missing = check_sql_keywords(sql, case["expected_sql_keywords"])
     result["missing_keywords"] = missing
     result["keyword_ok"] = not missing
-    result["passed"] = bool(result.get("parse_ok")) and not missing
+    # 开启落库检查时，执行失败不能被关键词命中掩盖。
+    result["passed"] = bool(result.get("parse_ok")) and not missing and (
+        not do_execute or result.get("executed") is True
+    )
     result["elapsed_ms"] = round((time.time() - t0) * 1000, 1)
     return result
 

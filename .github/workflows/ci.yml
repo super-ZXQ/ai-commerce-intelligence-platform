@@ -145,6 +145,7 @@ jobs:
       - name: 跑后端测试
         env:
           PYTHONPATH: ${{ github.workspace }}
+          TEST_ORDER_CONCURRENCY: "1"  # 仅连接 CI 中隔离的 MySQL 测试库
         run: |
           set -o pipefail
           cd backend
@@ -183,6 +184,9 @@ jobs:
 
       - name: Agent 离线路由评测
         run: python -m agent_core.evaluation
+
+      - name: 退款分析离线流程评测（非真实模型）
+        run: python -m agent_core.refund_evaluation
 
       - name: 编译检查所有 .py 文件
         run: |

@@ -241,6 +241,7 @@ class AIQueryResponse(BaseModel):
     sources: list[AgentSource] = Field(default_factory=list, description="RAG 引用来源")
     steps: list[AgentStep] = Field(default_factory=list, description="可公开的执行轨迹")
     usage: AgentUsage | None = Field(None, description="模型 Token 与端到端耗时")
+    analysis_evidence: list[dict[str, Any]] = Field(default_factory=list, description="多步分析使用的工具、SQL 和聚合结果")
 
 
 class ErrorResponse(BaseModel):

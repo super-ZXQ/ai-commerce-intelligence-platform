@@ -18,15 +18,16 @@ EVAL_DIR = Path(__file__).resolve().parent.parent / "eval"
 if str(EVAL_DIR) not in sys.path:
     sys.path.insert(0, str(EVAL_DIR))
 
-from run_sql_eval import check_sql_keywords, load_data_cases, normalize_sql  # noqa: E402
+from run_sql_eval import check_sql_keywords, evaluate_case, load_data_cases, normalize_sql  # noqa: E402
 from agent_core.sql_safety import validate_and_limit_sql  # noqa: E402
+from agent_core.models import ModelResponse  # noqa: E402
 
 
 GOLD_SQL = {
     "d01": 'SELECT SUM(payment_amount) AS total_sales FROM orders WHERE order_date >= \'2025-12-25\'',
-    "d02": 'SELECT platform, COUNT(DISTINCT order_id) AS cnt FROM orders WHERE platform IN (\'APP\', \'微信公众号\') GROUP BY platform ORDER BY cnt DESC',
+    "d02": 'SELECT platform_type, COUNT(DISTINCT order_id) AS cnt FROM orders WHERE platform_type IN (\'APP\', \'微信公众号\') GROUP BY platform_type ORDER BY cnt DESC',
     "d03": 'SELECT product_id, SUM(CASE WHEN is_refund = \'是\' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS refund_rate FROM orders GROUP BY product_id ORDER BY refund_rate DESC LIMIT 3',
-    "d06": 'SELECT COUNT(DISTINCT CASE WHEN order_count >= 2 THEN user_id END) * 1.0 / COUNT(DISTINCT user_id) AS repurchase_rate FROM (SELECT user_id, COUNT(DISTINCT order_id) AS order_count FROM orders GROUP BY user_id) t',
+    "d06": 'SELECT COUNT(DISTINCT CASE WHEN order_count >= 2 THEN user_name END) * 1.0 / COUNT(DISTINCT user_name) AS repurchase_rate FROM (SELECT user_name, COUNT(DISTINCT order_id) AS order_count FROM orders GROUP BY user_name) t',
 }
 
 
@@ -64,10 +65,25 @@ def test_gold_sql_keywords_hit():
         "d01": ["SUM(payment_amount)", "order_date"],
         "d02": ["platform", "COUNT", "ORDER BY"],
         "d03": ["is_refund", "GROUP BY", "LIMIT 3"],
-        "d06": ["COUNT(DISTINCT", "user_id"],
+        "d06": ["COUNT(DISTINCT", "user_name"],
     }
     for case_id, keywords in expected.items():
         assert check_sql_keywords(GOLD_SQL[case_id], keywords) == [], case_id
+
+
+@pytest.mark.asyncio
+async def test_execution_failure_does_not_pass_keyword_check(monkeypatch):
+    """执行失败时，关键词全部命中也不能通过评测。"""
+    class Adapter:
+        async def generate_sql(self, *args, **kwargs):
+            return ModelResponse("SELECT SUM(payment_amount) FROM orders")
+
+    monkeypatch.setattr("run_sql_eval.execute_sql", lambda _: {"executed": False, "exec_error": "失败"})
+    case = {"id": "d", "question": "销售额", "expected_sql_keywords": ["SUM(payment_amount)"]}
+    result = await evaluate_case(Adapter(), "orders(payment_amount DECIMAL)", case, True)
+    assert result["keyword_ok"] is True
+    assert result["executed"] is False
+    assert result["passed"] is False
 
 
 def test_load_data_cases_filters_knowledge_and_requires_keywords(tmp_path: Path):

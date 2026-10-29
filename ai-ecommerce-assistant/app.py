@@ -531,6 +531,7 @@ def get_session_runtime(_engine, _retriever):
         sql_generator=model_adapter.generate_sql,
         sql_executor=execute_sql,
         answer_generator=model_adapter.astream_answer,
+        analysis_planner=model_adapter.choose_refund_analysis,
         conversations=MemoryConversationStore(ttl_seconds=1800, max_sessions=1, max_turns=6),
         sql_timeout_seconds=10,
         # get_db_uri() 在无 MySQL 环境会回落到 SQLite，方言必须按实际连接串判断。
@@ -1049,6 +1050,12 @@ for msg_idx, msg in enumerate(st.session_state.messages):
                     )
                     st.caption(src["preview"])
         render_agent_steps(msg.get("agent_steps") or [])
+        if msg.get("analysis_evidence"):
+            with st.expander("多步分析数据依据", expanded=False):
+                for item in msg["analysis_evidence"]:
+                    st.markdown(f"**{item['label']}**")
+                    st.code(item["sql"], language="sql")
+                    st.dataframe(pd.DataFrame(item["rows"]), use_container_width=True)
 
         try:
             # result_data 为空（单值结果/无行）也走共用函数：SQL 块仍需独立展示
@@ -1128,6 +1135,12 @@ if prompt:
             except Exception as e:
                 st.caption(f"缓存图表加载失败：{str(e)[:50]}")
             render_agent_steps(cached.get("agent_steps") or [])
+            if cached.get("analysis_evidence"):
+                with st.expander("多步分析数据依据", expanded=False):
+                    for item in cached["analysis_evidence"]:
+                        st.markdown(f"**{item['label']}**")
+                        st.code(item["sql"], language="sql")
+                        st.dataframe(pd.DataFrame(item["rows"]), use_container_width=True)
         st.session_state.messages.append({
             "role": "assistant",
             "content": cached["answer"],
@@ -1138,6 +1151,7 @@ if prompt:
             "question": prompt,
             "rag_sources": cached.get("rag_sources") or [],
             "agent_steps": cached.get("agent_steps") or [],
+            "analysis_evidence": cached.get("analysis_evidence") or [],
         })
         st.stop()
 
@@ -1217,6 +1231,12 @@ if prompt:
 
         render_answer_with_highlights(answer)
         render_agent_steps(agent_steps)
+        if agent_result.analysis_evidence:
+            with st.expander("多步分析数据依据", expanded=False):
+                for item in agent_result.analysis_evidence:
+                    st.markdown(f"**{item['label']}**")
+                    st.code(item["sql"], language="sql")
+                    st.dataframe(pd.DataFrame(item["rows"]), use_container_width=True)
         result_df = pd.DataFrame(agent_result.rows)
 
         # SQL 无结果时，不直接断言"没有数据"——从回答文本兜底解析表格数据
@@ -1247,6 +1267,7 @@ if prompt:
             "question": prompt,
             "rag_sources": rag_sources,
             "agent_steps": agent_steps,
+            "analysis_evidence": agent_result.analysis_evidence,
         }
         st.session_state.messages.append(msg_data)
 
@@ -1258,6 +1279,7 @@ if prompt:
             "query_time": query_time,
             "rag_sources": rag_sources,
             "agent_steps": agent_steps,
+            "analysis_evidence": agent_result.analysis_evidence,
         })
 
         st.session_state.query_history.append({

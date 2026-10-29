@@ -73,7 +73,8 @@ def _doc_type(filename: str) -> str:
 
 
 def _make_doc_id(source: str, section: str, content: str) -> str:
-    raw = f"{source}::{section}::{content[:200]}"
+    # 对完整内容计算摘要，避免正文后半段更新后沿用旧向量。
+    raw = f"{source}::{section}::{content}"
     return hashlib.md5(raw.encode()).hexdigest()[:16]
 
 
@@ -215,7 +216,13 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
             to_write.append(doc)
             to_write_ids.append(doc_id)
 
-    # 找出已删除的 doc（源文档已无此 chunk）
+    if to_write:
+        logger.info("✏️  写入 %d 个新 chunk...", len(to_write))
+        store.add_documents(to_write, ids=to_write_ids)
+    else:
+        logger.info("✅ 无变更，跳过写入")
+
+    # 新向量写入成功后再删除旧版本，避免写入失败时丢失原有知识。
     deleted_ids = existing_ids - new_ids
     if deleted_ids:
         logger.info("🗑️  清理 %d 个废弃 doc", len(deleted_ids))
@@ -223,12 +230,6 @@ def build(kb_dir: str, persist_dir: str, rebuild: bool = False) -> dict:
             store._store.delete(ids=list(deleted_ids))
         except Exception as e:
             logger.warning("废弃 doc 清理失败（可忽略）: %s", e)
-
-    if to_write:
-        logger.info("✏️  写入 %d 个新 chunk...", len(to_write))
-        store.add_documents(to_write, ids=to_write_ids)
-    else:
-        logger.info("✅ 无变更，跳过写入")
 
     elapsed = time.time() - t0
     final_count = store.count()

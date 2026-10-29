@@ -155,6 +155,7 @@ _runtime = AgentRuntime(
     sql_generator=_model_adapter.generate_sql,
     sql_executor=_runtime_execute,
     answer_generator=_model_adapter.answer,
+    analysis_planner=_model_adapter.choose_refund_analysis,
     conversations=_conversation_store(),
     sql_timeout_seconds=10,
     # 方言决定能否把执行时限下推到数据库（MySQL 用 MAX_EXECUTION_TIME）。
@@ -184,6 +185,7 @@ async def process_natural_language_query(
         request_id=state["request_id"],
         thread_id=state["thread_id"],
         intent=result.intent,
+        analysis_evidence=result.analysis_evidence,
         sources=[
             {
                 "filename": item.filename,

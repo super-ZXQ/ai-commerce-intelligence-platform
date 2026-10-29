@@ -131,7 +131,7 @@
     <div class="studio-cta">
         <a class="btn btn-primary" href="/ai/" target="_blank">打开 AI 助手</a>
         <a class="btn btn-ghost" href="/BI/" target="_blank">BI 看板</a>
-        <a class="btn btn-ghost" href="/docs" target="_blank">查看 32 个 API</a>
+        <a class="btn btn-ghost" href="/docs" target="_blank">查看 API 文档</a>
         <a class="btn btn-ghost" href="https://github.com/super-ZXQ/ai-commerce-intelligence-platform" target="_blank" rel="noopener">源代码</a>
     </div>
 </section>
@@ -148,23 +148,23 @@
         </div>
         <div class="metric-card accent-blue rise">
             <div class="m-label">API 操作</div>
-            <div class="m-value num" data-count="32">0</div>
-            <div class="m-note">OpenAPI schema 统计（25 路由 + 应用级端点）</div>
+            <div class="m-value num" data-count="34">0</div>
+            <div class="m-note">OpenAPI schema 中的操作数</div>
         </div>
         <div class="metric-card accent-purple rise">
             <div class="m-label">评测样本</div>
             <div class="m-value num"><span data-count="100">0</span><span class="unit">+15+15</span></div>
-            <div class="m-note">路由 100 · 检索 15 · 端到端 15 条金标样本</div>
+            <div class="m-note">路由 100 · 词法检索 15 · 模型评测 15 条</div>
         </div>
         <div class="metric-card accent-orange rise">
-            <div class="m-label">端到端评测（GLM 快照）</div>
+            <div class="m-label">真实模型历史快照</div>
             <div class="m-value num">14<span class="unit">/15 通过 · P50</span> 1,508<span class="unit">ms</span></div>
-            <div class="m-note">结果集断言评测，快照见 eval 报告</div>
+            <div class="m-note">旧版比较规则，修正后待重跑</div>
         </div>
         <div class="metric-card rise">
             <div class="m-label">pytest 用例</div>
-            <div class="m-value num" id="pytestMetric"><span data-count="238">0</span></div>
-            <div class="m-note">已核实：后端 131 + AI 助手 107（2026-09-02 实际收集）</div>
+            <div class="m-value num" id="pytestMetric"><span data-count="252">0</span></div>
+            <div class="m-note">2026-09-18 历史实测，当前用例数以测试输出为准</div>
         </div>
     </div>
 </section>
@@ -228,7 +228,7 @@
 <!-- ================= 评测证据 ================= -->
 <section>
     <h2 class="section-title">评测是断言结果集，不是感觉</h2>
-    <p class="section-sub">端到端评测对查询结果集做断言（行数、列、关键值），而非检查「回答读起来对不对」。</p>
+    <p class="section-sub">真实模型评测包含 SQL 结果集比较与知识问答关键词检查；以下为历史快照，修正比较规则后待重跑。</p>
     <table class="eval-table">
         <thead>
             <tr><th>评测集</th><th>规模</th><th>断言方式</th><th>最近结果</th></tr>
@@ -243,20 +243,20 @@
             <tr>
                 <td>知识检索</td>
                 <td class="mono-cell">15 条</td>
-                <td>命中文档 + 相似度阈值 0.4</td>
+                <td>字符 bigram 词法检索与来源文件匹配</td>
                 <td><span class="pass-badge">PASS</span></td>
             </tr>
             <tr>
-                <td>端到端（GLM 快照）</td>
+                <td>模型评测（GLM 历史快照）</td>
                 <td class="mono-cell">15 条 · 真实模型调用</td>
-                <td>结果集断言（行/列/关键值）</td>
+                <td>旧版结果集比较及知识关键词检查</td>
                 <td><span class="pass-badge">14/15</span> <span class="mono-cell" style="color: var(--ink-3);">P50 1,508ms · P95 8,941ms · 6,894 tokens</span></td>
             </tr>
             <tr>
                 <td>单元 / 集成测试</td>
-                <td class="mono-cell">238 条（后端 131 + AI 助手 107）</td>
+                <td class="mono-cell">历史 252 条（后端 164 + AI 助手 88）</td>
                 <td>pytest 收集数</td>
-                <td><span class="pass-badge">238 已核实</span> <span style="color: var(--ink-3); font-size: 12px;">后端 131 + AI 助手 107，2026-09-02 本地实际收集</span></td>
+                <td><span class="pass-badge">252 passed</span> <span style="color: var(--ink-3); font-size: 12px;">2026-09-18 隔离环境历史结果</span></td>
             </tr>
         </tbody>
     </table>
@@ -362,7 +362,7 @@ MySQL 8（只读账号） · Redis 7（缓存/会话） · Chroma + BGE-small-zh
             <div class="rs-body">
                 <div class="rs-title">运行测试与评测</div>
                 <code>.venv\Scripts\python.exe -m pytest ai-ecommerce-assistant/tests -q
-# 端到端评测需配置模型 Key；无 Key 时自动跳过，不伪造结果</code>
+# 真实模型评测需显式配置模型 Key 并允许联网</code>
             </div>
         </div>
     </div>

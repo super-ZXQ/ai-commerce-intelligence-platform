@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -96,8 +96,8 @@ def _new_order(
 ) -> Order:
     """将已校验的创建事件投影为 orders 读模型行。
 
-    order_seq_id：Docker 旧卷/历史 schema 可能没有 AUTO_INCREMENT，因此调用方
-    应显式传入主键；为 None 时依赖数据库自增。
+    order_seq_id 为 None 时由数据库分配，避免并发事务读取相同的最大值。
+    显式主键参数保留给需要导入已有编号的调用方。
     """
     return Order(
         id=order_seq_id,
@@ -144,9 +144,12 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
         return duplicate
     assert ledger is not None
 
-    order = await db.scalar(
-        select(Order).where(Order.order_no == event.order_id).with_for_update()
-    )
+    order_query = select(Order).where(Order.order_no == event.order_id)
+    # 创建时无需锁定不存在的订单；MySQL 的间隙锁会让不同订单并发插入互相等待。
+    # 已有订单的退款、取消仍需行锁保护状态转换。
+    if event.event_type != "ORDER_CREATED":
+        order_query = order_query.with_for_update()
+    order = await db.scalar(order_query)
 
     if event.event_type == "ORDER_CREATED":
         if order is not None:
@@ -155,9 +158,8 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
             return _reject(ledger, event, "订单已存在，拒绝重复创建")
         payload = OrderCreatedPayload.model_validate(event.payload)
         order_time = _utc_naive(payload.order_time or event.occurred_at)
-        # 显式分配主键：不依赖目标库是否配置了 AUTO_INCREMENT。
-        max_seq = await db.scalar(select(func.max(Order.id)))
-        db.add(_new_order(event, payload, order_time, order_seq_id=(max_seq or 0) + 1))
+        # 自增由数据库原子分配；历史卷须先执行 Alembic 升级。
+        db.add(_new_order(event, payload, order_time))
         ledger.processing_status = _PROCESSED
         ledger.processed_at = _utc_now_naive()
         return _result(event, "processed")

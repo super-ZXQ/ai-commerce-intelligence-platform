@@ -39,7 +39,7 @@ def main() -> None:
                 connection.execute(text(f"ALTER TABLE orders ADD COLUMN {name} {definition}"))
         connection.execute(text("UPDATE orders SET order_status = 'ACTIVE' WHERE order_status IS NULL"))
         connection.execute(text("UPDATE orders SET event_version = 0 WHERE event_version IS NULL"))
-        # 历史 Docker 卷可能没有 AUTO_INCREMENT；事件路径也会显式分配主键，这里双保险对齐 schema。
+        # 历史 Docker 卷可能没有 AUTO_INCREMENT；事件路径依赖数据库分配主键。
         extra = connection.execute(
             text(
                 "SELECT EXTRA FROM information_schema.COLUMNS "

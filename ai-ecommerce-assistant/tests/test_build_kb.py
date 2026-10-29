@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import pytest
+import build_knowledge_base
 from build_knowledge_base import (
     _doc_type,
     _make_doc_id,
@@ -53,6 +54,44 @@ def test_doc_id_length_is_16():
 
 def test_doc_id_differs_on_content():
     assert _make_doc_id("a.md", "S", "x") != _make_doc_id("a.md", "S", "y")
+
+
+def test_doc_id_changes_when_only_content_after_200_chars_changes():
+    prefix = "a" * 200
+    assert _make_doc_id("a.md", "S", prefix + "旧规则") != _make_doc_id("a.md", "S", prefix + "新规则")
+
+
+def test_incremental_build_updates_tail_and_removes_old_chunk(tmp_path, monkeypatch):
+    """修改正文尾部后，增量构建应替换旧知识。"""
+    documents = {}
+
+    class Store:
+        def __init__(self, **_kwargs):
+            self._store = self
+
+        def count(self):
+            return len(documents)
+
+        def get_all_ids(self):
+            return list(documents)
+
+        def add_documents(self, docs, ids):
+            documents.update(zip(ids, docs, strict=True))
+
+        def delete(self, ids):
+            for doc_id in ids:
+                del documents[doc_id]
+
+    monkeypatch.setattr(build_knowledge_base, "VectorStore", Store)
+    monkeypatch.setattr(build_knowledge_base, "get_embeddings", lambda: None)
+    path = tmp_path / "rules.md"
+    path.write_text("## 规则\n" + "a" * 200 + "旧规则", encoding="utf-8")
+    build_knowledge_base.build(str(tmp_path), str(tmp_path / "db"))
+    path.write_text("## 规则\n" + "a" * 200 + "新规则", encoding="utf-8")
+    report = build_knowledge_base.build(str(tmp_path), str(tmp_path / "db"))
+    assert report["chunks_new"] == report["chunks_removed"] == 1
+    assert len(documents) == 1
+    assert "新规则" in next(iter(documents.values())).page_content
 
 
 def test_doc_id_differs_on_section():

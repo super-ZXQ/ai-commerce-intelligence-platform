@@ -1,0 +1,21 @@
+{"id": "h01", "query": "退款率到底为什么变高了？按平台看看", "data": "holdout_rise", "required": ["overall", "platform"], "counts": [3, 2, 3, 0], "choices": ["platform", "finish"]}
+{"id": "h02", "query": "这次退款率为什么涨了，各平台分别怎样？", "data": "holdout_rise", "required": ["overall", "platform"], "counts": [3, 2, 3, 0], "choices": ["platform", "finish"]}
+{"id": "h03", "query": "退款率上升原因是什么？请拆分平台", "data": "holdout_rise", "required": ["overall", "platform"], "counts": [3, 2, 3, 0], "choices": ["platform", "finish"]}
+{"id": "h04", "query": "退款率为何升高，各个平台分别贡献多少？", "data": "holdout_rise", "required": ["overall", "platform"], "counts": [3, 2, 3, 0], "choices": ["platform", "finish"]}
+{"id": "h05", "query": "退款率为何增加，请从商品角度分析", "data": "holdout_rise", "required": ["overall", "product"], "counts": [3, 2, 3, 0], "choices": ["product", "finish"]}
+{"id": "h06", "query": "退款率变高的原因是什么，看看商品维度", "data": "holdout_rise", "required": ["overall", "product"], "counts": [3, 2, 3, 0], "choices": ["product", "finish"]}
+{"id": "h07", "query": "退款率为什么涨了，按产品商品拆解", "data": "holdout_rise", "required": ["overall", "product"], "counts": [3, 2, 3, 0], "choices": ["product", "finish"]}
+{"id": "h08", "query": "退款率为何上涨？查一下各商品的变化", "data": "holdout_rise", "required": ["overall", "product"], "counts": [3, 2, 3, 0], "choices": ["product", "finish"]}
+{"id": "h09", "query": "退款率上升的原因是什么？分别看平台与商品", "data": "holdout_rise", "required": ["overall", "platform", "product"], "counts": [3, 2, 3, 0], "choices": ["platform", "product"]}
+{"id": "h10", "query": "退款率为什么变高？分析商品和平台", "data": "holdout_rise", "required": ["overall", "platform", "product"], "counts": [3, 2, 3, 0], "choices": ["platform", "product"]}
+{"id": "h11", "query": "退款率为何走高，按平台与商品一起看", "data": "holdout_rise", "required": ["overall", "platform", "product"], "counts": [3, 2, 3, 0], "choices": ["platform", "product"]}
+{"id": "h12", "query": "退款率上涨原因：平台及商品分别有什么变化？", "data": "holdout_rise", "required": ["overall", "platform", "product"], "counts": [3, 2, 3, 0], "choices": ["platform", "product"]}
+{"id": "h13", "query": "退款率为何上升？看看平台", "data": "holdout_flat", "required": ["overall"], "counts": [3, 1, 3, 2], "choices": [], "answer_contains": "没有显示退款率上升"}
+{"id": "h14", "query": "退款率为什么突然涨了，按商品分析", "data": "holdout_flat", "required": ["overall"], "counts": [3, 1, 3, 2], "choices": [], "answer_contains": "没有显示退款率上升"}
+{"id": "h15", "query": "退款率上升原因是什么？", "data": "holdout_flat", "required": ["overall"], "counts": [3, 1, 3, 2], "choices": [], "answer_contains": "没有显示退款率上升"}
+{"id": "h16", "query": "退款率为何升高？按平台看", "data": "empty", "required": ["overall"], "counts": null, "choices": [], "answer_contains": "没有订单数据"}
+{"id": "h17", "query": "退款率为什么变化？分析商品", "data": "empty", "required": ["overall"], "counts": null, "choices": [], "answer_contains": "没有订单数据"}
+{"id": "h18", "query": "退款率上升的原因是什么？", "data": "empty", "required": ["overall"], "counts": null, "choices": [], "answer_contains": "没有订单数据"}
+{"id": "h19", "query": "退款率为什么上升？请看平台", "data": "holdout_rise", "required": [], "counts": null, "choices": [], "fail_first": true, "error": true}
+{"id": "h20", "query": "退款率为何变高？请看商品", "data": "holdout_rise", "required": [], "counts": null, "choices": [], "fail_first": true, "error": true}
+{"id": "h21", "query": "退款率上涨原因是什么？", "data": "holdout_rise", "required": [], "counts": null, "choices": [], "fail_first": true, "error": true}
