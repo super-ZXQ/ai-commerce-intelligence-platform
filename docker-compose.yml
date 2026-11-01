@@ -232,6 +232,15 @@ services:
       - --server.baseUrlPath=/BI
       - --browser.gatherUsageStats=false
       - --server.fileWatcherType=none
+    environment:
+      # BI 默认读取运行期业务库（只读账号），读取失败回退 data/ 快照；
+      # 页面缓存 30 秒，侧边栏刷新按钮会立即重读。
+      BI_DATA_SOURCE: db
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      DB_USER: ea_app
+      DB_PASSWORD: ${DB_APP_PASSWORD:?请设置 DB_APP_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy

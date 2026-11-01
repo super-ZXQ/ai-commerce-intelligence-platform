@@ -75,9 +75,11 @@ GRANT SELECT ON \`${DB_NAME}\`.\`order_status_reconciliation\` TO 'ea_app'@'%';
 -- AI 只读账号：Text-to-SQL 只允许访问 orders，缩小越权查询的影响面。
 GRANT SELECT ON \`${DB_NAME}\`.\`orders\` TO 'ea_ai'@'%';
 
--- 事件写账号：只写订单读模型与事件账本，无审计/认证表权限。
+-- 事件写账号：只写订单读模型、事件账本与数据版本，无审计/认证表权限。
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`orders\` TO 'ea_events'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`order_events\` TO 'ea_events'@'%';
+-- 版本行在事件事务内自增；UPDATE 读取 data_version 需要列级 SELECT。
+GRANT SELECT, UPDATE ON \`${DB_NAME}\`.\`data_state\` TO 'ea_events'@'%';
 
 -- 认证账号：仅认证、服务凭据与审计表；无业务数据访问权限。
 GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`auth_users\` TO 'ea_auth'@'%';

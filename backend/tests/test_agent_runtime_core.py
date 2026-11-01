@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from agent_core.session import FallbackConversationStore, MemoryConversationStore
+from agent_core.session import (
+    FallbackConversationStore,
+    MemoryConversationStore,
+    RedisConversationStore,
+)
 from agent_core.sql_safety import SQLValidationError, apply_execution_guard, validate_and_limit_sql
 from agent_core.models import AgentResult, AgentSource, AgentStep, AgentUsage, ModelResponse
 from agent_core.runtime import AgentRuntime
@@ -105,6 +109,98 @@ async def test_pop_last_turn_falls_back_when_primary_unavailable() -> None:
     await store.save_turn("alice", "t", "question", "answer")
     assert await store.pop_last_turn("alice", "t") is True
     assert await store.get_history("alice", "t") == []
+
+
+class _FakeWatchPipeline:
+    """模拟 redis-py 的 WATCH/MULTI：第一次 execute 制造并发冲突。"""
+
+    def __init__(self, redis):
+        self.redis = redis
+        self.commands: list[tuple] = []
+        self.watching = False
+
+    async def watch(self, _key):
+        self.watching = True
+
+    async def get(self, key):
+        return self.redis.data.get(key)
+
+    async def unwatch(self):
+        self.watching = False
+
+    def multi(self):
+        pass
+
+    def setex(self, key, _ttl, value):
+        self.commands.append(("set", key, value))
+        return self
+
+    def delete(self, key):
+        self.commands.append(("delete", key))
+        return self
+
+    async def execute(self):
+        if self.watching and self.redis.conflicts > 0:
+            from redis.exceptions import WatchError
+
+            self.redis.conflicts -= 1
+            self.watching = False
+            raise WatchError
+        for command in self.commands:
+            if command[0] == "set":
+                self.redis.data[command[1]] = command[2]
+            else:
+                self.redis.data.pop(command[1], None)
+        self.commands.clear()
+        self.watching = False
+        return []
+
+    async def reset(self):
+        self.commands.clear()
+        self.watching = False
+
+
+class _FakeWatchRedis:
+    def __init__(self, conflicts: int = 0):
+        self.data: dict[str, str] = {}
+        self.conflicts = conflicts
+
+    async def get(self, key):
+        return self.data.get(key)
+
+    def pipeline(self, transaction=True):
+        assert transaction
+        return _FakeWatchPipeline(self)
+
+
+def _redis_store(redis: _FakeWatchRedis) -> RedisConversationStore:
+    store = RedisConversationStore.__new__(RedisConversationStore)
+    store._redis = redis
+    store.ttl_seconds = 60
+    store.max_messages = 12
+    return store
+
+
+@pytest.mark.asyncio
+async def test_redis_save_turn_retries_after_watch_conflict() -> None:
+    store = _redis_store(_FakeWatchRedis(conflicts=1))
+    await store.save_turn("alice", "t", "q1", "a1")
+    assert await store.get_history("alice", "t") == [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_redis_pop_last_turn_checks_tail_inside_transaction() -> None:
+    store = _redis_store(_FakeWatchRedis())
+    await store.save_turn("alice", "t", "q1", "a1")
+    await store.save_turn("alice", "t", "q2", "a2")
+
+    assert await store.pop_last_turn("alice", "t", question="q1") is False
+    assert len(await store.get_history("alice", "t")) == 4
+    assert await store.pop_last_turn("alice", "t", question="q2") is True
+    assert [m["content"] for m in await store.get_history("alice", "t")] == ["q1", "a1"]
 
 
 class _FailingStore:

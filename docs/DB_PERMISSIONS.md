@@ -11,7 +11,7 @@
 |------|--------|--------|----------|
 | `ea_app` | FastAPI 业务读路径、BI 查询 | `DB_USER` / `DB_PASSWORD` | 表级只读 |
 | `ea_ai` | AI Text-to-SQL 只读执行 | `AI_DB_USER` / `AI_DB_PASSWORD` | 仅 `orders` 表级只读 |
-| `ea_events` | 订单事件摄入写路径 | `EVENT_DB_USER` / `EVENT_DB_PASSWORD` | `orders` / `order_events` 表级读写 |
+| `ea_events` | 订单事件摄入写路径 | `EVENT_DB_USER` / `EVENT_DB_PASSWORD` | `orders` / `order_events` / `data_state` 表级读写 |
 | `ea_auth` | 登录、权限、服务凭据、审计 | `AUTH_DB_USER` / `AUTH_DB_PASSWORD` | 仅认证/审计表 |
 | `ea_sync` | 显式订单导入、staging 换表 | `MIGRATION_DB_USER=ea_sync`（data-import） | 库级 DDL（运维例外） |
 | `ea_migrate` | Alembic schema 升级 | `MIGRATION_DB_USER=ea_migrate` | 库级 DDL（迁移例外） |
@@ -23,7 +23,7 @@
 |----|----------|---------|-------------|-----------|
 | `orders` | SELECT | SELECT | SELECT/INSERT/UPDATE | — |
 | `order_events` | SELECT | — | SELECT/INSERT/UPDATE | — |
-| `data_state` | SELECT | — | — | — |
+| `data_state` | SELECT | — | SELECT/UPDATE | — |
 | `data_import_runs` | SELECT | — | — | — |
 | `order_status_reconciliation` | SELECT | — | — | — |
 | `auth_users` | — | — | — | SELECT/INSERT/UPDATE/DELETE |
@@ -36,6 +36,7 @@
 
 - `ea_ai` 只授予 `orders`，即使 Text-to-SQL 黑名单被绕过，也无法读取认证表或其他业务表。
 - `ea_events` 不能删除订单、不能访问认证表；事件幂等由 `order_events.event_id` 唯一键兜底。
+- `ea_events` 可在事件事务内更新 `data_state.data_version`，用于缓存版本切换；该权限不包含 DELETE，不能重置版本或删除版本行。
 - `ea_auth` 无任何 `orders` 权限；认证库连接池与业务连接池相互独立。
 - `ea_app` 不授予 `auth_users` / `service_clients`，避免业务接口意外泄露口令哈希。
 - 审计表只允许追加与查询，不允许认证账号修改历史审计。
@@ -68,8 +69,10 @@ SELECT COUNT(*) FROM orders;
 
 -- ea_events：应成功
 INSERT INTO order_events (...) VALUES (...);
+UPDATE data_state SET data_version = data_version + 1 WHERE id = 1;
 -- ea_events：应失败（1142）
 SELECT COUNT(*) FROM auth_users;
+DELETE FROM data_state WHERE id = 1;
 ```
 
 2. 迁移后重新执行 `docker compose run --rm db-grant`，确认脚本幂等且不产生新授权错误。

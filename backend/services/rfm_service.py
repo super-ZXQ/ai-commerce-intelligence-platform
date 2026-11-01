@@ -55,7 +55,8 @@ async def _fetch_rfm_raw(db: AsyncSession, ref_date) -> list[dict]:
         and_(
             Order.order_date <= ref_date,
             Order.payment_amount > 0,
-            Order.order_status == "ACTIVE",
+            # 与 BI/AI 统一：取消订单不参与 RFM；退款订单保留，M 值为历史付款额。
+            Order.order_status != "CANCELLED",
         )
     ).group_by(
         Order.user_name
@@ -257,7 +258,7 @@ def _summary_from_snapshot(snapshot: dict) -> dict:
     }
 
 
-@cached(ttl=600, tags=("rfm",))
+@cached(ttl=600, tags=("rfm",), versioned=True)
 async def compute_rfm(
     db: AsyncSession,
     reference_date: str | None = None,
@@ -272,7 +273,7 @@ async def compute_rfm(
     return _summary_from_snapshot(snapshot)
 
 
-@cached(ttl=300, tags=("rfm",))
+@cached(ttl=300, tags=("rfm",), versioned=True)
 async def get_rfm_segment_detail(
     db: AsyncSession,
     segment: str,
@@ -305,7 +306,7 @@ async def get_rfm_segment_detail(
     }
 
 
-@cached(ttl=300, tags=("rfm",))
+@cached(ttl=300, tags=("rfm",), versioned=True)
 async def get_rfm_top_users(
     db: AsyncSession,
     limit: int = 20,
@@ -325,7 +326,7 @@ async def get_rfm_top_users(
     }
 
 
-@cached(ttl=600, tags=("rfm",))
+@cached(ttl=600, tags=("rfm",), versioned=True)
 async def get_rfm_overview(db: AsyncSession) -> dict:
     rfm_data = await compute_rfm(db)
 

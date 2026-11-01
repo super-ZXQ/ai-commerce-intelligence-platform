@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -87,6 +87,16 @@ async def _insert_ledger_or_duplicate(
     return ledger, None
 
 
+async def _bump_data_version(db: AsyncSession) -> None:
+    """在事件事务内递增全局数据版本。
+
+    单行更新会串行化并发事件事务，这是刻意选择：版本号必须与订单/账本
+    提交顺序一致，缓存才能按同一快照切换。事件写入是低频管理操作，
+    单行锁不会成为查询链路的瓶颈。
+    """
+    await db.execute(text("UPDATE data_state SET data_version = data_version + 1 WHERE id = 1"))
+
+
 def _new_order(
     event: OrderEventInput,
     payload: OrderCreatedPayload,
@@ -160,6 +170,7 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
         order_time = _utc_naive(payload.order_time or event.occurred_at)
         # 自增由数据库原子分配；历史卷须先执行 Alembic 升级。
         db.add(_new_order(event, payload, order_time))
+        await _bump_data_version(db)
         ledger.processing_status = _PROCESSED
         ledger.processed_at = _utc_now_naive()
         return _result(event, "processed")
@@ -179,6 +190,7 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
     order.is_refunded = "是" if target_status == _REFUNDED else order.is_refunded
     order.event_version = event.version
     order.updated_at = _utc_now_naive()
+    await _bump_data_version(db)
     ledger.processing_status = _PROCESSED
     ledger.processed_at = _utc_now_naive()
     return _result(event, "processed")

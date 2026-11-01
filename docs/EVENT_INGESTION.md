@@ -58,9 +58,18 @@ Agent 不读取事件写账号的连接串，LLM 也不会获得任何写库工�
 
 ## 指标口径与缓存
 
-事件读模型中 `ACTIVE` 订单计入销售额/GMV、趋势、商品排行和 RFM；退款与取消会从这些有效经营指标中移除。退款金额仍由退款状态独立统计。
+统一指标口径：只有 `CANCELLED` 订单不计入经营指标。销售额/GMV、趋势、商品排行、品类分析和 RFM 均以“非取消订单”为基数；退款订单保留在销售额与订单数中（毛额口径），退款金额与退款率单独累计。退款率 = 退款订单数 ÷ 非取消订单数，按订单日期归因（订单队列口径）；事件账本中的退款发生时间不参与 BI/AI 指标，避免历史 CSV 与运行期数据口径分裂。
 
-处理成功后仅失效 `analytics` 和 `rfm` 标签缓存，并清除 RFM 进程内快照；不执行 Redis `FLUSHDB`。`GET /api/order-events/freshness` 返回：
+处理成功时在**同一事务内**执行 `UPDATE data_state SET data_version = data_version + 1 WHERE id = 1`，提交后仅失效 `analytics` 和 `rfm` 标签缓存，并清除 RFM 进程内快照；不执行 Redis `FLUSHDB`。版本更新与订单/账本同提交、同回滚，因此不会出现“数据已变但版本未变”或“版本已变但数据回滚”的错位。
+
+缓存 key 的版本语义：
+
+- `analytics` / `rfm` 的缓存装饰器在查询前从**同一数据库会话**读取 `data_state.data_version`，并把 `v{version}` 拼入 key。读取发生在业务查询之前，MySQL REPEATABLE READ 下版本与后续查询共享同一快照。
+- 事件提交后新请求读取到新版本，自然落到新 key，不依赖标签失效是否成功；旧 key 随 TTL 过期，不会被再次读取。
+- 版本读取失败（旧库未迁移、连接异常）时回退到纯 TTL 语义，此时允许的陈旧窗口等于该接口 TTL（分析类 120/180 秒、RFM 300/600 秒）。标签失效成功时陈旧窗口为 0；多进程环境下每个进程的 RFM 进程内快照依赖版本 key 切换。
+- `UPDATE data_state` 会串行化并发事件事务（单行锁）。事件摄入是低频管理操作，单行锁只影响写路径，不阻塞读查询；隔离 MySQL 并发测试验证 N 笔并发事件全部成功且版本恰好 +N。
+
+`GET /api/order-events/freshness` 返回：
 
 - `data_updated_at`
 - `last_event_occurred_at`

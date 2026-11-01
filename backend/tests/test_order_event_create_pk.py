@@ -56,7 +56,7 @@ async def test_concurrent_order_creation_on_isolated_mysql(monkeypatch):
     """仅在明确指定隔离测试库时并发写入，并清理本测试的行。"""
     if os.environ.get("TEST_ORDER_CONCURRENCY") != "1":
         pytest.skip("仅在隔离 MySQL 测试库运行")
-    from sqlalchemy import delete, select
+    from sqlalchemy import delete, select, text
 
     from backend.database import event_engine, event_session_factory
     from backend.models.database_models import Order, OrderEvent
@@ -80,12 +80,21 @@ async def test_concurrent_order_creation_on_isolated_mysql(monkeypatch):
     order_ids = [event.order_id for event in events]
     event_ids = [str(event.event_id) for event in events]
     try:
+        async with event_session_factory() as session:
+            version_before = int(
+                await session.scalar(text("SELECT data_version FROM data_state WHERE id = 1"))
+            )
         results = await asyncio.gather(*(create(event) for event in events), return_exceptions=True)
         assert all(not isinstance(result, BaseException) and result.status == "processed" for result in results), results
         async with event_session_factory() as session:
             rows = (await session.execute(select(Order.id).where(Order.order_no.in_(order_ids)))).scalars().all()
             assert len(rows) == len(events)
             assert len(set(rows)) == len(events)
+            version_after = int(
+                await session.scalar(text("SELECT data_version FROM data_state WHERE id = 1"))
+            )
+        # 并发事件按事务提交顺序递增版本，且每笔成功事件恰好 +1。
+        assert version_after == version_before + len(events)
     finally:
         async with event_session_factory() as session:
             async with session.begin():

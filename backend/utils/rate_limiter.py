@@ -20,6 +20,26 @@ RATE_LIMITS = {
     "default": {"requests": 100, "window": 60},
 }
 
+# 主体级限流：同一 NAT/代理后的多个账号不能互相挤占额度，单个账号也不能
+# 通过切换流式/非流式端点绕过配额。桶名固定，与具体 URL 路径解耦。
+PRINCIPAL_RATE_LIMITS = {
+    "ai": {
+        "prefixes": ("/api/ai/query", "/api/ai/stream"),
+        "requests": 10,
+        "window": 60,
+    },
+    "export": {
+        "prefixes": ("/api/export/",),
+        "requests": 3,
+        "window": 120,
+    },
+    "events": {
+        "prefixes": ("/api/order-events",),
+        "requests": 120,
+        "window": 60,
+    },
+}
+
 _CLEANUP_INTERVAL = 300
 _MAX_STORE_SIZE = 10000
 
@@ -76,6 +96,51 @@ def _get_client_id(request: Request, trust_proxy_headers: bool = False) -> str:
             if ips:
                 return ips[-1]
     return request.client.host if request.client else "unknown"
+
+
+def check_principal_rate_limit(request: Request, principal_name: str) -> dict | None:
+    """按调用主体限流；未命中受控桶的路由返回 None。
+
+    与 IP 限流同时生效：IP 桶防止匿名滥用，主体桶防止同一出口下的
+    单账号挤占其他账号的额度。
+    """
+    if not principal_name:
+        return None
+    path = request.url.path
+    bucket = None
+    for name, config in PRINCIPAL_RATE_LIMITS.items():
+        if any(path.startswith(prefix) for prefix in config["prefixes"]):
+            bucket = name
+            break
+    if bucket is None:
+        return None
+
+    _ensure_cleanup_thread()
+    config = PRINCIPAL_RATE_LIMITS[bucket]
+    key = f"principal:{principal_name}:{bucket}"
+    now = time.time()
+    window = config["window"]
+    max_requests = config["requests"]
+
+    with _rate_lock:
+        _rate_store[key] = [t for t in _rate_store[key] if now - t < window]
+        if len(_rate_store[key]) >= max_requests:
+            retry_after = int(_rate_store[key][0] + window - now) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"该账号请求过于频繁，请 {retry_after} 秒后重试",
+                headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Limit": str(max_requests),
+                    "X-RateLimit-Scope": "principal",
+                },
+            )
+        _rate_store[key].append(now)
+        return {
+            "limit": max_requests,
+            "remaining": max_requests - len(_rate_store[key]),
+            "reset": int(_rate_store[key][0] + window),
+        }
 
 
 def check_rate_limit(request: Request, trust_proxy_headers: bool = False) -> dict:

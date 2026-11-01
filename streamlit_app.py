@@ -103,8 +103,58 @@ _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 if not os.path.exists(os.path.join(_REPO_ROOT, 'data')):
     _REPO_ROOT = os.path.dirname(_REPO_ROOT)
 
-@st.cache_data(show_spinner="正在加载数据，请稍候...")
-def load_data():
+_BI_DB_SQL = """
+SELECT order_id AS order_no, order_time, payment_time, payment_amount,
+       user_name, product_id, platform_type
+FROM orders
+WHERE order_status <> 'CANCELLED'
+"""
+_BI_DB_COLUMNS = {
+    'order_no': '订单号',
+    'order_time': '下单时间',
+    'payment_time': '付款时间',
+    'payment_amount': '付款金额',
+    'user_name': '用户名',
+    'product_id': '商品编号',
+    'platform_type': '平台类型',
+}
+
+
+def _db_configured() -> bool:
+    return all(os.getenv(name) for name in ('DB_HOST', 'DB_USER', 'DB_NAME'))
+
+
+def _load_orders_from_db() -> pd.DataFrame:
+    """用只读业务账号读取运行期订单；取消订单与后端指标口径保持一致。"""
+    import pymysql
+
+    conn = pymysql.connect(
+        host=os.getenv('DB_HOST', 'localhost'),
+        port=int(os.getenv('DB_PORT', '3306')),
+        user=os.getenv('DB_USER', ''),
+        password=os.getenv('DB_PASSWORD', ''),
+        database=os.getenv('DB_NAME', ''),
+        charset='utf8mb4',
+        connect_timeout=5,
+        read_timeout=30,
+        cursorclass=pymysql.cursors.DictCursor,
+    )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(_BI_DB_SQL)
+            rows = cursor.fetchall()
+    finally:
+        conn.close()
+    if not rows:
+        raise RuntimeError('业务库暂无订单数据')
+    frame = pd.DataFrame(rows).rename(columns=_BI_DB_COLUMNS)
+    frame['下单时间'] = pd.to_datetime(frame['下单时间'])
+    frame['付款时间'] = pd.to_datetime(frame['付款时间'])
+    frame['付款金额'] = frame['付款金额'].astype(float)
+    return frame
+
+
+def _load_orders_from_csv() -> pd.DataFrame:
     base = os.path.join(_REPO_ROOT, 'data')
     for ext in ('.parquet', '.csv'):
         f = os.path.join(base, 'cleaned_orders' + ext)
@@ -114,15 +164,41 @@ def load_data():
             return pd.read_csv(f, parse_dates=['下单时间', '付款时间'])
     raise FileNotFoundError("未找到数据文件 data/cleaned_orders.parquet 或 .csv")
 
+
+@st.cache_data(ttl=30, show_spinner="正在加载数据，请稍候...")
+def load_data(refresh_token: int = 0) -> tuple[pd.DataFrame, str]:
+    """优先读业务库；未配置或读取失败时回退本地快照。
+
+    refresh_token 参与缓存键，侧边栏“刷新数据”会换一个 token 立即重读；
+    即使不点刷新，运行期数据最多陈旧 30 秒。
+    """
+    mode = os.getenv('BI_DATA_SOURCE', 'auto').strip().lower()
+    if mode not in ('auto', 'db', 'csv'):
+        raise ValueError('BI_DATA_SOURCE 只能是 auto/db/csv')
+    if mode in ('auto', 'db') and _db_configured():
+        try:
+            return _load_orders_from_db(), '业务库（非取消订单）'
+        except Exception as exc:
+            if mode == 'db':
+                raise RuntimeError(f'业务库读取失败：{exc}') from exc
+    elif mode == 'db':
+        raise RuntimeError('BI_DATA_SOURCE=db 但未配置 DB_HOST/DB_USER/DB_NAME')
+    return _load_orders_from_csv(), '本地 CSV 快照'
+
+
+page = st.sidebar.selectbox("选择看板页面", ["销售总览", "RFM 客户分层"])
+if st.sidebar.button("刷新数据", help="重新读取业务库；页面缓存最长 30 秒"):
+    st.session_state['data_refresh_token'] = st.session_state.get('data_refresh_token', 0) + 1
+    load_data.clear()
+    st.rerun()
+
 with st.spinner("正在加载数据..."):
     try:
-        df = load_data()
-        st.success(f"成功加载 {len(df):,} 条订单数据")
+        df, data_source = load_data(st.session_state.get('data_refresh_token', 0))
+        st.success(f"成功加载 {len(df):,} 条订单数据（来源：{data_source}）")
     except Exception as e:
         st.error(f"数据加载失败：{e}")
         st.stop()
-
-page = st.sidebar.selectbox("选择看板页面", ["销售总览", "RFM 客户分层"])
 
 # ══════════════════════════════════════════════════════════════
 # 销售总览
@@ -199,7 +275,7 @@ if page == "销售总览":
     st.plotly_chart(fig_user, width='stretch')
 
     st.markdown("---")
-    st.caption(f"数据更新时间：{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：cleaned_orders | AI Commerce Intelligence Platform v1.0.3")
+    st.caption(f"数据更新时间：{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} | 数据来源：{data_source} | AI Commerce Intelligence Platform v1.0.3")
 
 # ══════════════════════════════════════════════════════════════
 # RFM 分层分析

@@ -249,6 +249,26 @@ class TestSanitizeError:
         exc = Exception("timeout after 30s")
         assert sanitize_error(exc) == "timeout after 30s"
 
+    def test_model_key_and_bearer_are_masked(self):
+        from backend.utils.text_cleaner import sanitize_error
+        exc = Exception(
+            "401 from provider: Authorization: Bearer sk-live-abcdef1234567890 "
+            "x-api-key: service-key-secret"
+        )
+        sanitized = sanitize_error(exc)
+        assert "sk-live-abcdef1234567890" not in sanitized
+        assert "service-key-secret" not in sanitized
+        assert sanitized.count("***") >= 2
+
+    def test_key_value_secrets_are_masked(self):
+        from backend.utils.text_cleaner import sanitize_error
+        sanitized = sanitize_error(
+            Exception("request failed: api_key=abc123&password=hunter2&token=xyz")
+        )
+        for secret in ("abc123", "hunter2", "xyz"):
+            assert secret not in sanitized
+        assert "api_key=***" in sanitized
+
 
 # ─── AI SQL 只读账户连接串 ───────────────────────────────
 

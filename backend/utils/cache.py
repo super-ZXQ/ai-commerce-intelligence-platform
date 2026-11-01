@@ -108,6 +108,26 @@ def _make_key(*args, **kwargs) -> str:
     return hashlib.md5(raw.encode()).hexdigest()
 
 
+async def _read_session_data_version(session: Any) -> int | None:
+    """读取与本次查询同一会话的数据版本。
+
+    读版本必须发生在业务查询之前：MySQL REPEATABLE READ 会在本会话第一次
+    一致性读时建立快照，版本号与随后的查询共享同一快照。若读取失败（旧库
+    未迁移、测试桩、连接异常），返回 None 并回退到纯 TTL 语义，不让缓存层
+    阻断主查询链路。
+    """
+    if session is None:
+        return None
+    try:
+        from sqlalchemy import text
+
+        value = await session.scalar(text("SELECT data_version FROM data_state WHERE id = 1"))
+        return int(value) if value is not None else None
+    except Exception as exc:
+        logger.warning("读取 data_state.data_version 失败，缓存键回退到 TTL 语义: %s", exc)
+        return None
+
+
 def _to_jsonable(value: Any) -> Any:
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json")
@@ -314,11 +334,15 @@ def operational_snapshot() -> dict[str, Any]:
     }
 
 
-def cached(ttl: int = DEFAULT_TTL, *, tags: tuple[str, ...] = ()):
+def cached(ttl: int = DEFAULT_TTL, *, tags: tuple[str, ...] = (), versioned: bool = False):
     """缓存装饰器：自动识别并跳过 SQLAlchemy Session 等不可哈希参数。
 
     约定：被装饰函数的形参名以 "_" 开头的（如 db / session / conn）会被排除在
     缓存 key 之外，避免每次新建 session 都会 cache miss。
+
+    versioned=True 时把 data_state.data_version 纳入 key：事件或导入提交后
+    版本单调递增，新请求自然切换到新 key，不依赖标签失效是否成功。版本读取
+    失败则回退 TTL 语义，允许的陈旧窗口等于 ttl。
     """
     def decorator(func: Callable[..., Awaitable[Any]]):
         sig = inspect.signature(func)
@@ -344,10 +368,28 @@ def cached(ttl: int = DEFAULT_TTL, *, tags: tuple[str, ...] = ()):
                     cache_kwargs[name] = value
             return tuple(cache_args), cache_kwargs
 
+        def _session_arg(args: tuple, kwargs: dict) -> Any:
+            try:
+                bound = sig.bind_partial(*args, **kwargs)
+            except TypeError:
+                return None
+            for name in ("db", "session", "conn"):
+                if name in bound.arguments:
+                    return bound.arguments[name]
+            return None
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
             cache_args, cache_kwargs = _cache_key_args(args, kwargs)
-            cache_key = f"{func.__module__}.{func.__name__}:{_make_key(*cache_args, **cache_kwargs)}"
+            version_suffix = ""
+            if versioned:
+                data_version = await _read_session_data_version(_session_arg(args, kwargs))
+                if data_version is not None:
+                    version_suffix = f":v{data_version}"
+            cache_key = (
+                f"{func.__module__}.{func.__name__}:"
+                f"{_make_key(*cache_args, **cache_kwargs)}{version_suffix}"
+            )
             cached_result = await get(cache_key)
             if cached_result is not None:
                 logger.debug(f"缓存命中: {cache_key}")

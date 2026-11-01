@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.database import get_db
 from backend.models.database_models import Order
 from backend.utils.auth import SCOPE_DATA_EXPORT, Principal, require_scope
@@ -17,6 +18,7 @@ from backend.services import analytics_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/export", tags=["数据导出"])
+settings = get_settings()
 
 _EXPORT_CHUNK_SIZE = 5000
 _ORDER_EXPORT_HEADERS = [
@@ -128,6 +130,29 @@ async def export_orders(
 
     count_stmt = select(func.count(Order.id)).where(*conditions)
     total = (await db.execute(count_stmt)).scalar() or 0
+
+    if total > settings.export_max_rows:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error_code": "EXPORT_TOO_LARGE",
+                "message": (
+                    f"导出 {total:,} 行超过上限 {settings.export_max_rows:,} 行，"
+                    "请缩小日期或平台范围后重试"
+                ),
+            },
+        )
+    if export_format == "excel" and total > settings.export_excel_max_rows:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error_code": "EXPORT_EXCEL_TOO_LARGE",
+                "message": (
+                    f"Excel 导出 {total:,} 行超过上限 {settings.export_excel_max_rows:,} 行，"
+                    "请改用 CSV 或缩小筛选范围"
+                ),
+            },
+        )
 
     if export_format == "csv":
         return StreamingResponse(

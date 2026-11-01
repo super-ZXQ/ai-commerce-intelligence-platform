@@ -310,24 +310,29 @@ async def get_principal(
     token = _bearer_token(request)
     if token:
         principal = await load_principal_from_token(auth_db, token)
-        if principal is not None:
-            return principal
-        raise HTTPException(
-            status_code=401,
-            detail="登录已失效，请重新登录",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    api_key = request.headers.get("x-api-key", "").strip()
-    if api_key:
+        if principal is None:
+            raise HTTPException(
+                status_code=401,
+                detail="登录已失效，请重新登录",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    else:
+        api_key = request.headers.get("x-api-key", "").strip()
+        if not api_key:
+            raise HTTPException(
+                status_code=401,
+                detail="未提供认证令牌",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         principal = await load_service_principal(auth_db, api_key)
-        if principal is not None:
-            return principal
-        raise HTTPException(status_code=401, detail="服务凭据无效或已过期")
-    raise HTTPException(
-        status_code=401,
-        detail="未提供认证令牌",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+        if principal is None:
+            raise HTTPException(status_code=401, detail="服务凭据无效或已过期")
+
+    # 认证成功后再按主体限流；登录失败不进入主体桶，避免用他人账号名刷桶。
+    from backend.utils.rate_limiter import check_principal_rate_limit
+
+    check_principal_rate_limit(request, principal.name)
+    return principal
 
 
 def require_scope(scope: str):

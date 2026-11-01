@@ -109,6 +109,10 @@ class Settings(BaseSettings):
 
     default_page_size: int = 20
     max_page_size: int = 100
+    # 导出上限：CSV 流式返回，总量上限防止单请求长期占用连接；
+    # Excel 需在内存构建工作簿，单独设置更低上限。
+    export_max_rows: int = 200_000
+    export_excel_max_rows: int = 50_000
 
     cache_ttl_seconds: int = 300
 

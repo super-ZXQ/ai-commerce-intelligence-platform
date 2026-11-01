@@ -48,6 +48,11 @@ def refund_sql(tool: str, dialect: str) -> str:
         COUNT(DISTINCT CASE WHEN o.order_date >= {current_start} AND o.is_refund = '是' THEN o.order_id END) AS current_refunds,
         COUNT(DISTINCT CASE WHEN o.order_date < {current_start} THEN o.order_id END) AS previous_orders,
         COUNT(DISTINCT CASE WHEN o.order_date < {current_start} AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds
-        FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders) AS b
+        FROM orders AS o
+        CROSS JOIN (
+            SELECT MAX(order_date) AS end_date FROM orders
+            WHERE order_status <> 'CANCELLED'
+        ) AS b
         WHERE o.order_date >= {previous_start} AND o.order_date <= b.end_date
+          AND o.order_status <> 'CANCELLED'
         {group} ORDER BY current_refunds DESC LIMIT 50"""

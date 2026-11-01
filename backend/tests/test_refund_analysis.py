@@ -20,12 +20,15 @@ from agent_core.sql_safety import apply_execution_guard, validate_and_limit_sql
 def runtime_for_test(choices, *, latest_refund=True, fail_on=None):
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
-    db.execute("CREATE TABLE orders (order_id TEXT, order_date TEXT, is_refund TEXT, platform_type TEXT, product_id TEXT)")
-    db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?)", [
-        ("p1", "2025-01-01", "否", "APP", "A"),
-        ("p2", "2025-01-30", "否", "APP", "B"),
-        ("c1", "2025-01-31", "是" if latest_refund else "否", "APP", "A"),
-        ("c2", "2025-03-01", "否", "Web", "B"),
+    db.execute(
+        "CREATE TABLE orders (order_id TEXT, order_date TEXT, is_refund TEXT, "
+        "platform_type TEXT, product_id TEXT, order_status TEXT)"
+    )
+    db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?)", [
+        ("p1", "2025-01-01", "否", "APP", "A", "ACTIVE"),
+        ("p2", "2025-01-30", "否", "APP", "B", "ACTIVE"),
+        ("c1", "2025-01-31", "是" if latest_refund else "否", "APP", "A", "ACTIVE"),
+        ("c2", "2025-03-01", "否", "Web", "B", "ACTIVE"),
     ])
     selected = deque(choices)
     calls = []
@@ -35,7 +38,7 @@ def runtime_for_test(choices, *, latest_refund=True, fail_on=None):
         return []
 
     async def schema():
-        return "orders(order_id, order_date, is_refund, platform_type, product_id)"
+        return "orders(order_id, order_date, is_refund, platform_type, product_id, order_status)"
 
     async def generate(*_args):
         return ModelResponse("SELECT COUNT(*) FROM orders")
@@ -170,12 +173,12 @@ def test_refund_tools_on_isolated_mysql():
             created = True
             cursor.execute(f"USE `{database}`")
             cursor.execute("CREATE TABLE orders (order_id VARCHAR(50), order_date DATE, is_refund VARCHAR(10), "
-                           "platform_type VARCHAR(50), product_id VARCHAR(50))")
-            cursor.executemany("INSERT INTO orders VALUES (%s, %s, %s, %s, %s)", [
-                ("p1", "2025-01-01", "否", "APP", "A"),
-                ("p2", "2025-01-30", "否", "Web", "B"),
-                ("c1", "2025-01-31", "是", "APP", "A"),
-                ("c2", "2025-03-01", "否", "Web", "B"),
+                           "platform_type VARCHAR(50), product_id VARCHAR(50), order_status VARCHAR(20))")
+            cursor.executemany("INSERT INTO orders VALUES (%s, %s, %s, %s, %s, %s)", [
+                ("p1", "2025-01-01", "否", "APP", "A", "ACTIVE"),
+                ("p2", "2025-01-30", "否", "Web", "B", "ACTIVE"),
+                ("c1", "2025-01-31", "是", "APP", "A", "REFUNDED"),
+                ("c2", "2025-03-01", "否", "Web", "B", "ACTIVE"),
             ])
             for tool in ("overall", "platform", "product"):
                 sql = apply_execution_guard(validate_and_limit_sql(refund_sql(tool, "mysql"), max_rows=50), 10000)

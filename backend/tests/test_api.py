@@ -6,6 +6,7 @@ import pymysql
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 
 from backend.config import get_settings
 from backend.database import event_session_factory
@@ -305,6 +306,12 @@ class TestAI:
         assert not {"generate_sql", "validate_sql", "execute_sql", "load_schema"} & set(step_names)
 
 
+async def _data_version() -> int:
+    async with event_session_factory() as db:
+        value = await db.scalar(text("SELECT data_version FROM data_state WHERE id = 1"))
+    return int(value)
+
+
 def _created_event(order_id: str, version: int = 1) -> dict:
     return {
         "event_id": str(uuid4()),
@@ -344,21 +351,26 @@ class TestOrderEvents:
         assert retried.status == "processed"
 
     @pytest.mark.asyncio
-    async def test_event_create_duplicate_refund_and_metrics_are_consistent(self, authed_client: AsyncClient):
+    async def test_event_create_duplicate_refund_cancel_and_metrics_are_consistent(
+        self, authed_client: AsyncClient
+    ):
         order_id = f"EVT-{uuid4().hex[:20]}"
-        before = (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"]
+        before = (await authed_client.get("/api/analytics/sales-overview")).json()
         created = _created_event(order_id)
 
         first = await authed_client.post("/api/order-events", json=created)
         assert first.status_code == 200
         assert first.json()["results"][0]["status"] == "processed"
-        after_create = (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"]
-        assert after_create == pytest.approx(before + 100.0)
+        after_create = (await authed_client.get("/api/analytics/sales-overview")).json()
+        assert after_create["total_sales"] == pytest.approx(before["total_sales"] + 100.0)
+        assert after_create["total_orders"] == before["total_orders"] + 1
 
         duplicate = await authed_client.post("/api/order-events", json=created)
         assert duplicate.status_code == 200
         assert duplicate.json()["results"][0]["status"] == "duplicate"
-        assert (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"] == pytest.approx(after_create)
+        assert (
+            await authed_client.get("/api/analytics/sales-overview")
+        ).json()["total_sales"] == pytest.approx(after_create["total_sales"])
 
         refunded = {
             "event_id": str(uuid4()), "order_id": order_id, "event_type": "ORDER_REFUNDED",
@@ -367,8 +379,57 @@ class TestOrderEvents:
         response = await authed_client.post("/api/order-events", json=refunded)
         assert response.status_code == 200
         assert response.json()["results"][0]["status"] == "processed"
-        after_refund = (await authed_client.get("/api/analytics/sales-overview")).json()["total_sales"]
-        assert after_refund == pytest.approx(before)
+        after_refund = (await authed_client.get("/api/analytics/sales-overview")).json()
+        # 统一口径：退款订单保留在销售额与订单数中，退款金额单独累计。
+        assert after_refund["total_sales"] == pytest.approx(after_create["total_sales"])
+        assert after_refund["total_orders"] == after_create["total_orders"]
+        assert after_refund["total_refund_amount"] == pytest.approx(
+            before["total_refund_amount"] + 100.0
+        )
+        assert after_refund["refund_rate"] >= before["refund_rate"]
+
+        cancel_id = f"CANCEL-{uuid4().hex[:20]}"
+        cancelled = _created_event(cancel_id, version=1)
+        assert (await authed_client.post("/api/order-events", json=cancelled)).json()["processed"] == 1
+        cancel_event = {
+            "event_id": str(uuid4()), "order_id": cancel_id, "event_type": "ORDER_CANCELLED",
+            "occurred_at": datetime.now(UTC).isoformat(), "version": 2, "source": "pytest", "payload": {},
+        }
+        assert (await authed_client.post("/api/order-events", json=cancel_event)).json()["processed"] == 1
+        after_cancel = (await authed_client.get("/api/analytics/sales-overview")).json()
+        # 取消订单不计入任何经营指标，销售额与订单数回到取消前水平。
+        assert after_cancel["total_sales"] == pytest.approx(after_refund["total_sales"])
+        assert after_cancel["total_orders"] == after_refund["total_orders"]
+
+    @pytest.mark.asyncio
+    async def test_data_version_bumps_only_for_processed_events(self, authed_client: AsyncClient):
+        order_id = f"VERSION-{uuid4().hex[:16]}"
+        before = await _data_version()
+        created = _created_event(order_id)
+        assert (await authed_client.post("/api/order-events", json=created)).json()["processed"] == 1
+        assert await _data_version() == before + 1
+
+        duplicate = await authed_client.post("/api/order-events", json=created)
+        assert duplicate.json()["results"][0]["status"] == "duplicate"
+        assert await _data_version() == before + 1
+
+        rejected = await authed_client.post(
+            "/api/order-events", json=_created_event(order_id, version=1)
+        )
+        assert rejected.json()["results"][0]["status"] == "rejected"
+        assert await _data_version() == before + 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_event_writes_keep_version_monotonic(self, authed_client: AsyncClient):
+        before = await _data_version()
+        events = [_created_event(f"VERSION-CONC-{uuid4().hex[:14]}") for _ in range(3)]
+        responses = await asyncio.gather(*[
+            authed_client.post("/api/order-events", json=event) for event in events
+        ])
+        assert all(response.status_code == 200 for response in responses)
+        assert all(response.json()["results"][0]["status"] == "processed" for response in responses)
+        # 全局版本行串行递增：并发事件全部提交后恰好增加 3。
+        assert await _data_version() == before + 3
 
     @pytest.mark.asyncio
     async def test_concurrent_same_event_id_is_processed_once(self, authed_client: AsyncClient):
@@ -417,6 +478,36 @@ class TestOrderEvents:
 
 class TestExport:
     @pytest.mark.asyncio
+    async def test_export_orders_rejects_total_over_limit(self, authed_client: AsyncClient, monkeypatch):
+        from types import SimpleNamespace
+
+        from backend.routes import export as export_routes
+
+        monkeypatch.setattr(
+            export_routes,
+            "settings",
+            SimpleNamespace(export_max_rows=1, export_excel_max_rows=1),
+        )
+        r = await authed_client.get("/api/export/orders?export_format=csv")
+        assert r.status_code == 413
+        assert r.json()["detail"]["error_code"] == "EXPORT_TOO_LARGE"
+
+    @pytest.mark.asyncio
+    async def test_export_orders_excel_has_lower_limit(self, authed_client: AsyncClient, monkeypatch):
+        from types import SimpleNamespace
+
+        from backend.routes import export as export_routes
+
+        monkeypatch.setattr(
+            export_routes,
+            "settings",
+            SimpleNamespace(export_max_rows=10**9, export_excel_max_rows=1),
+        )
+        r = await authed_client.get("/api/export/orders?export_format=excel")
+        assert r.status_code == 413
+        assert r.json()["detail"]["error_code"] == "EXPORT_EXCEL_TOO_LARGE"
+
+    @pytest.mark.asyncio
     async def test_export_orders_csv_stream(self, authed_client: AsyncClient):
         r = await authed_client.get("/api/export/orders?export_format=csv")
         assert r.status_code == 200
@@ -425,7 +516,17 @@ class TestExport:
         assert "attachment; filename=orders_export.csv" in r.headers["content-disposition"]
 
     @pytest.mark.asyncio
-    async def test_export_orders_excel(self, authed_client: AsyncClient):
+    async def test_export_orders_excel(self, authed_client: AsyncClient, monkeypatch):
+        from types import SimpleNamespace
+
+        from backend.routes import export as export_routes
+
+        # 默认 Excel 上限低于开发库全量行数；此处放开上限，仅验证工作簿生成。
+        monkeypatch.setattr(
+            export_routes,
+            "settings",
+            SimpleNamespace(export_max_rows=10**9, export_excel_max_rows=10**9),
+        )
         r = await authed_client.get("/api/export/orders?export_format=excel")
         assert r.status_code == 200
         assert "spreadsheetml.sheet" in r.headers["content-type"]

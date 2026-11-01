@@ -7,6 +7,7 @@ import hashlib
 import json
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from typing import Protocol
 
 Message = dict[str, str]
@@ -88,7 +89,13 @@ class RedisConversationStore:
     def __init__(self, redis_url: str, ttl_seconds: int = 1800, max_turns: int = 6):
         from redis.asyncio import from_url
 
-        self._redis = from_url(redis_url, decode_responses=True, socket_connect_timeout=2)
+        # socket_timeout 防止 Redis 抖动时请求无限挂起；连接超时单独设置。
+        self._redis = from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
         self.ttl_seconds = ttl_seconds
         self.max_messages = max_turns * 2
 
@@ -104,28 +111,62 @@ class RedisConversationStore:
         value = json.loads(payload)
         return value if isinstance(value, list) else []
 
+    async def _mutate_atomically(
+        self, key: str, mutate: Callable[[list[Message]], list[Message] | None]
+    ) -> bool:
+        """用 WATCH/MULTI 原子读改写，避免并发追加互相覆盖。
+
+        mutate 返回 None 表示条件不满足、放弃写入；返回空列表表示删除 key。
+        观察到并发修改时重试，最多 3 次。
+        """
+        from redis.exceptions import WatchError
+
+        for _ in range(3):
+            pipe = self._redis.pipeline(transaction=True)
+            try:
+                await pipe.watch(key)
+                payload = await pipe.get(key)
+                history = json.loads(payload) if payload else []
+                if not isinstance(history, list):
+                    history = []
+                updated = mutate(history)
+                if updated is None:
+                    await pipe.unwatch()
+                    return False
+                pipe.multi()
+                if updated:
+                    pipe.setex(
+                        key,
+                        self.ttl_seconds,
+                        json.dumps(updated[-self.max_messages:], ensure_ascii=False),
+                    )
+                else:
+                    pipe.delete(key)
+                await pipe.execute()
+                return True
+            except WatchError:
+                continue
+            finally:
+                await pipe.reset()
+        raise RuntimeError("会话写入冲突，请重试")
+
     async def save_turn(self, owner: str, thread_id: str, question: str, answer: str) -> None:
-        history = await self.get_history(owner, thread_id)
-        history.extend(({"role": "user", "content": question}, {"role": "assistant", "content": answer}))
-        await self._redis.setex(
-            self._key(owner, thread_id),
-            self.ttl_seconds,
-            json.dumps(history[-self.max_messages:], ensure_ascii=False),
-        )
+        def append_turn(history: list[Message]) -> list[Message]:
+            return [
+                *history,
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": answer},
+            ]
+
+        await self._mutate_atomically(self._key(owner, thread_id), append_turn)
 
     async def pop_last_turn(self, owner: str, thread_id: str, question: str | None = None) -> bool:
-        key = self._key(owner, thread_id)
-        history = await self.get_history(owner, thread_id)
-        if not _turn_matches(history, question):
-            return False
-        remaining = history[:-2]
-        if remaining:
-            await self._redis.setex(
-                key, self.ttl_seconds, json.dumps(remaining, ensure_ascii=False)
-            )
-        else:
-            await self._redis.delete(key)
-        return True
+        def remove_tail(history: list[Message]) -> list[Message] | None:
+            if not _turn_matches(history, question):
+                return None
+            return history[:-2]
+
+        return await self._mutate_atomically(self._key(owner, thread_id), remove_tail)
 
 
 class FallbackConversationStore:

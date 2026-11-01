@@ -34,23 +34,26 @@ CASES = (
 def _database(kind: str) -> sqlite3.Connection:
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
-    db.execute("CREATE TABLE orders (order_id TEXT, order_date TEXT, is_refund TEXT, platform_type TEXT, product_id TEXT)")
+    db.execute(
+        "CREATE TABLE orders (order_id TEXT, order_date TEXT, is_refund TEXT, "
+        "platform_type TEXT, product_id TEXT, order_status TEXT)"
+    )
     if kind in ("holdout_rise", "holdout_flat"):
         # 留出集使用另一批合成订单，避免复用开发集中的 2 单对比。
-        db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?)", [
-            ("old-1", "2025-07-02", "是" if kind == "holdout_flat" else "否", "网页", "X"),
-            ("old-2", "2025-07-31", "是" if kind == "holdout_flat" else "否", "小程序", "Y"),
-            ("old-3", "2025-07-15", "否", "网页", "Y"),
-            ("new-1", "2025-08-01", "是", "网页", "X"),
-            ("new-2", "2025-08-30", "是" if kind == "holdout_rise" else "否", "小程序", "Z"),
-            ("new-3", "2025-08-15", "否", "网页", "Z"),
+        db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?)", [
+            ("old-1", "2025-07-02", "是" if kind == "holdout_flat" else "否", "网页", "X", "ACTIVE"),
+            ("old-2", "2025-07-31", "是" if kind == "holdout_flat" else "否", "小程序", "Y", "ACTIVE"),
+            ("old-3", "2025-07-15", "否", "网页", "Y", "ACTIVE"),
+            ("new-1", "2025-08-01", "是", "网页", "X", "REFUNDED"),
+            ("new-2", "2025-08-30", "是" if kind == "holdout_rise" else "否", "小程序", "Z", "ACTIVE"),
+            ("new-3", "2025-08-15", "否", "网页", "Z", "ACTIVE"),
         ])
     elif kind != "empty":
-        db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?)", [
-            ("p1", "2025-01-01", "否", "APP", "A"),
-            ("p2", "2025-01-30", "否", "Web", "B"),
-            ("c1", "2025-01-31", "是" if kind == "rise" else "否", "APP", "A"),
-            ("c2", "2025-03-01", "否", "Web", "B"),
+        db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?)", [
+            ("p1", "2025-01-01", "否", "APP", "A", "ACTIVE"),
+            ("p2", "2025-01-30", "否", "Web", "B", "ACTIVE"),
+            ("c1", "2025-01-31", "是" if kind == "rise" else "否", "APP", "A", "ACTIVE"),
+            ("c2", "2025-03-01", "否", "Web", "B", "ACTIVE"),
         ])
     return db
 

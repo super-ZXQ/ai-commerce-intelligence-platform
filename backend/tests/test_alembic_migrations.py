@@ -185,6 +185,8 @@ def test_table_level_grants_are_least_privilege():
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`service_clients\\`" in sh
     assert "GRANT SELECT, INSERT ON \\`${DB_NAME}\\`.\\`auth_audit_log\\`" in sh
     assert "GRANT SELECT, INSERT ON \\`${DB_NAME}\\`.\\`ai_query_audit\\`" in sh
+    assert "GRANT SELECT, UPDATE ON \\`${DB_NAME}\\`.\\`data_state\\` TO 'ea_events'@'%'" in sh
+    assert "DELETE ON \\`${DB_NAME}\\`.\\`data_state\\`" not in sh
     assert "auth_users" not in sh.split("GRANT SELECT ON")[1].split("ea_ai")[0]
 
 

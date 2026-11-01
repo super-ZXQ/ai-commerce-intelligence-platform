@@ -14,7 +14,13 @@ from backend.services.rfm_service import (
     get_rfm_top_users,
 )
 from backend.utils import cache
-from backend.utils.rate_limiter import _get_client_id
+from fastapi import HTTPException
+
+from backend.utils.rate_limiter import (
+    PRINCIPAL_RATE_LIMITS,
+    _get_client_id,
+    check_principal_rate_limit,
+)
 from backend.utils.rfm_scoring import assign_segment, quantile_scores
 from backend.utils.sql_guard import is_read_only_sql
 
@@ -243,6 +249,57 @@ async def test_cached_function_without_return_annotation(monkeypatch):
     assert calls == 1
 
 
+class _FakeVersionSession:
+    def __init__(self, version: int | None):
+        self.version = version
+
+    async def scalar(self, _statement):
+        if self.version is None:
+            raise RuntimeError("data_state 不可用")
+        return self.version
+
+
+@pytest.mark.asyncio
+async def test_versioned_cache_switches_key_after_version_bump(monkeypatch):
+    fake = _FakeRedis()
+    monkeypatch.setattr(cache, "_redis_client", fake)
+    monkeypatch.setattr(cache, "_redis_available", True)
+    calls = 0
+
+    @cache.cached(ttl=60, versioned=True)
+    async def load_versioned(db):
+        nonlocal calls
+        calls += 1
+        return {"call": calls}
+
+    session = _FakeVersionSession(7)
+    assert await load_versioned(session) == {"call": 1}
+    assert await load_versioned(session) == {"call": 1}
+
+    session.version = 8
+    assert await load_versioned(session) == {"call": 2}
+    assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_versioned_cache_falls_back_to_ttl_when_version_unavailable(monkeypatch):
+    fake = _FakeRedis()
+    monkeypatch.setattr(cache, "_redis_client", fake)
+    monkeypatch.setattr(cache, "_redis_available", True)
+    calls = 0
+
+    @cache.cached(ttl=60, versioned=True)
+    async def load_without_version(db):
+        nonlocal calls
+        calls += 1
+        return {"call": calls}
+
+    session = _FakeVersionSession(None)
+    assert await load_without_version(session) == {"call": 1}
+    assert await load_without_version(session) == {"call": 1}
+    assert calls == 1
+
+
 @pytest.mark.asyncio
 async def test_cache_cleanup_removes_idle_redis_locks(monkeypatch):
     fake = _FakeRedis()
@@ -283,6 +340,28 @@ async def test_tagged_invalidation_removes_only_affected_cache_entries(monkeypat
     assert await cache.invalidate_tags("analytics") == 1
     assert await analytics_value() == 2
     assert await other_value() == 1
+
+
+def test_principal_rate_limit_is_isolated_per_account(monkeypatch):
+    monkeypatch.setitem(PRINCIPAL_RATE_LIMITS["ai"], "requests", 2)
+    request = SimpleNamespace(url=SimpleNamespace(path="/api/ai/stream"))
+
+    assert check_principal_rate_limit(request, "alice")["remaining"] == 1
+    assert check_principal_rate_limit(request, "alice")["remaining"] == 0
+    # bob 不受 alice 的额度影响；同一账号再请求才触发 429。
+    assert check_principal_rate_limit(request, "bob")["remaining"] == 1
+    with pytest.raises(HTTPException) as exc:
+        check_principal_rate_limit(request, "alice")
+    assert exc.value.status_code == 429
+    assert exc.value.headers["X-RateLimit-Scope"] == "principal"
+
+
+def test_principal_rate_limit_covers_stream_and_non_stream_bucket():
+    request = SimpleNamespace(url=SimpleNamespace(path="/api/ai/query"))
+    assert check_principal_rate_limit(request, "carol") is not None
+    # 非 AI 查询路由不受主体桶影响。
+    other = SimpleNamespace(url=SimpleNamespace(path="/api/orders"))
+    assert check_principal_rate_limit(other, "carol") is None
 
 
 def test_proxy_headers_are_ignored_by_default():
