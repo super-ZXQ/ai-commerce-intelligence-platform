@@ -20,7 +20,7 @@
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 386 项自动化测试（后端 297：295 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 387 项自动化测试（后端 298：296 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
 
 ## 在线演示
 
@@ -491,7 +491,7 @@ rag_tool_call_total 0
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 297 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 298 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -592,10 +592,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（386 项，实收 384 passed / 2 skipped）
+### 自动化测试（387 项，实收 385 passed / 2 skipped）
 
 ```bash
-# 后端（297 项，完整运行需要 MySQL）
+# 后端（298 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（89 项）
@@ -604,7 +604,7 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（297 项）：
+后端（298 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis WATCH/MULTI 原子写入与冲突重试、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
@@ -630,9 +630,9 @@ AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEm
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 297 | **295 passed / 2 skipped**（43.99s） |
+| `backend/tests` | 298 | **296 passed / 2 skipped**（43.67s） |
 | `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.80s） |
-| **合计** | **386** | **384 passed / 2 skipped / 0 failed** |
+| **合计** | **387** | **385 passed / 2 skipped / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -758,7 +758,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
-│   ├── tests/                    # 297 项 API/事件集成测试
+│   ├── tests/                    # 298 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）

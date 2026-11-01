@@ -31,6 +31,15 @@ async def bi_orders(
     _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """与销售总览使用同一非取消口径；整次分页读取绑定同一数据版本。"""
+    if page > 1 and data_version is None:
+        # 没有首屏版本就无法保证跨页处于同一快照，宁可拒绝也不返回可能漏行的页。
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "BI_DATA_VERSION_REQUIRED",
+                "message": "翻页必须携带首屏返回的 data_version",
+            },
+        )
     try:
         result = await order_service.get_bi_orders(
             db,

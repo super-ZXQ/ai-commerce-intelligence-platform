@@ -351,6 +351,15 @@ class TestBIDataAccess:
             )
 
     @pytest.mark.asyncio
+    async def test_bi_page_two_requires_data_version(self, authed_client: AsyncClient):
+        """没有首屏版本时拒绝翻页，避免不同快照的页被拼到一起。"""
+        response = await authed_client.get(
+            "/api/bi/orders", params={"page": 2, "page_size": 2}
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"]["error_code"] == "BI_DATA_VERSION_REQUIRED"
+
+    @pytest.mark.asyncio
     async def test_bi_pagination_rejects_snapshot_before_new_order(
         self, authed_client: AsyncClient
     ):
