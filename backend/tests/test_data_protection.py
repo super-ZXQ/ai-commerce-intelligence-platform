@@ -480,5 +480,8 @@ def test_no_startup_sync_and_no_platform_key_in_session_defaults():
     assert "data-import" in compose
     assert "st.session_state.model_api_key = API_KEY" not in assistant
     assert "value=st.session_state.model_api_key" not in assistant
-    assert "allowed_hosts=PROVIDER_ALLOWLIST" in assistant
-    assert "平台密钥只保存在服务端" in assistant
+    # 模型地址与平台密钥只由后端持有；助手仅通过 BACKEND_API_URL 调用 FastAPI。
+    assert "BACKEND_API_URL" in assistant
+    assert "allowed_hosts=" not in assistant
+    assert "ChatOpenAI" not in assistant
+    assert "用户无需也不能在页面填写平台密钥" in assistant

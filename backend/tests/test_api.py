@@ -2,14 +2,57 @@ import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pymysql
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from backend.config import get_settings
 from backend.database import event_session_factory
 from backend.main import app
 from backend.models.schemas import OrderEventInput
 from backend.services import order_event_service
+from backend.utils.auth import hash_password, role_default_scopes
+
+TEST_ADMIN_USERNAME = "ci_admin"
+TEST_ADMIN_PASSWORD = "ci-admin-pass-123"
+
+
+def _admin_connection():
+    settings = get_settings()
+    return pymysql.connect(
+        host=settings.db_host,
+        port=settings.db_port,
+        user=settings.auth_db_user or settings.db_user,
+        password=settings.auth_db_password or settings.db_password,
+        database=settings.db_name,
+        charset="utf8mb4",
+        autocommit=True,
+    )
+
+
+@pytest.fixture(scope="module")
+def test_admin():
+    """独立的测试管理员，不改写开发库里真实 admin 账号的口令。"""
+    conn = _admin_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM auth_users WHERE username=%s", (TEST_ADMIN_USERNAME,))
+            cur.execute(
+                "INSERT INTO auth_users "
+                "(username, password_hash, role, scopes, is_active, token_version) "
+                "VALUES (%s, %s, 'admin', %s, 1, 1)",
+                (TEST_ADMIN_USERNAME, hash_password(TEST_ADMIN_PASSWORD), role_default_scopes("admin")),
+            )
+    finally:
+        conn.close()
+    yield {"username": TEST_ADMIN_USERNAME, "password": TEST_ADMIN_PASSWORD}
+    conn = _admin_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM auth_users WHERE username=%s", (TEST_ADMIN_USERNAME,))
+    finally:
+        conn.close()
 
 
 # 每个测试使用独立事件循环，避免 aiomysql 连接跨 loop 复用。
@@ -30,22 +73,25 @@ async def client():
 
 
 @pytest_asyncio.fixture
-async def authed_client():
-    """带 JWT 鉴权的 client fixture。
-
-    统一在此登录 admin/admin123，注入 Authorization 头。
-    """
+async def authed_client(test_admin: dict):
+    """带 JWT 鉴权的 client fixture，登录模块级测试管理员。"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        r = await ac.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        r = await ac.post(
+            "/api/auth/login",
+            json={"username": test_admin["username"], "password": test_admin["password"]},
+        )
         token = r.json()["access_token"]
         ac.headers["Authorization"] = f"Bearer {token}"
         yield ac
 
 
 @pytest_asyncio.fixture
-async def auth_token(client: AsyncClient):
-    r = await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+async def auth_token(client: AsyncClient, test_admin: dict):
+    r = await client.post(
+        "/api/auth/login",
+        json={"username": test_admin["username"], "password": test_admin["password"]},
+    )
     return r.json()["access_token"]
 
 
@@ -98,16 +144,22 @@ class TestSystem:
 
 class TestAuth:
     @pytest.mark.asyncio
-    async def test_login_success(self, client: AsyncClient):
-        r = await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    async def test_login_success(self, client: AsyncClient, test_admin: dict):
+        r = await client.post(
+            "/api/auth/login",
+            json={"username": test_admin["username"], "password": test_admin["password"]},
+        )
         assert r.status_code == 200
         data = r.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
     @pytest.mark.asyncio
-    async def test_login_wrong_password(self, client: AsyncClient):
-        r = await client.post("/api/auth/login", json={"username": "admin", "password": "wrong"})
+    async def test_login_wrong_password(self, client: AsyncClient, test_admin: dict):
+        r = await client.post(
+            "/api/auth/login",
+            json={"username": test_admin["username"], "password": "wrong"},
+        )
         assert r.status_code == 401
 
     @pytest.mark.asyncio
@@ -121,10 +173,12 @@ class TestAuth:
         assert r.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_me_with_token(self, client: AsyncClient, auth_token: str):
+    async def test_me_with_token(
+        self, client: AsyncClient, auth_token: str, test_admin: dict
+    ):
         r = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {auth_token}"})
         assert r.status_code == 200
-        assert r.json()["username"] == "admin"
+        assert r.json()["username"] == test_admin["username"]
 
     @pytest.mark.asyncio
     async def test_refresh_token(self, client: AsyncClient, auth_token: str):

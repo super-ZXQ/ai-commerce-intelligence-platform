@@ -7,11 +7,19 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import get_settings
-from backend.database import check_db_connection, check_event_db_connection, engine, event_engine
+from backend.database import (
+    auth_engine,
+    auth_session_factory,
+    check_auth_db_connection,
+    check_db_connection,
+    check_event_db_connection,
+    engine,
+    event_engine,
+)
 from backend.routes import ai, analytics, auth, export, monitor, order_events, orders, products, rfm
 from backend.routes.monitor import (
     _load_rag_stats,
@@ -21,6 +29,7 @@ from backend.routes.monitor import (
     render_rag_prometheus,
 )
 from backend.services.rfm_service import RfmDataUnavailableError
+from backend.utils.auth import ensure_bootstrap_users
 from backend.utils.cache import cleanup_memory_cache, close_redis, init_redis
 from backend.utils.cache import clear as clear_cache
 from backend.utils.rate_limiter import check_rate_limit
@@ -58,6 +67,10 @@ async def lifespan(app: FastAPI):
     logger.info("✅ 数据库连接检查完成")
     if not await check_event_db_connection():
         raise RuntimeError("事件数据库连接失败，终止后端启动")
+    if not await check_auth_db_connection():
+        raise RuntimeError("认证数据库连接失败，终止后端启动")
+    async with auth_session_factory() as auth_db:
+        await ensure_bootstrap_users(auth_db)
 
     if settings.redis_enabled:
         redis_ok = await init_redis(settings.redis_url)
@@ -82,6 +95,7 @@ async def lifespan(app: FastAPI):
     await close_redis()
     await engine.dispose()
     await event_engine.dispose()
+    await auth_engine.dispose()
     logger.info("👋 数据库连接池已关闭")
 
 
@@ -126,7 +140,10 @@ app.add_middleware(
 
 _SKIP_RATE_LIMIT_PATHS = (
     "/docs", "/redoc", "/health", "/health/detailed", "/health-panel", "/",
-    "/demo", "/openapi.json", "/monitor", "/metrics",
+    "/demo", "/openapi.json", "/monitor", "/metrics", "/login", "/logout",
+    # Nginx auth_request 会为每个静态资源/WebSocket 握手发起子请求，
+    # 若计入限流桶会让正常浏览快速触发 429。
+    "/api/auth/verify",
 )
 
 
@@ -230,6 +247,19 @@ app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 @app.get("/", tags=["系统"])
 async def root() -> FileResponse:
     return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+
+
+@app.get("/login", include_in_schema=False)
+async def login_page() -> FileResponse:
+    """统一登录页：写入 HttpOnly Cookie，供 /ai/ 与 /BI/ 的 auth_request 使用。"""
+    return FileResponse(os.path.join(_STATIC_DIR, "login.html"))
+
+
+@app.get("/logout", include_in_schema=False)
+async def logout_page() -> RedirectResponse:
+    redirect = RedirectResponse("/login", status_code=303)
+    redirect.delete_cookie(settings.auth_cookie_name, path="/")
+    return redirect
 
 
 @app.get("/favicon.ico", include_in_schema=False)

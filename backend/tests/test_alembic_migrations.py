@@ -17,8 +17,9 @@ _VERSIONS = _BACKEND / "alembic" / "versions"
 _REF_SQL = _ROOT / "sql" / "01_create_table.sql"
 _SEED = _BACKEND / "scripts" / "seed_ci_data.py"
 _BOOTSTRAP_SH = _ROOT / "deploy" / "mysql" / "bootstrap-users.sh"
+_GRANT_SH = _ROOT / "deploy" / "mysql" / "apply-grants.sh"
 # Alembic head 由迁移树决定；测试不再写死单一 revision，避免新增迁移后漏改。
-_HEAD = "0003_data_protection"
+_HEAD = "0004_auth_identity"
 # alembic CLI must run from repo root: backend/alembic/ can shadow the package
 _ALEMBIC_CWD = _ROOT
 
@@ -119,6 +120,21 @@ def test_data_protection_migration_declares_audit_tables():
     assert "UPDATE orders" not in source
 
 
+def test_auth_identity_migration_declares_identity_tables():
+    source = (_VERSIONS / "0004_auth_identity.py").read_text(encoding="utf-8")
+    for marker in (
+        "CREATE TABLE IF NOT EXISTS auth_users",
+        "CREATE TABLE IF NOT EXISTS service_clients",
+        "CREATE TABLE IF NOT EXISTS auth_audit_log",
+        "CREATE TABLE IF NOT EXISTS ai_query_audit",
+        "token_version",
+        "key_hash",
+        "query_sha256",
+        "query_length",
+    ):
+        assert marker in source, f"0004 missing: {marker}"
+
+
 def test_reference_sql_and_baseline_stay_consistent():
     """Reference DDL in sql/01 must not drift from Alembic baseline."""
     ref = _REF_SQL.read_text(encoding="utf-8")
@@ -156,6 +172,20 @@ def test_bootstrap_role_separation():
         assert ddl not in ai_block.replace("CREATE USER", ""), "ea_ai must not get DDL grants"
     assert "ON \\`${DB_NAME}\\`.*" in sh or "ON `${DB_NAME}`.*" in sh
     assert "GRANT FILE" not in sh, "import must not depend on MySQL FILE privilege"
+
+
+def test_table_level_grants_are_least_privilege():
+    sh = _GRANT_SH.read_text(encoding="utf-8")
+    # ea_app 不能读取认证表；ea_ai 只能访问 orders；ea_auth 不能访问业务数据。
+    assert "REVOKE ALL PRIVILEGES ON \\`${DB_NAME}\\`.* FROM '${user}'@'%'" in sh
+    assert "for user in ea_app ea_ai ea_events ea_auth; do" in sh
+    assert "GRANT SELECT ON \\`${DB_NAME}\\`.\\`orders\\` TO 'ea_ai'@'%'" in sh
+    assert "'ea_auth'@'%'" in sh
+    assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`auth_users\\`" in sh
+    assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`service_clients\\`" in sh
+    assert "GRANT SELECT, INSERT ON \\`${DB_NAME}\\`.\\`auth_audit_log\\`" in sh
+    assert "GRANT SELECT, INSERT ON \\`${DB_NAME}\\`.\\`ai_query_audit\\`" in sh
+    assert "auth_users" not in sh.split("GRANT SELECT ON")[1].split("ea_ai")[0]
 
 
 def test_migration_url_never_defaults_to_ai_readonly_account(monkeypatch):
@@ -226,6 +256,10 @@ def test_alembic_upgrade_head_on_mysql_if_available():
             "data_state",
             "data_import_runs",
             "order_status_reconciliation",
+            "auth_users",
+            "service_clients",
+            "auth_audit_log",
+            "ai_query_audit",
         } <= tables
         cols = {row[0] for row in c.execute(text("SHOW COLUMNS FROM orders")).fetchall()}
         assert {"order_seq_id", "order_id", "order_status", "event_version"} <= cols
@@ -362,6 +396,10 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
                 "data_state",
                 "data_import_runs",
                 "order_status_reconciliation",
+                "auth_users",
+                "service_clients",
+                "auth_audit_log",
+                "ai_query_audit",
             } <= tables
             assert c.execute(text("SELECT COUNT(*) FROM data_state")).scalar() == 1
             assert (

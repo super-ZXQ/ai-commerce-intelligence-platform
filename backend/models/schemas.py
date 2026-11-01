@@ -118,6 +118,11 @@ class AIQueryRequest(BaseModel):
     thread_id: str | None = Field(None, min_length=1, max_length=128, description="多轮会话标识")
 
 
+class AIConversationPopRequest(BaseModel):
+    thread_id: str = Field(..., min_length=1, max_length=128, description="多轮会话标识")
+    question: str | None = Field(None, max_length=500, description="待撤销轮次的问题，用于防止误删")
+
+
 # ─────────────────── 订单事件摄入契约 ───────────────────
 
 class _StrictPayload(BaseModel):

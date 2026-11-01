@@ -16,7 +16,7 @@ from backend.config import get_settings
 from backend.database import get_event_db
 from backend.models.database_models import OrderEvent
 from backend.models.schemas import OrderEventBatchRequest, OrderEventBatchResponse, OrderEventInput
-from backend.routes.auth import get_current_user
+from backend.utils.auth import SCOPE_DATA_READ, SCOPE_EVENTS_WRITE, Principal, require_scope
 from backend.services.order_event_service import apply_order_event
 from backend.utils.cache import operational_snapshot
 from backend.utils.event_metrics import record_db_timeout, record_event
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 async def ingest_order_events(
     request: OrderEventInput | OrderEventBatchRequest,
     db: AsyncSession = Depends(get_event_db),
-    _user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_EVENTS_WRITE)),
 ):
     """接收单条或小批量订单事件。
 
@@ -83,7 +83,7 @@ async def ingest_order_events(
 @router.get("/freshness", summary="订单事件与缓存新鲜度")
 async def get_event_freshness(
     db: AsyncSession = Depends(get_event_db),
-    _user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """返回真实事件水位与本进程缓存生成时间；没有事件时不伪造时间戳。"""
     row = (await db.execute(

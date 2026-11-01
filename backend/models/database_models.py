@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, Date, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import JSON, Column, Date, DateTime, Integer, Numeric, String, Text, func
 
 from backend.database import Base
 
@@ -26,6 +26,75 @@ class Order(Base):
     order_status = Column("order_status", String(20), nullable=False, default="ACTIVE", index=True)
     event_version = Column("event_version", Integer, nullable=False, default=0)
     updated_at = Column("updated_at", DateTime, nullable=True)
+
+
+class AuthUser(Base):
+    """数据库用户目录；密码只保存 bcrypt 哈希。"""
+
+    __tablename__ = "auth_users"
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    username = Column("username", String(100), unique=True, nullable=False, index=True)
+    password_hash = Column("password_hash", String(255), nullable=False)
+    role = Column("role", String(20), nullable=False, default="viewer")
+    scopes = Column("scopes", String(512), nullable=False, default="")
+    is_active = Column("is_active", Integer, nullable=False, default=1)
+    token_version = Column("token_version", Integer, nullable=False, default=1)
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
+    updated_at = Column("updated_at", DateTime, nullable=False, server_default=func.now())
+    last_login_at = Column("last_login_at", DateTime, nullable=True)
+
+
+class ServiceClient(Base):
+    """机器客户端凭据；只保存密钥哈希，创建时明文仅输出一次。"""
+
+    __tablename__ = "service_clients"
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    name = Column("name", String(100), unique=True, nullable=False, index=True)
+    key_prefix = Column("key_prefix", String(16), nullable=False, index=True)
+    key_hash = Column("key_hash", String(64), unique=True, nullable=False)
+    scopes = Column("scopes", String(512), nullable=False, default="")
+    is_active = Column("is_active", Integer, nullable=False, default=1)
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
+    last_used_at = Column("last_used_at", DateTime, nullable=True)
+    expires_at = Column("expires_at", DateTime, nullable=True)
+
+
+class AuthAuditLog(Base):
+    __tablename__ = "auth_audit_log"
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    principal_type = Column("principal_type", String(20), nullable=False)
+    principal_name = Column("principal_name", String(100), nullable=False, index=True)
+    action = Column("action", String(50), nullable=False)
+    resource = Column("resource", String(255), nullable=False, default="")
+    outcome = Column("outcome", String(20), nullable=False)
+    client_ip = Column("client_ip", String(64), nullable=False, default="")
+    detail = Column("detail", String(500), nullable=False, default="")
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
+
+
+class AIQueryAudit(Base):
+    """AI 查询审计：不保存原始问题，只保存哈希、长度、意图与用量。"""
+
+    __tablename__ = "ai_query_audit"
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    request_id = Column("request_id", String(64), nullable=False, index=True)
+    principal_name = Column("principal_name", String(100), nullable=False, index=True)
+    thread_id = Column("thread_id", String(128), nullable=False, default="")
+    model_mode = Column("model_mode", String(20), nullable=False, default="managed")
+    intent = Column("intent", String(32), nullable=False, default="")
+    outcome = Column("outcome", String(20), nullable=False)
+    query_sha256 = Column("query_sha256", String(64), nullable=False)
+    query_length = Column("query_length", Integer, nullable=False, default=0)
+    input_tokens = Column("input_tokens", Integer, nullable=True)
+    output_tokens = Column("output_tokens", Integer, nullable=True)
+    total_tokens = Column("total_tokens", Integer, nullable=True)
+    latency_ms = Column("latency_ms", Integer, nullable=True)
+    error_category = Column("error_category", String(80), nullable=False, default="")
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
 
 
 class OrderEvent(Base):

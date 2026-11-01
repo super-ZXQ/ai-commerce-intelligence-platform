@@ -20,7 +20,7 @@
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 252 项自动化测试（隔离 MySQL 实收全绿）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 323 项自动化测试（后端 234：232 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
 
 ## 在线演示
 
@@ -68,6 +68,8 @@ docker compose up -d
 ├── ea-backend      → FastAPI (Docker 内网 :8000)
 ├── ea-ai-assistant → AI 助手 (Docker 内网 :8502, baseUrlPath=/ai)
 ├── ea-db-bootstrap → 一次性创建最小权限数据库账号
+├── ea-db-migrate   → Alembic 版本化升级（一次性）
+├── ea-db-grant     → 迁移完成后应用表级最小权限（一次性）
 ├── ea-mysql        → MySQL 8.0 (Docker 内网 :3306) + 自动建表
 └── ea-redis        → Redis 7 Alpine (Docker 内网 :6379) + AOF持久化 + LRU淘汰
 ```
@@ -77,15 +79,16 @@ docker compose up -d
 | 路径 | 转发服务 | 说明 |
 |------|----------|------|
 | `/` | backend:8000 | 统一导航页（默认入口） |
-| `/BI/` | streamlit:8501 | BI 看板（baseUrlPath=/BI，访问 `/BI` 会 301 跳转到 `/BI/`） |
-| `/ai/` | ai-assistant:8502 | AI 分析助手（baseUrlPath=/ai），内置 RAG 知识库 |
+| `/login` `/logout` | backend:8000 | 统一登录/退出（公开）；登录后写入 HttpOnly 会话 Cookie |
+| `/BI/` | streamlit:8501 | BI 看板（需会话；baseUrlPath=/BI，`/BI` 会 301 跳到 `/BI/`） |
+| `/ai/` | ai-assistant:8502 | AI 分析助手（需会话；baseUrlPath=/ai；RAG/模型由后端执行） |
 | `/api/*` | backend:8000 | RESTful API |
 | `/nav` | backend:8000 | 导航页（备用路由） |
 | `/docs` `/redoc` `/openapi.json` | backend:8000 | Swagger / ReDoc 文档 |
 | `/health` `/health/detailed` `/metrics` | backend:8000 | 公开健康检查与 Prometheus 指标 |
 | `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
 
-部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入和数据同步分别创建最小权限账号；API 与 AI 仅有查询权限，`ea_events` 仅能更新 `orders` 与 `order_events`。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；Excel 因工作簿格式限制仍需在内存中生成。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
+部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入、认证和数据同步分别创建最小权限账号；`db-migrate` 完成 Alembic 升级后，`db-grant` 再按表授予权限：`ea_app` 只读业务表，`ea_ai` 只能读 `orders`，`ea_events` 只能写 `orders`/`order_events`，`ea_auth` 只能访问认证与审计表。统一会话由 FastAPI 签发 HttpOnly Cookie，Nginx `auth_request` 保护 `/ai/` 与 `/BI/`（含 WebSocket 握手），后端在每次业务操作时重新校验账号状态、角色与权限。AI 助手只通过 `BACKEND_API_URL` 调用后端，不接触数据库、模型密钥或直连 LLM。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；Excel 因工作簿格式限制仍需在内存中生成。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
 
 ### 本地开发
 
@@ -115,13 +118,26 @@ REDIS_ENABLED=false
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-JWT_SECRET=your-secret-key-change-in-production
+JWT_SECRET=<openssl rand -hex 32 的输出>
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=请设置强密码
+# 生产（DEBUG=false）只接受 bcrypt 哈希，生成方式：
+#   python -m backend.utils.auth '你的强密码'
+# Docker Compose .env 中哈希含 $，必须用单引号包裹：ADMIN_PASSWORD='$2b$12$....'
+ADMIN_PASSWORD=<bcrypt 哈希>
+ANALYST_USERNAME=analyst
+ANALYST_PASSWORD=<bcrypt 哈希，可留空>
 
 LLM_API_KEY=sk-你的DeepSeekKey
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
+```
+
+`backend/.env` 的 `JWT_SECRET`、`ADMIN_PASSWORD` 留空或使用示例值时，`DEBUG=false` 会直接启动失败，避免把弱凭据带上线。首次启动且 `auth_users` 为空时，后端会用 `ADMIN_USERNAME`/`ADMIN_PASSWORD` 创建管理员；之后请用 CLI 管理账号，不要再依赖环境变量覆盖：
+
+```bash
+python -m backend.scripts.manage_auth create-user analyst --role analyst
+python -m backend.scripts.manage_auth set-password analyst
+python -m backend.scripts.manage_auth create-service bi-exporter --scopes data:read,data:export
 ```
 
 也可使用智谱 OpenAI 兼容接口；Key 只写入本机 `.env`，不要提交：
@@ -132,18 +148,14 @@ LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
 LLM_MODEL=glm-4.7-flash
 ```
 
-**`ai-ecommerce-assistant/.env`**：
+**`ai-ecommerce-assistant/.env`**（助手只做 UI，不配置数据库或模型密钥）：
 
 ```env
-LLM_API_KEY=sk-你的DeepSeekKey
-LLM_BASE_URL=https://api.deepseek.com
-LLM_MODEL=deepseek-chat
-
-DB_USER=root
-DB_PASSWORD=你的MySQL密码
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=ai_commerce_intelligence_platform
+BACKEND_API_URL=http://localhost:8000
+LOGIN_URL=http://localhost:8000/login
+LOGOUT_URL=http://localhost:8000/logout
+AUTH_COOKIE_NAME=ea_session
+AI_READ_TIMEOUT_SECONDS=180
 ```
 
 **启动三端口开发模式：**
@@ -170,9 +182,9 @@ python -m alembic -c backend/alembic.ini upgrade head
 python backend/scripts/import_orders.py --mode dry-run
 python backend/scripts/import_orders.py --mode bootstrap
 
-# Docker Compose：mysql redis → db-bootstrap → db-migrate(alembic) → 显式导入 → 应用
+# Docker Compose：mysql redis → db-bootstrap → db-migrate(alembic) → db-grant → 显式导入 → 应用
 docker compose up -d mysql redis
-docker compose up -d db-bootstrap db-migrate
+docker compose up -d db-bootstrap db-migrate db-grant
 # 默认 dry-run；确认输出后再执行 bootstrap
 docker compose --profile data-import run --rm data-import --mode bootstrap
 docker compose up -d backend streamlit ai-assistant nginx
@@ -180,7 +192,7 @@ docker compose up -d backend streamlit ai-assistant nginx
 
 **Alembic 是 schema evolution source of truth**（`backend/alembic/`）。
 `sql/01_create_table.sql` 仅保留为参考 DDL，**不再**挂载到 MySQL `initdb.d`；一致性由 `test_alembic_migrations.py` 校验。
-历史数据库需先升级到 Alembic head（当前 `0003_data_protection`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表。
+历史数据库需先升级到 Alembic head（当前 `0004_auth_identity`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表，`0004_auth_identity` 增加数据库用户目录、服务凭据与认证/AI 审计表。权限矩阵见 `docs/DB_PERMISSIONS.md`。
 订单 CSV 只能由 `backend/scripts/import_orders.py` 显式导入（应用侧批量 INSERT，不依赖 `LOAD DATA`/`FILE` 权限）；后端启动不再同步或覆盖订单。
 已有运行期订单或事件账本时禁止全量替换；历史退款状态通过 `backend/scripts/reconcile_orders.py` 独立对账（默认 dry-run）。
 
@@ -463,7 +475,7 @@ rag_tool_call_total 0
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 88 项测试（Python 3.12 + 3.13）+ 后端 164 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 234 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -562,19 +574,19 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（252 项，实收全绿）
+### 自动化测试（323 项，实收 321 passed / 2 skipped）
 
 ```bash
-# 后端（164 项，完整运行需要 MySQL）
+# 后端（234 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
-# AI/RAG（88 项）
+# AI/RAG（89 项）
 python -m pytest ai-ecommerce-assistant/tests/ -v
 ```
 
 **测试覆盖：**
 
-后端（164 项）：
+后端（234 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
@@ -582,7 +594,7 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 - `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
 
-AI/RAG（88 项）：
+AI/RAG（89 项）：
 - `test_vector_store.py` — Chroma 增删查改（fake embedder，不依赖真实模型）
 - `test_retriever.py` — 缓存/TTL/LRU/阈值/超时/stats，以及**检索异常不写缓存**回归
 - `test_rag_metrics.py` — score_buckets / 原子写入 / JSON 加载 / 结构化事件 / JSONL 落盘 / 反馈写文件
@@ -593,13 +605,13 @@ AI/RAG（88 项）：
 
 AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEmbeddings` 生成确定性归一化向量。
 
-**测试规模（实收，非估填）** — 2026-09-18 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
+**测试规模（实收，非估填）** — 2026-11-01 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 164 | **164 passed**（14s） |
-| `ai-ecommerce-assistant/tests` | 88 | **88 passed**（11s） |
-| **合计** | **252** | **252 passed / 0 failed** |
+| `backend/tests` | 234 | **232 passed / 2 skipped**（35.57s） |
+| `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.65s） |
+| **合计** | **323** | **321 passed / 2 skipped / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -725,7 +737,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
-│   ├── tests/                    # 164 项 API/事件集成测试
+│   ├── tests/                    # 234 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）
@@ -738,7 +750,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── vector_store.py       # Chroma 封装
 │   │   ├── retriever.py          # 缓存/超时/格式化/埋点
 │   │   └── metrics.py            # 跨进程 stats 共享 + Prometheus 渲染 + JSONL 事件
-│   ├── tests/                    # 88 项 AI/RAG 测试
+│   ├── tests/                    # 89 项 AI/RAG 测试
 │   ├── eval/                     # 评估集 + 评估脚本
 │   ├── data/chroma/              # Chroma 持久化目录
 │   ├── pytest.ini                # pytest 配置

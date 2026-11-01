@@ -10,7 +10,7 @@ from backend.models.schemas import (
     OrderResponse,
     PaginatedResponse,
 )
-from backend.routes.auth import get_current_user
+from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
 from backend.services import order_service
 from backend.services.order_service import SORT_COLUMN_MAP
 
@@ -28,7 +28,7 @@ async def list_orders(
     sort_by: str = Query("order_time", description="排序字段"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="排序方向 asc/desc"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取所有订单列表，支持分页和排序。
@@ -61,7 +61,7 @@ async def filter_orders(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     条件筛选订单，支持多维度过滤。
@@ -100,7 +100,7 @@ async def filter_orders(
 async def get_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     根据订单ID获取单个订单详情。

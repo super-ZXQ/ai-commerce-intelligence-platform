@@ -1,9 +1,13 @@
 import asyncio
+import hashlib
 import logging
+from collections import OrderedDict
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -11,12 +15,19 @@ from sqlalchemy.engine import Engine
 from agent_core import AgentRuntime
 from agent_core.db_schema import describe_table
 from agent_core.model_adapter import OpenAIModelAdapter
+from agent_core.provider_policy import (
+    ModelConfig,
+    ProviderPolicyError,
+    build_byok_config,
+    build_managed_config,
+)
 from agent_core.rag import MarkdownKnowledgeRetriever
 from agent_core.session import FallbackConversationStore, MemoryConversationStore, RedisConversationStore
 from agent_core.sql_safety import dialect_from_url
 from backend.config import get_settings
 from backend.models.schemas import AIQueryResponse, AgentUsage
 from backend.utils.sql_guard import guard_read_only_engine, is_read_only_sql
+from backend.utils.text_cleaner import sanitize_error
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +137,36 @@ async def _runtime_retrieve(query: str):
     return await _knowledge_retriever.retrieve(query, top_k=3)
 
 
+def knowledge_status() -> dict:
+    """后端知识库状态；Streamlit 不再各自初始化本地检索器。"""
+    return _knowledge_retriever.status()
+
+
+def _probe_database() -> dict:
+    dialect = dialect_from_url(settings.ai_database_url)
+    try:
+        with _get_sync_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return {"ok": True, "dialect": dialect}
+    except Exception as exc:  # noqa: BLE001 - 只暴露异常类型，不泄露连接串
+        logger.warning("AI 数据库探活失败: %s", type(exc).__name__)
+        return {"ok": False, "dialect": dialect, "error": type(exc).__name__}
+
+
+async def database_status() -> dict:
+    """AI 查询所用只读连接的可用性，供前端状态条展示。"""
+    return await asyncio.to_thread(_probe_database)
+
+
+async def pop_last_conversation_turn(
+    owner: str,
+    thread_id: str,
+    question: str | None = None,
+) -> bool:
+    """撤销末轮问答；question 用于确认待删轮次，避免误删其他上下文。"""
+    return await _conversations.pop_last_turn(owner, thread_id, question)
+
+
 async def _runtime_schema() -> str:
     return await asyncio.to_thread(describe_table, _get_sync_engine(), "orders")
 
@@ -146,32 +187,120 @@ _model_adapter = OpenAIModelAdapter(
 
 def _conversation_store():
     memory = MemoryConversationStore(ttl_seconds=1800, max_sessions=1000, max_turns=6)
-    primary = RedisConversationStore(settings.redis_url) if settings.redis_enabled else None
+    # 会话使用独立逻辑 DB 仅作命名隔离；同一实例的 allkeys-lru 仍可能淘汰会话。
+    primary = (
+        RedisConversationStore(settings.redis_session_url)
+        if settings.redis_enabled
+        else None
+    )
     return FallbackConversationStore(primary, memory)
 
 
-_runtime = AgentRuntime(
-    retriever=_runtime_retrieve,
-    schema_loader=_runtime_schema,
-    sql_generator=_model_adapter.generate_sql,
-    sql_executor=_runtime_execute,
-    answer_generator=_model_adapter.answer,
-    analysis_planner=_model_adapter.choose_refund_analysis,
-    conversations=_conversation_store(),
-    sql_timeout_seconds=10,
-    # 方言决定能否把执行时限下推到数据库（MySQL 用 MAX_EXECUTION_TIME）。
-    sql_dialect=dialect_from_url(settings.ai_database_url),
-)
+_conversations = _conversation_store()
 
 
-async def process_natural_language_query(
-    query: str,
-    thread_id: str | None = None,
+def _build_runtime(adapter: OpenAIModelAdapter) -> AgentRuntime:
+    return AgentRuntime(
+        retriever=_runtime_retrieve,
+        schema_loader=_runtime_schema,
+        sql_generator=adapter.generate_sql,
+        sql_executor=_runtime_execute,
+        answer_generator=adapter.astream_answer,
+        analysis_planner=adapter.choose_refund_analysis,
+        conversations=_conversations,
+        sql_timeout_seconds=10,
+        # 方言决定能否把执行时限下推到数据库（MySQL 用 MAX_EXECUTION_TIME）。
+        sql_dialect=dialect_from_url(settings.ai_database_url),
+    )
+
+
+_runtime = _build_runtime(_model_adapter)
+
+# BYOK 运行时按“模式+密钥哈希+地址+模型”隔离；只缓存少量指纹，避免密钥常驻内存。
+_MAX_CACHED_RUNTIMES = 8
+_runtime_cache: OrderedDict[str, tuple[AgentRuntime, OpenAIModelAdapter]] = OrderedDict()
+
+
+class AIModelConfigError(ValueError):
+    """模型模式或 BYOK 请求头不符合部署策略。"""
+
+
+def resolve_model_config(
     *,
-    owner: str = "anonymous",
-) -> AIQueryResponse:
-    """使用共享分节点 Runtime，并转换为向后兼容的 API 响应。"""
-    state = await _runtime.invoke(query, owner=owner, thread_id=thread_id)
+    api_key: str | None,
+    base_url: str | None,
+    model: str | None,
+) -> ModelConfig | None:
+    """按部署模式解析本次请求的模型配置。
+
+    - managed：完全使用服务端配置，出现任何 BYOK 请求头都拒绝，避免静默改变计费主体；
+    - byok：必须携带密钥、地址和模型，地址仍受统一 allowlist 与 SSRF 校验；
+    - managed 尚未配置密钥时返回 None，由 Runtime 在真正调用模型时给出可控失败。
+    """
+    has_byok_headers = any(value and value.strip() for value in (api_key, base_url, model))
+    if settings.llm_mode == "managed":
+        if has_byok_headers:
+            raise AIModelConfigError("托管模式不接受 BYOK 请求头")
+        if not settings.llm_api_key:
+            return None
+        try:
+            return build_managed_config(
+                api_key=settings.llm_api_key,
+                base_url=settings.llm_base_url,
+                model=settings.llm_model,
+                allowed_hosts=settings.llm_allowed_hosts,
+                resolve_dns=False,
+            )
+        except ProviderPolicyError as exc:
+            raise AIModelConfigError(str(exc)) from exc
+
+    if not settings.allow_byok:
+        raise AIModelConfigError("BYOK 未启用")
+    if not (api_key and base_url and model):
+        raise AIModelConfigError("BYOK 模式需要 X-LLM-Api-Key、X-LLM-Base-Url 和 X-LLM-Model")
+    try:
+        return build_byok_config(
+            api_key=api_key.strip(),
+            base_url=base_url.strip(),
+            model=model.strip(),
+            allowed_hosts=settings.llm_allowed_hosts,
+            resolve_dns=False,
+        )
+    except ProviderPolicyError as exc:
+        raise AIModelConfigError(str(exc)) from exc
+
+
+def _runtime_for(config: ModelConfig | None) -> AgentRuntime:
+    if config is None:
+        return _runtime
+    fingerprint = hashlib.sha256(
+        f"{config.mode}|{hashlib.sha256(config.api_key.encode()).hexdigest()}|"
+        f"{config.base_url}|{config.model}".encode()
+    ).hexdigest()
+    cached = _runtime_cache.get(fingerprint)
+    if cached is not None:
+        _runtime_cache.move_to_end(fingerprint)
+        return cached[0]
+
+    adapter = OpenAIModelAdapter(
+        api_key=config.api_key,
+        base_url=config.base_url,
+        model=config.model,
+        business_context=BUSINESS_CONTEXT,
+        allowed_hosts=settings.llm_allowed_hosts,
+    )
+    runtime = _build_runtime(adapter)
+    _runtime_cache[fingerprint] = (runtime, adapter)
+    while len(_runtime_cache) > _MAX_CACHED_RUNTIMES:
+        _, (_, evicted_adapter) = _runtime_cache.popitem(last=False)
+        try:
+            asyncio.get_running_loop().create_task(evicted_adapter.aclose())
+        except RuntimeError:
+            pass
+    return runtime
+
+
+def _state_to_response(state: dict[str, Any]) -> AIQueryResponse:
     result = state["result"]
     visualization = None
     if result.rows:
@@ -213,3 +342,56 @@ async def process_natural_language_query(
             latency_ms=result.usage.latency_ms,
         ) if result.usage else None,
     )
+
+
+async def process_natural_language_query(
+    query: str,
+    thread_id: str | None = None,
+    *,
+    owner: str = "anonymous",
+    config: ModelConfig | None = None,
+) -> AIQueryResponse:
+    """非流式入口；配额、并发与审计由路由层统一执行。"""
+    runtime = _runtime_for(config)
+    state = await runtime.invoke(query, owner=owner, thread_id=thread_id)
+    return _state_to_response(state)
+
+
+async def stream_natural_language_query(
+    query: str,
+    thread_id: str | None = None,
+    *,
+    owner: str = "anonymous",
+    config: ModelConfig | None = None,
+    on_step: Callable[[dict[str, Any]], None] | None = None,
+    on_token: Callable[[str], None] | None = None,
+) -> AIQueryResponse:
+    """流式入口：步骤与 token 经回调下发，返回值与非流式完全一致。"""
+    runtime = _runtime_for(config)
+    state = await runtime.astream(
+        query,
+        owner=owner,
+        thread_id=thread_id,
+        on_step=on_step,
+        on_token=on_token,
+    )
+    return _state_to_response(state)
+
+
+async def test_model_connection(config: ModelConfig) -> bool:
+    """探活只使用本次配置，不复用其他主体的模型客户端。"""
+    adapter = OpenAIModelAdapter(
+        api_key=config.api_key,
+        base_url=config.base_url,
+        model=config.model,
+        business_context=BUSINESS_CONTEXT,
+        allowed_hosts=settings.llm_allowed_hosts,
+    )
+    try:
+        await asyncio.to_thread(adapter.test_connection)
+        return True
+    except Exception as exc:  # noqa: BLE001 - 只返回布尔状态，避免密钥/地址进入响应
+        logger.warning("模型连接测试失败: %s", sanitize_error(exc))
+        return False
+    finally:
+        await adapter.aclose()

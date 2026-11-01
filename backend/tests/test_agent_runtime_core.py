@@ -50,6 +50,19 @@ async def test_memory_conversations_are_isolated_and_keep_six_turns() -> None:
 
 
 @pytest.mark.asyncio
+async def test_twenty_writes_keep_only_latest_six_turns() -> None:
+    """写入全部成功，但只保留最近 6 轮；不承诺 20 轮全部留存。"""
+    store = MemoryConversationStore(max_turns=6)
+    for index in range(20):
+        await store.save_turn("alice", "thread", f"q{index}", f"a{index}")
+
+    history = await store.get_history("alice", "thread")
+    assert len(history) == 12
+    assert history[0]["content"] == "q14"
+    assert history[-1]["content"] == "a19"
+
+
+@pytest.mark.asyncio
 async def test_memory_conversation_expires() -> None:
     store = MemoryConversationStore(ttl_seconds=0)
     await store.save_turn("alice", "thread", "question", "answer")

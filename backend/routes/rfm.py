@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.routes.auth import get_current_user
+from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
 from backend.services.rfm_service import (
     VALID_SEGMENTS,
     compute_rfm,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/rfm", tags=["RFM用户画像"])
 @router.get("/overview", summary="RFM 用户画像总览")
 async def rfm_overview(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     result = await get_rfm_overview(db)
     return result
@@ -33,7 +33,7 @@ async def rfm_segments(
     reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     result = await compute_rfm(
         db,
@@ -58,7 +58,7 @@ async def rfm_segment_users(
     reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     if segment not in VALID_SEGMENTS:
         raise HTTPException(
@@ -80,7 +80,7 @@ async def rfm_top_users(
     reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     result = await get_rfm_top_users(
         db, limit=limit,

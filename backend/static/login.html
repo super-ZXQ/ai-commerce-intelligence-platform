@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · AI Commerce Intelligence Platform</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --brand: #1565C0;
+      --bg: #F6F8FC;
+      --surface: #FFFFFF;
+      --line: #E2E8F0;
+      --ink: #0F172A;
+      --muted: #64748B;
+      --danger: #DC2626;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: var(--bg); color: var(--ink);
+      font-family: "Noto Sans SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    .card {
+      width: min(400px, calc(100vw - 32px)); background: var(--surface);
+      border: 1px solid var(--line); border-radius: 16px; padding: 32px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .06);
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; letter-spacing: -.02em; }
+    p.sub { margin: 0 0 24px; color: var(--muted); font-size: .9rem; line-height: 1.6; }
+    label { display: block; font-size: .85rem; font-weight: 600; margin: 16px 0 6px; }
+    input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 10px; font-size: 1rem; outline: none;
+    }
+    input:focus { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(21, 101, 192, .14); }
+    button {
+      width: 100%; margin-top: 24px; padding: 11px 12px; border: 0; border-radius: 10px;
+      background: var(--brand); color: #fff; font-size: 1rem; font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    .error {
+      display: none; margin-top: 16px; padding: 10px 12px; border-radius: 10px;
+      background: #FEF2F2; color: var(--danger); font-size: .88rem; line-height: 1.5;
+    }
+    .note { margin-top: 20px; color: var(--muted); font-size: .78rem; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>登录分析平台</h1>
+    <p class="sub">统一会话由 FastAPI 签发，经 Nginx 校验后访问 BI 看板与 AI 助手。</p>
+    <form id="login-form">
+      <label for="username">用户名</label>
+      <input id="username" name="username" autocomplete="username" required autofocus>
+      <label for="password">密码</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="submit" type="submit">登录</button>
+      <div id="error" class="error" role="alert"></div>
+    </form>
+    <p class="note">会话 Cookie 为 HttpOnly，页面脚本无法读取；退出请访问 <a href="/logout">/logout</a>。</p>
+  </main>
+  <script>
+    const form = document.getElementById('login-form');
+    const errorBox = document.getElementById('error');
+    const submit = document.getElementById('submit');
+
+    function safeNext() {
+      const value = new URLSearchParams(window.location.search).get('next') || '/';
+      // 只允许站内路径，防止登录后被重定向到外部站点。
+      return value.startsWith('/') && !value.startsWith('//') ? value : '/';
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.style.display = 'none';
+      submit.disabled = true;
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value,
+          }),
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const detail = payload.detail;
+          throw new Error(typeof detail === 'string' ? detail : (detail && detail.message) || '登录失败');
+        }
+        window.location.href = safeNext();
+      } catch (err) {
+        errorBox.textContent = err.message || '登录失败，请重试';
+        errorBox.style.display = 'block';
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

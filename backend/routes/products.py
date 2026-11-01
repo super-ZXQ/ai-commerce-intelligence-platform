@@ -8,7 +8,7 @@ from backend.models.schemas import (
     ProductSalesResponse,
     UserSpendingResponse,
 )
-from backend.routes.auth import get_current_user
+from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
 from backend.services import order_service
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api", tags=["商品与用户"])
 async def list_products(
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取商品销售排名列表，按销售额降序排列。
@@ -34,7 +34,7 @@ async def list_products(
 async def list_users(
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取用户消费排名列表，按消费总额降序排列。

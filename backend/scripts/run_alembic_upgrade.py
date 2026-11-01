@@ -82,6 +82,10 @@ def main() -> int:
                 "data_state",
                 "data_import_runs",
                 "order_status_reconciliation",
+                "auth_users",
+                "service_clients",
+                "auth_audit_log",
+                "ai_query_audit",
             }
             missing = need - tables
             if missing:

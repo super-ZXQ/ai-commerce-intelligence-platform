@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from functools import lru_cache
 from urllib.parse import quote_plus
 
@@ -18,6 +19,8 @@ _INSECURE_ADMIN_PASSWORDS = {
     "change-this-admin-password",
     "change-this-analyst-password",
 }
+# 完整的 bcrypt 结构校验：只检查前缀会把 Compose 误吞 $ 后的截断值当成合法哈希。
+_BCRYPT_HASH_RE = re.compile(r"^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$")
 
 
 class Settings(BaseSettings):
@@ -51,10 +54,28 @@ class Settings(BaseSettings):
     order_event_timeout_seconds: float = 5.0
     order_event_batch_max_size: int = 100
 
+    # 认证目录专用账号。Docker 中为 ea_auth，仅能读写认证/审计表；
+    # 未配置时回落主库账户（本地开发/测试）。
+    auth_db_user: str = ""
+    auth_db_password: str = ""
+    # 统一登录会话 Cookie：HttpOnly，Nginx auth_request 用它保护 /ai/、/BI/ 与 WebSocket。
+    auth_cookie_name: str = "ea_session"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: str = "lax"
+
+    # AI 后端入口的容量与成本边界（按主体执行）。
+    ai_max_concurrency: int = 2
+    ai_queue_timeout_seconds: float = 10.0
+    ai_query_timeout_seconds: float = 120.0
+    ai_daily_request_limit: int = 200
+    ai_max_inflight_per_user: int = 1
+
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""
     redis_db: int = 0
+    # 会话使用独立逻辑 DB，仅作为命名隔离；同一 Redis 实例的淘汰策略仍作用于全部 DB。
+    redis_session_db: int = 1
     redis_enabled: bool = False
 
     llm_api_key: str = ""
@@ -116,6 +137,28 @@ class Settings(BaseSettings):
                 logger.warning("开发模式未设置 ADMIN_PASSWORD，使用本地默认密码")
             else:
                 raise ValueError("生产环境必须设置 ADMIN_PASSWORD 环境变量！")
+        if self.auth_db_user and not self.auth_db_password:
+            raise ValueError("设置 AUTH_DB_USER 时必须同时设置 AUTH_DB_PASSWORD")
+        if self.ai_max_concurrency < 1:
+            raise ValueError("AI_MAX_CONCURRENCY 必须大于 0")
+        if self.ai_max_inflight_per_user < 1:
+            raise ValueError("AI_MAX_INFLIGHT_PER_USER 必须大于 0")
+        if self.ai_daily_request_limit < 1:
+            raise ValueError("AI_DAILY_REQUEST_LIMIT 必须大于 0")
+        if self.ai_queue_timeout_seconds <= 0 or self.ai_query_timeout_seconds <= 0:
+            raise ValueError("AI_QUEUE_TIMEOUT_SECONDS / AI_QUERY_TIMEOUT_SECONDS 必须大于 0")
+        self.auth_cookie_samesite = self.auth_cookie_samesite.lower()
+        if self.auth_cookie_samesite not in {"lax", "strict", "none"}:
+            raise ValueError("AUTH_COOKIE_SAMESITE 只能是 lax、strict 或 none")
+        if self.auth_cookie_samesite == "none" and not self.auth_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SAMESITE=none 时必须同时开启 AUTH_COOKIE_SECURE")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", self.auth_cookie_name):
+            raise ValueError("AUTH_COOKIE_NAME 只能包含字母、数字、下划线和连字符")
+        if not 0 <= self.redis_db <= 15 or not 0 <= self.redis_session_db <= 15:
+            raise ValueError("REDIS_DB / REDIS_SESSION_DB 必须在 0-15 之间")
+        if self.redis_session_db == self.redis_db:
+            # 逻辑 DB 只是命名隔离，不改变 allkeys-lru 的全局淘汰；但同库会直接键冲突。
+            raise ValueError("REDIS_SESSION_DB 必须与 REDIS_DB 不同，避免会话键与业务缓存键冲突")
         if not self.debug:
             if self.jwt_secret in _INSECURE_JWT_SECRETS or len(self.jwt_secret) < 32:
                 raise ValueError("生产环境 JWT_SECRET 至少需要 32 位且不能使用示例值！")
@@ -126,9 +169,9 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 ADMIN_PASSWORD 至少需要 12 位且不能使用示例值！")
             # 生产环境只接受 bcrypt 哈希（python -m backend.utils.auth 生成）：
             # 明文密码在 DEBUG=False 下登录会被拒，配置错误应启动即失败而非运行时才暴露。
-            if not self.admin_password.startswith(("$2a$", "$2b$", "$2y$")):
+            if not _BCRYPT_HASH_RE.fullmatch(self.admin_password):
                 raise ValueError("生产环境 ADMIN_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
-            if self.analyst_password and not self.analyst_password.startswith(("$2a$", "$2b$", "$2y$")):
+            if self.analyst_password and not _BCRYPT_HASH_RE.fullmatch(self.analyst_password):
                 raise ValueError("生产环境 ANALYST_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
 
     @property
@@ -182,10 +225,30 @@ class Settings(BaseSettings):
         )
 
     @property
+    def auth_async_database_url(self) -> str:
+        """认证目录专用连接串：ea_auth 仅能访问认证/审计表，未配置时回落主账号。"""
+        user = self.auth_db_user or self.db_user
+        password = self.auth_db_password if self.auth_db_user else self.db_password
+        return (
+            f"mysql+aiomysql://{quote_plus(user)}:{quote_plus(password)}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+        )
+
+    @property
     def redis_url(self) -> str:
         if self.redis_password:
             return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def redis_session_url(self) -> str:
+        """会话逻辑 DB 连接串；只是命名隔离，淘汰策略仍由 Redis 实例全局决定。"""
+        if self.redis_password:
+            return (
+                f"redis://:{self.redis_password}@{self.redis_host}:"
+                f"{self.redis_port}/{self.redis_session_db}"
+            )
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_session_db}"
 
 
 @lru_cache

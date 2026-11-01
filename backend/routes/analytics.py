@@ -12,7 +12,7 @@ from backend.models.schemas import (
     TopProductResponse,
     UserBehaviorResponse,
 )
-from backend.routes.auth import get_current_user
+from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
 from backend.services import analytics_service
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/analytics", tags=["数据分析"])
 
 
 @router.get("/sales-overview", response_model=SalesOverviewResponse, summary="销售总览")
-async def sales_overview(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
+async def sales_overview(db: AsyncSession = Depends(get_db), _principal: Principal = Depends(require_scope(SCOPE_DATA_READ))):
     """
     获取销售总览数据，包含：
 
@@ -41,7 +41,7 @@ async def sales_trend(
     start_date: date | None = Query(None, description="开始日期 YYYY-MM-DD"),
     end_date: date | None = Query(None, description="结束日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取销售趋势数据，支持按日/周/月聚合。
@@ -66,7 +66,7 @@ async def sales_trend(
 async def top_products(
     limit: int = Query(10, ge=1, le=50, description="返回数量"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取热销商品排名，按销售额降序。
@@ -77,7 +77,7 @@ async def top_products(
 
 
 @router.get("/user-behavior", response_model=UserBehaviorResponse, summary="用户行为分析")
-async def user_behavior(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
+async def user_behavior(db: AsyncSession = Depends(get_db), _principal: Principal = Depends(require_scope(SCOPE_DATA_READ))):
     """
     获取用户行为分析数据，包含：
 
@@ -91,7 +91,7 @@ async def user_behavior(db: AsyncSession = Depends(get_db), user: dict = Depends
 
 
 @router.get("/category-analysis", response_model=CategoryAnalysisResponse, summary="平台/品类分析")
-async def category_analysis(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
+async def category_analysis(db: AsyncSession = Depends(get_db), _principal: Principal = Depends(require_scope(SCOPE_DATA_READ))):
     """
     获取各平台/品类分析数据，包含：
 

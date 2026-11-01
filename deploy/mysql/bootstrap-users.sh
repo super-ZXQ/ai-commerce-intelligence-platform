@@ -21,6 +21,7 @@ APP_PASSWORD_ESCAPED="$(escape_sql_string "${DB_APP_PASSWORD}")"
 AI_PASSWORD_ESCAPED="$(escape_sql_string "${DB_AI_PASSWORD}")"
 SYNC_PASSWORD_ESCAPED="$(escape_sql_string "${DB_SYNC_PASSWORD}")"
 EVENT_PASSWORD_ESCAPED="$(escape_sql_string "${DB_EVENT_PASSWORD}")"
+AUTH_PASSWORD_ESCAPED="$(escape_sql_string "${DB_AUTH_PASSWORD}")"
 MIGRATE_PASSWORD_ESCAPED="$(escape_sql_string "${DB_MIGRATE_PASSWORD:-${DB_SYNC_PASSWORD}}")"
 
 attempt=1
@@ -59,6 +60,10 @@ CREATE USER IF NOT EXISTS 'ea_migrate'@'%' IDENTIFIED BY '${MIGRATE_PASSWORD_ESC
 ALTER USER 'ea_migrate'@'%' IDENTIFIED BY '${MIGRATE_PASSWORD_ESCAPED}';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES
   ON \`${DB_NAME}\`.* TO 'ea_migrate'@'%';
+
+-- 认证账号在 bootstrap 阶段先建用户；表级授权由 db-migrate 之后的 apply-grants.sh 完成。
+CREATE USER IF NOT EXISTS 'ea_auth'@'%' IDENTIFIED BY '${AUTH_PASSWORD_ESCAPED}';
+ALTER USER 'ea_auth'@'%' IDENTIFIED BY '${AUTH_PASSWORD_ESCAPED}';
 
 FLUSH PRIVILEGES;
 SQL

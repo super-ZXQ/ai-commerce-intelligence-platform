@@ -31,6 +31,16 @@ event_engine = create_async_engine(
     echo=settings.debug,
 )
 
+# 认证目录独立连接池：ea_auth 只能访问认证/审计表，不能读取订单。
+auth_engine = create_async_engine(
+    settings.auth_async_database_url,
+    pool_size=max(1, min(settings.db_pool_size, 5)),
+    max_overflow=max(1, min(settings.db_max_overflow, 5)),
+    pool_recycle=settings.db_pool_recycle,
+    pool_pre_ping=True,
+    echo=settings.debug,
+)
+
 async_session_factory = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -38,6 +48,11 @@ async_session_factory = async_sessionmaker(
 )
 event_session_factory = async_sessionmaker(
     event_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+auth_session_factory = async_sessionmaker(
+    auth_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
@@ -64,6 +79,26 @@ async def get_event_db() -> AsyncSession:
         except Exception:
             await session.rollback()
             raise
+
+
+async def get_auth_db() -> AsyncSession:
+    """认证目录专用会话；认证/审计代码不能借用主业务连接池。"""
+    async with auth_session_factory() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+
+async def check_auth_db_connection() -> bool:
+    try:
+        async with auth_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception as exc:
+        logger.error("认证数据库连接检查失败: %s", sanitize_error(exc))
+        return False
 
 
 async def check_db_connection() -> bool:

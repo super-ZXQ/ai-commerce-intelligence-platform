@@ -74,3 +74,11 @@ class MarkdownKnowledgeRetriever:
             )
             for score, chunk in ranked[:top_k]
         ]
+
+    def status(self) -> dict:
+        """返回知识库可观测状态；只暴露计数与错误类别，不暴露服务器路径。"""
+        try:
+            count = len(self._load())
+            return {"ok": True, "count": count, "error": None}
+        except Exception as exc:  # noqa: BLE001 - 状态检查不能反向中断服务
+            return {"ok": False, "count": 0, "error": type(exc).__name__}

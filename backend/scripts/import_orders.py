@@ -23,7 +23,7 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from urllib.parse import quote_plus
 from uuid import uuid4
@@ -266,7 +266,9 @@ def scan_csv(path: Path) -> CsvStats:
             rows += 1
             if parsed["is_refund"] == "是":
                 refund_rows += 1
-            payment_sum += parsed["payment_amount"] or Decimal("0")
+            payment_sum += (parsed["payment_amount"] or Decimal("0")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
             order_date = parsed["order_date"]
             if order_date is not None:
                 min_order_date = (
@@ -459,7 +461,7 @@ def _validate_staging(conn, staging: str, stats: CsvStats) -> None:
         raise CsvValidationError(
             f"staging 订单号不唯一: rows={row.rows_count}, distinct={row.distinct_orders}"
         )
-    if Decimal(row.payment_sum or 0) != stats.payment_sum:
+    if Decimal(row.payment_sum or 0).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) != stats.payment_sum:
         raise CsvValidationError(
             f"staging 付款金额合计不一致: expected={stats.payment_sum}, "
             f"actual={row.payment_sum}"

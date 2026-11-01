@@ -27,10 +27,13 @@ jobs:
           DB_AI_PASSWORD=ci-ai-password
           DB_SYNC_PASSWORD=ci-sync-password
           DB_EVENT_PASSWORD=ci-event-password
+          DB_AUTH_PASSWORD=ci-auth-password
           DB_MIGRATE_PASSWORD=ci-migrate-password
           MIGRATION_DB_USER=ea_migrate
           DB_NAME=ai_commerce_intelligence_platform
           REDIS_PASSWORD=
+          REDIS_DB=0
+          REDIS_SESSION_DB=1
           NGINX_PORT=80
           JWT_SECRET=ci-docker-secret-not-for-production
           ADMIN_USERNAME=admin
@@ -38,6 +41,16 @@ jobs:
           ANALYST_USERNAME=analyst
           ANALYST_PASSWORD=analyst123
           DEBUG=true
+          AUTH_COOKIE_NAME=ea_session
+          AUTH_COOKIE_SECURE=false
+          AUTH_COOKIE_SAMESITE=lax
+          LOGIN_URL=/login
+          LOGOUT_URL=/logout
+          AI_MAX_CONCURRENCY=2
+          AI_MAX_INFLIGHT_PER_USER=1
+          AI_DAILY_REQUEST_LIMIT=200
+          AI_QUEUE_TIMEOUT_SECONDS=10
+          AI_QUERY_TIMEOUT_SECONDS=120
           LLM_API_KEY=
           LLM_BASE_URL=https://api.deepseek.com
           LLM_MODEL=deepseek-chat
@@ -70,14 +83,30 @@ jobs:
             -uroot -pci-root-password -Nse \
             'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
           echo "alembic_version=$version"
-          test "$version" = "0003_data_protection"
+          test "$version" = "0004_auth_identity"
 
           for t in orders order_events app_metadata alembic_version data_state \
-                   data_import_runs order_status_reconciliation; do
+                   data_import_runs order_status_reconciliation \
+                   auth_users service_clients auth_audit_log ai_query_audit; do
             docker compose exec -T mysql mysql \
               -uroot -pci-root-password -Nse \
               "SHOW TABLES FROM ai_commerce_intelligence_platform LIKE '$t'" | grep -q "$t"
           done
+
+          # 表级最小权限：ea_ai 只能读 orders，不能读认证表。
+          docker compose exec -T mysql mysql -uea_ai -pci-ai-password -Nse \
+            'SELECT COUNT(*) FROM ai_commerce_intelligence_platform.orders' >/dev/null
+          if docker compose exec -T mysql mysql -uea_ai -pci-ai-password -Nse \
+            'SELECT COUNT(*) FROM ai_commerce_intelligence_platform.auth_users' >/dev/null 2>&1; then
+            echo "ea_ai 不应读取 auth_users"; exit 1
+          fi
+          # ea_auth 只能访问认证表，不能读 orders。
+          docker compose exec -T mysql mysql -uea_auth -pci-auth-password -Nse \
+            'SELECT COUNT(*) FROM ai_commerce_intelligence_platform.auth_users' >/dev/null
+          if docker compose exec -T mysql mysql -uea_auth -pci-auth-password -Nse \
+            'SELECT COUNT(*) FROM ai_commerce_intelligence_platform.orders' >/dev/null 2>&1; then
+            echo "ea_auth 不应读取 orders"; exit 1
+          fi
 
           # 订单数据只能由显式 data-import 导入；后端启动不得触碰 orders。
           docker compose --profile data-import run --rm data-import --mode bootstrap
@@ -163,20 +192,47 @@ jobs:
             "SELECT COUNT(*) FROM ai_commerce_intelligence_platform.order_events WHERE order_id LIKE 'CI-RETENTION-%'")"
           test "$ledger_rows" = "5"
 
-          # db-migrate 应已成功退出
+          # db-migrate / db-grant 应已成功退出
           migrate_status="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' ea-db-migrate)"
           echo "db-migrate: $migrate_status"
           echo "$migrate_status" | grep -q 'exited 0'
+          grant_status="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' ea-db-grant)"
+          echo "db-grant: $grant_status"
+          echo "$grant_status" | grep -q 'exited 0'
 
-          for path in / /BI/ /ai/ /docs /demo /monitor /health-panel; do
+          # 公开页面无需登录。
+          for path in / /docs /demo /monitor /health-panel; do
             status="$(curl --location --silent --output /dev/null \
               --write-out '%{http_code}' --max-time 20 "http://localhost${path}")"
             echo "$path -> $status"
             test "$status" = "200"
           done
 
+          # 未登录访问 BI / AI 必须跳到登录页，不能直接拿到页面。
+          for path in /BI/ /ai/; do
+            headers="$(curl --silent --output /dev/null --dump-header - \
+              --max-time 20 "http://localhost${path}" | tr -d '\r')"
+            echo "$headers" | grep -q '^HTTP/1.1 302'
+            echo "$headers" | grep -qi '^location: /login'
+            echo "$path 未登录 -> 302 /login"
+          done
+
+          # 统一 HttpOnly Cookie 登录；Streamlit 从同源 Cookie 读取会话。
+          curl --fail --silent --show-error -c /tmp/ea-cookies.txt \
+            -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"admin123"}' >/dev/null
+          grep -q 'ea_session' /tmp/ea-cookies.txt
+          for path in /BI/ /ai/; do
+            status="$(curl --silent --output /dev/null -b /tmp/ea-cookies.txt \
+              --write-out '%{http_code}' --max-time 20 "http://localhost${path}")"
+            echo "$path 已登录 -> $status"
+            test "$status" = "200"
+          done
+
           ws_status="$(curl --http1.1 --silent --output /dev/null \
             --write-out '%{http_code}' --max-time 3 \
+            -b /tmp/ea-cookies.txt \
             --header 'Connection: Upgrade' \
             --header 'Upgrade: websocket' \
             --header 'Origin: http://localhost' \
