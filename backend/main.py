@@ -20,7 +20,7 @@ from backend.database import (
     engine,
     event_engine,
 )
-from backend.routes import ai, analytics, auth, export, monitor, order_events, orders, products, rfm
+from backend.routes import ai, analytics, auth, bi, export, monitor, order_events, orders, products, rfm
 from backend.routes.monitor import (
     _load_rag_stats,
     detailed_health,
@@ -230,6 +230,7 @@ app.include_router(orders.router)
 app.include_router(order_events.router)
 app.include_router(products.router)
 app.include_router(analytics.router)
+app.include_router(bi.router)
 app.include_router(ai.router)
 app.include_router(export.router)
 app.include_router(monitor.router)

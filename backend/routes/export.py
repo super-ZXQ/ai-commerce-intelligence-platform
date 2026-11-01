@@ -2,10 +2,11 @@ import csv
 import io
 import logging
 from datetime import date
+from urllib.parse import quote
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +14,7 @@ from backend.config import get_settings
 from backend.database import get_db
 from backend.models.database_models import Order
 from backend.utils.auth import SCOPE_DATA_EXPORT, Principal, require_scope
-from backend.services import analytics_service
+from backend.services import analytics_service, rfm_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ _EXPORT_CHUNK_SIZE = 5000
 _ORDER_EXPORT_HEADERS = [
     "订单编号", "订单号", "用户名", "商品编号", "订单金额", "付款金额",
     "平台类型", "下单时间", "付款时间", "是否退款", "优惠金额",
+]
+_RFM_EXPORT_HEADERS = [
+    "客户ID", "R评分", "F评分", "M评分", "最近消费(天)", "消费频次", "累计GMV(元)",
 ]
 
 
@@ -179,6 +183,66 @@ async def export_orders(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=orders_export.xlsx"},
         )
+
+
+@router.get("/rfm-segment", summary="导出 RFM 分群客户明细")
+async def export_rfm_segment(
+    segment: str = Query(..., description="RFM 分群名称"),
+    reference_date: date | None = Query(None, description="参考日期 YYYY-MM-DD"),
+    n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
+    r_threshold: int = Query(3, ge=2, le=10, description="R 评分阈值"),
+    f_threshold: int = Query(3, ge=2, le=10, description="F 评分阈值"),
+    m_threshold: int = Query(3, ge=2, le=10, description="M 评分阈值"),
+    limit: int = Query(200, ge=1, le=1000, description="导出条数"),
+    db: AsyncSession = Depends(get_db),
+    _principal: Principal = Depends(require_scope(SCOPE_DATA_EXPORT)),
+):
+    """导出与 BI 页面同口径的分群明细；权限由后端按当前账号判定。"""
+    if segment not in rfm_service.VALID_SEGMENTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效分群名称: {segment}，可选值: {rfm_service.VALID_SEGMENTS}",
+        )
+    if max(r_threshold, f_threshold, m_threshold) > n_bins:
+        raise HTTPException(status_code=400, detail="评分阈值不能大于分位数分组数")
+
+    rows = await rfm_service.get_rfm_segment_export_rows(
+        db,
+        segment=segment,
+        reference_date=reference_date.isoformat() if reference_date else None,
+        n_bins=n_bins,
+        r_threshold=r_threshold,
+        f_threshold=f_threshold,
+        m_threshold=m_threshold,
+        limit=limit,
+    )
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(_RFM_EXPORT_HEADERS)
+    writer.writerows(
+        [
+            _sanitize_cell(row["user_name"]),
+            row["r_score"],
+            row["f_score"],
+            row["m_score"],
+            row["recency_days"],
+            row["frequency"],
+            row["monetary"],
+        ]
+        for row in rows
+    )
+    filename = quote(f"{segment}_客户明细.csv")
+    return Response(
+        content=("\ufeff" + buffer.getvalue()).encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=rfm_segment.csv; filename*=UTF-8''{filename}"
+            ),
+            "Cache-Control": "no-store",
+        },
+    )
+
 
 @router.get("/analytics", summary="导出分析报告")
 async def export_analytics(

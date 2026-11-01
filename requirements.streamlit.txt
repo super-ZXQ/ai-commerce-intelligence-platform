@@ -4,6 +4,5 @@ numpy==2.4.6
 plotly==6.8.0
 streamlit==1.58.0
 msgpack==1.2.2
-pymysql==1.2.0
-# MySQL 8 caching_sha2_password 认证所需，与 backend/requirements.txt 版本一致。
-cryptography==50.0.1
+# BI 页面只经后端 API 读数据与导出，不再安装 MySQL 驱动。
+httpx==0.28.1

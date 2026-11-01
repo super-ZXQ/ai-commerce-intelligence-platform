@@ -277,15 +277,14 @@ services:
       - --browser.gatherUsageStats=false
       - --server.fileWatcherType=none
     environment:
-      # BI 默认读取运行期业务库（只读账号），读取失败回退 data/ 快照；
-      # 页面缓存 30 秒，侧边栏刷新按钮会立即重读。
-      BI_DATA_SOURCE: db
-      DB_HOST: mysql
-      DB_PORT: "3306"
-      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
-      DB_USER: ea_app
-      DB_PASSWORD: ${DB_APP_PASSWORD:?请设置 DB_APP_PASSWORD}
+      # BI 不再持有数据库凭据：页面携带会话 Cookie 调用后端，
+      # 由后端执行 data:read / data:export 权限校验与数据读取。
+      BACKEND_API_URL: http://backend:8000
+      LOGIN_URL: ${LOGIN_URL:-/login}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-ea_session}
     depends_on:
+      backend:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       db-grant:

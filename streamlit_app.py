@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from backend.utils.rfm_scoring import assign_segment, quantile_scores
+from bi_api import BiApiClient, BiApiError, BiAuthError, BiPermissionError
 from bi_style import BI_DASHBOARD_CSS
 
 # ══════════════════════════════════════════════════════════════
@@ -97,19 +98,13 @@ st.set_page_config(
 st.markdown(BI_DASHBOARD_CSS, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-# 数据加载
+# 后端会话与数据加载
 # ══════════════════════════════════════════════════════════════
-_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-if not os.path.exists(os.path.join(_REPO_ROOT, 'data')):
-    _REPO_ROOT = os.path.dirname(_REPO_ROOT)
+BACKEND_API_URL = os.environ.get('BACKEND_API_URL', 'http://localhost:8000').rstrip('/')
+AUTH_COOKIE_NAME = os.environ.get('AUTH_COOKIE_NAME', 'ea_session')
+LOGIN_URL = os.environ.get('LOGIN_URL', 'http://localhost:8000/login')
 
-_BI_DB_SQL = """
-SELECT order_id AS order_no, order_time, payment_time, payment_amount,
-       user_name, product_id, platform_type
-FROM orders
-WHERE order_status <> 'CANCELLED'
-"""
-_BI_DB_COLUMNS = {
+_BI_COLUMNS = {
     'order_no': '订单号',
     'order_time': '下单时间',
     'payment_time': '付款时间',
@@ -120,74 +115,85 @@ _BI_DB_COLUMNS = {
 }
 
 
-def _db_configured() -> bool:
-    return all(os.getenv(name) for name in ('DB_HOST', 'DB_USER', 'DB_NAME'))
-
-
-def _load_orders_from_db() -> pd.DataFrame:
-    """用只读业务账号读取运行期订单；取消订单与后端指标口径保持一致。"""
-    import pymysql
-
-    conn = pymysql.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        port=int(os.getenv('DB_PORT', '3306')),
-        user=os.getenv('DB_USER', ''),
-        password=os.getenv('DB_PASSWORD', ''),
-        database=os.getenv('DB_NAME', ''),
-        charset='utf8mb4',
-        connect_timeout=5,
-        read_timeout=30,
-        cursorclass=pymysql.cursors.DictCursor,
-    )
+def _session_token() -> str:
+    """从浏览器请求读取 HttpOnly 会话 Cookie；本进程不签发、不保存身份。"""
     try:
-        with conn.cursor() as cursor:
-            cursor.execute(_BI_DB_SQL)
-            rows = cursor.fetchall()
-    finally:
-        conn.close()
-    if not rows:
-        raise RuntimeError('业务库暂无订单数据')
-    frame = pd.DataFrame(rows).rename(columns=_BI_DB_COLUMNS)
-    frame['下单时间'] = pd.to_datetime(frame['下单时间'])
-    frame['付款时间'] = pd.to_datetime(frame['付款时间'])
-    frame['付款金额'] = frame['付款金额'].astype(float)
-    return frame
+        return (st.context.cookies.get(AUTH_COOKIE_NAME) or '').strip()
+    except Exception:
+        return ''
 
 
-def _load_orders_from_csv() -> pd.DataFrame:
-    base = os.path.join(_REPO_ROOT, 'data')
-    for ext in ('.parquet', '.csv'):
-        f = os.path.join(base, 'cleaned_orders' + ext)
-        if os.path.exists(f):
-            if ext == '.parquet':
-                return pd.read_parquet(f)
-            return pd.read_csv(f, parse_dates=['下单时间', '付款时间'])
-    raise FileNotFoundError("未找到数据文件 data/cleaned_orders.parquet 或 .csv")
+def _bi_client() -> BiApiClient:
+    return BiApiClient(BACKEND_API_URL, AUTH_COOKIE_NAME, _session_token())
+
+
+def _render_login_gate() -> None:
+    st.warning('需要登录后才能访问 BI 看板。')
+    st.link_button('前往登录', LOGIN_URL)
+
+
+def _require_session() -> dict:
+    """每次脚本运行都向后端确认账号状态与权限，不依赖 Nginx 入口认证。"""
+    if not _session_token():
+        _render_login_gate()
+        st.stop()
+    try:
+        session = _bi_client().verify_session()
+    except BiApiError as exc:
+        st.error(f'后端不可用：{exc.message}')
+        st.stop()
+    if session is None:
+        _render_login_gate()
+        st.stop()
+    if 'data:read' not in set(session.get('scopes') or []):
+        st.error('当前账号缺少 data:read 权限，无法查看经营数据。')
+        st.stop()
+    return session
+
+
+bi_session = _require_session()
+_bi_scopes = set(bi_session.get('scopes') or [])
+export_allowed = 'data:export' in _bi_scopes
 
 
 @st.cache_data(ttl=30, show_spinner="正在加载数据，请稍候...")
 def load_data(refresh_token: int = 0) -> tuple[pd.DataFrame, str]:
-    """优先读业务库；未配置或读取失败时回退本地快照。
+    """经后端读取非取消订单；refresh_token 只用于手动刷新时失效页面缓存。"""
+    rows = _bi_client().fetch_orders()
+    if not rows:
+        raise RuntimeError('业务库暂无订单数据')
+    frame = pd.DataFrame(rows).rename(columns=_BI_COLUMNS)
+    frame['下单时间'] = pd.to_datetime(frame['下单时间'])
+    frame['付款时间'] = pd.to_datetime(frame['付款时间'])
+    frame['付款金额'] = frame['付款金额'].astype(float)
+    return frame, '后端 API（非取消订单）'
 
-    refresh_token 参与缓存键，侧边栏“刷新数据”会换一个 token 立即重读；
-    即使不点刷新，运行期数据最多陈旧 30 秒。
-    """
-    mode = os.getenv('BI_DATA_SOURCE', 'auto').strip().lower()
-    if mode not in ('auto', 'db', 'csv'):
-        raise ValueError('BI_DATA_SOURCE 只能是 auto/db/csv')
-    if mode in ('auto', 'db') and _db_configured():
-        try:
-            return _load_orders_from_db(), '业务库（非取消订单）'
-        except Exception as exc:
-            if mode == 'db':
-                raise RuntimeError(f'业务库读取失败：{exc}') from exc
-    elif mode == 'db':
-        raise RuntimeError('BI_DATA_SOURCE=db 但未配置 DB_HOST/DB_USER/DB_NAME')
-    return _load_orders_from_csv(), '本地 CSV 快照'
+
+@st.cache_data(ttl=30, show_spinner=False)
+def load_rfm_export(
+    segment: str,
+    reference_date: str,
+    n_bins: int,
+    r_threshold: int,
+    f_threshold: int,
+    m_threshold: int,
+    refresh_token: int = 0,
+) -> bytes:
+    """导出由后端重新分层并生成；页面只负责触发与展示下载。"""
+    return _bi_client().fetch_rfm_export(
+        segment=segment,
+        reference_date=reference_date,
+        n_bins=n_bins,
+        r_threshold=r_threshold,
+        f_threshold=f_threshold,
+        m_threshold=m_threshold,
+        limit=200,
+    )
 
 
 page = st.sidebar.selectbox("选择看板页面", ["销售总览", "RFM 客户分层"])
-if st.sidebar.button("刷新数据", help="重新读取业务库；页面缓存最长 30 秒"):
+st.sidebar.caption(f"登录账号：{bi_session.get('username', '')}")
+if st.sidebar.button("刷新数据", help="重新经后端读取数据；页面缓存最长 30 秒"):
     st.session_state['data_refresh_token'] = st.session_state.get('data_refresh_token', 0) + 1
     load_data.clear()
     st.rerun()
@@ -196,6 +202,15 @@ with st.spinner("正在加载数据..."):
     try:
         df, data_source = load_data(st.session_state.get('data_refresh_token', 0))
         st.success(f"成功加载 {len(df):,} 条订单数据（来源：{data_source}）")
+    except BiAuthError:
+        _render_login_gate()
+        st.stop()
+    except BiPermissionError as exc:
+        st.error(f"当前账号无权读取数据：{exc.message}")
+        st.stop()
+    except BiApiError as exc:
+        st.error(f"后端数据加载失败：{exc.message}")
+        st.stop()
     except Exception as e:
         st.error(f"数据加载失败：{e}")
         st.stop()
@@ -884,14 +899,33 @@ elif page == "RFM 客户分层":
             detail_df = seg_users[show_cols].sort_values('monetary', ascending=False).head(200).rename(columns=display_labels)
             st.dataframe(detail_df, width='stretch', hide_index=True, height=400)
 
-            # ── 导出CSV ──
-            csv_data = detail_df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="导出 CSV",
-                data=csv_data,
-                file_name=f"{sel_segment}_客户明细.csv",
-                mime="text/csv",
-            )
+            # ── 导出CSV（由后端按 data:export 权限重新分层并生成）──
+            if export_allowed:
+                try:
+                    csv_data = load_rfm_export(
+                        sel_segment,
+                        ref_date_input.isoformat(),
+                        n_bins,
+                        r_threshold,
+                        f_threshold,
+                        m_threshold,
+                        st.session_state.get('data_refresh_token', 0),
+                    )
+                    st.download_button(
+                        label="导出 CSV",
+                        data=csv_data,
+                        file_name=f"{sel_segment}_客户明细.csv",
+                        mime="text/csv",
+                    )
+                    st.caption("导出由后端按当前账号权限执行，最多 200 条。")
+                except BiAuthError:
+                    _render_login_gate()
+                except BiPermissionError:
+                    st.caption("当前账号无导出权限（data:export）。")
+                except BiApiError as exc:
+                    st.caption(f"导出暂不可用：{exc.message}")
+            else:
+                st.caption("当前账号无导出权限（data:export），无法下载客户明细。")
 
     st.markdown("---")
     st.caption(f"数据更新时间：{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} | RFM 分层页面 v3.0 | AI Commerce Intelligence Platform")

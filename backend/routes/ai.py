@@ -35,6 +35,9 @@ settings = get_settings()
 
 router = APIRouter(prefix="/api/ai", tags=["AI助手"])
 
+# 连接测试没有用户问题文本；审计只记录固定标记的哈希与长度。
+_TEST_QUERY = "__model_connection_test__"
+
 
 def _model_headers(request: Request) -> dict[str, str | None]:
     return {
@@ -71,6 +74,8 @@ async def _audit_denied(
     query: str,
     mode: str,
     exc: AILimitError,
+    action: str = "ai.query",
+    resource: str = "/api/ai/query",
 ) -> None:
     await audit_ai_query(
         auth_db,
@@ -86,9 +91,9 @@ async def _audit_denied(
         auth_db,
         principal_type=principal.principal_type,
         principal_name=principal.name,
-        action="ai.query",
+        action=action,
         outcome="denied",
-        resource="/api/ai/query",
+        resource=resource,
         client=client_ip(request),
         detail=exc.code,
     )
@@ -338,14 +343,58 @@ async def test_model_connection(
     principal: Principal = Depends(require_scope(SCOPE_AI_QUERY)),
     auth_db: AsyncSession = Depends(get_auth_db),
 ) -> dict:
-    """连接测试同样走后端策略；密钥只存在于请求内存，不写入日志与审计。"""
+    """连接测试同样走后端策略与额度/并发边界；密钥只存在于请求内存。
+
+    测试会真实调用模型，因此必须与查询共用每日额度、单用户并发和全局并发，
+    并写入 AI 用量审计；否则额度耗尽后仍可借测试入口消耗平台资源。
+    """
     config, mode = _resolve_config(request)
     if config is None:
         raise HTTPException(
             status_code=503,
             detail={"error_code": "MODEL_NOT_CONFIGURED", "message": "平台模型尚未配置"},
         )
-    ok = await ai_service.test_model_connection(config)
+    started = time.perf_counter()
+    audit_request_id = str(uuid4())
+    try:
+        slot = await acquire_ai_slot(principal.name, auth_db)
+    except AILimitError as exc:
+        await _audit_denied(
+            auth_db,
+            principal=principal,
+            request=request,
+            query=_TEST_QUERY,
+            mode=mode,
+            exc=exc,
+            action="ai.test",
+            resource="/api/ai/test",
+        )
+        raise _limit_http_error(exc) from exc
+
+    error_category = ""
+    try:
+        ok = await asyncio.wait_for(
+            ai_service.test_model_connection(config),
+            timeout=settings.ai_query_timeout_seconds,
+        )
+    except Exception as exc:  # noqa: BLE001 - 探活失败只回固定错误，不回显异常
+        logger.warning("模型连接测试异常: %s", sanitize_error(exc))
+        ok = False
+        error_category = type(exc).__name__
+    finally:
+        slot.release()
+
+    await audit_ai_query(
+        auth_db,
+        request_id=audit_request_id,
+        principal_name=principal.name,
+        thread_id="",
+        model_mode=mode,
+        query=_TEST_QUERY,
+        outcome="success" if ok else "error",
+        latency_ms=round((time.perf_counter() - started) * 1000),
+        error_category=error_category or ("" if ok else "MODEL_UNREACHABLE"),
+    )
     await record_auth_audit(
         auth_db,
         principal_type=principal.principal_type,

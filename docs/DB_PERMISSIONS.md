@@ -9,7 +9,7 @@
 
 | 账号 | 使用方 | 配置项 | 权限级别 |
 |------|--------|--------|----------|
-| `ea_app` | FastAPI 业务读路径、BI 查询 | `DB_USER` / `DB_PASSWORD` | 表级只读 |
+| `ea_app` | FastAPI 业务读路径（含 BI 数据与导出） | `DB_USER` / `DB_PASSWORD` | 表级只读 |
 | `ea_ai` | AI Text-to-SQL 只读执行 | `AI_DB_USER` / `AI_DB_PASSWORD` | 仅 `orders` 表级只读 |
 | `ea_events` | 订单事件摄入写路径 | `EVENT_DB_USER` / `EVENT_DB_PASSWORD` | `orders` / `order_events` / `data_state` 表级读写 |
 | `ea_auth` | 登录、权限、服务凭据、审计 | `AUTH_DB_USER` / `AUTH_DB_PASSWORD` | 仅认证/审计表 |
@@ -39,6 +39,9 @@
 - `ea_events` 可在事件事务内更新 `data_state.data_version`，用于缓存版本切换；该权限不包含 DELETE，不能重置版本或删除版本行。
 - `ea_auth` 无任何 `orders` 权限；认证库连接池与业务连接池相互独立。
 - `ea_app` 不授予 `auth_users` / `service_clients`，避免业务接口意外泄露口令哈希。
+- BI 看板容器不持有 `ea_app` 凭据：页面携带会话 Cookie 调用 `/api/bi/orders` 与
+  `/api/export/rfm-segment`，由 FastAPI 使用 `ea_app` 读取并执行 `data:read` /
+  `data:export` 校验。
 - 审计表只允许追加与查询，不允许认证账号修改历史审计。
 
 ## 运维例外：`ea_sync` 与 `ea_migrate`

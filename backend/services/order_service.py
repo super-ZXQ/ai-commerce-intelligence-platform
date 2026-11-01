@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database_models import Order
 from backend.models.schemas import (
+    BIOrderItem,
+    BIOrderPage,
     OrderFilterParams,
     OrderResponse,
     PaginatedResponse,
@@ -21,6 +23,10 @@ SORT_COLUMN_MAP = {
     "order_amount": Order.order_amount,
     "order_no": Order.order_no,
 }
+
+# 与 analytics_service._ORDER_BASE 保持一致：所有经营聚合都排除取消订单；
+# 退款订单仍保留在销售额/订单数中。
+_ORDER_BASE = Order.order_status != "CANCELLED"
 
 
 async def get_orders(
@@ -117,6 +123,52 @@ async def filter_orders(
     )
 
 
+async def get_bi_orders(
+    db: AsyncSession,
+    page: int = 1,
+    page_size: int = 5000,
+) -> BIOrderPage:
+    """BI 看板读取运行期订单：按非取消口径分页，权限由路由层校验。"""
+    total = (
+        await db.execute(select(func.count(Order.id)).where(_ORDER_BASE))
+    ).scalar() or 0
+    stmt = (
+        select(
+            Order.order_no,
+            Order.order_time,
+            Order.payment_time,
+            Order.payment_amount,
+            Order.user_name,
+            Order.product_id,
+            Order.platform_type,
+        )
+        .where(_ORDER_BASE)
+        # 时间并列值很多，必须补 id 保证 OFFSET 分页稳定、不重不漏。
+        .order_by(Order.order_time.asc(), Order.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = (await db.execute(stmt)).all()
+    return BIOrderPage(
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if page_size > 0 else 0,
+        items=[
+            BIOrderItem(
+                order_no=row.order_no,
+                order_time=row.order_time,
+                payment_time=row.payment_time,
+                payment_amount=float(row.payment_amount) if row.payment_amount is not None else None,
+                user_name=row.user_name,
+                product_id=row.product_id,
+                platform_type=row.platform_type,
+            )
+            for row in rows
+        ],
+    )
+
+
 async def get_product_sales(
     db: AsyncSession,
     limit: int = 20,
@@ -128,6 +180,7 @@ async def get_product_sales(
             func.count(Order.id).label("order_count"),
             func.sum(Order.payment_amount).label("total_sales"),
         )
+        .where(_ORDER_BASE)
         .group_by(Order.product_id)
         .order_by(desc(func.sum(Order.payment_amount)))
         .limit(limit)
@@ -156,6 +209,7 @@ async def get_user_spending(
             func.count(Order.id).label("order_count"),
             func.sum(Order.payment_amount).label("total_spent"),
         )
+        .where(_ORDER_BASE)
         .group_by(Order.user_name)
         .order_by(desc(func.sum(Order.payment_amount)))
         .limit(limit)

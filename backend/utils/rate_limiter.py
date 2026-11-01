@@ -17,6 +17,9 @@ RATE_LIMITS = {
     "/api/ai/query": {"requests": 10, "window": 60},
     "/api/order-events": {"requests": 120, "window": 60},
     "/api/export/": {"requests": 3, "window": 120},
+    # BI 首屏会分页拉取运行期订单，单次加载约 10-20 个请求；额度按页面刷新
+    # 次数预留，避免多用户共用出口 IP 时被默认 100/分钟误伤。
+    "/api/bi/": {"requests": 300, "window": 60},
     "default": {"requests": 100, "window": 60},
 }
 
@@ -35,6 +38,11 @@ PRINCIPAL_RATE_LIMITS = {
     },
     "events": {
         "prefixes": ("/api/order-events",),
+        "requests": 120,
+        "window": 60,
+    },
+    "bi": {
+        "prefixes": ("/api/bi/",),
         "requests": 120,
         "window": 60,
     },

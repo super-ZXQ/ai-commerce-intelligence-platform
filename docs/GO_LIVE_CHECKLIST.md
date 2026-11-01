@@ -20,6 +20,7 @@
 - [ ] 空库初始化后 `orders` 行数为 102,287；`data_import_runs` 最新状态 `completed`
 - [ ] 运行期创建/退款/取消各 1 笔，重启 backend 后订单与 `order_events` 仍存在
 - [ ] `data_state.data_version` 随已处理事件递增，且并发事件不丢计数
+- [ ] 创建测试订单后取消：销售总览、商品/用户排行与 BI 快照均不计入该订单
 - [ ] 不存在 `--include-runtime` 或启动时全量替换订单的入口
 
 ## C. 备份与恢复
@@ -46,6 +47,7 @@
 - [ ] 未登录访问 `/BI/`、`/ai/` 跳转 `/login`
 - [ ] 登录后 BI/AI 正常，Streamlit WebSocket 握手为 101
 - [ ] 账号禁用或降低权限后，下一次业务请求立即被拒绝
+- [ ] `viewer` 可读 `/api/bi/orders`，但 `/api/export/rfm-segment` 返回 403
 - [ ] `/docs`、`/metrics` 是否需要对外暴露已确认；如需限制已在 Nginx 加白名单
 
 ## F. 健康与可观测
@@ -54,6 +56,8 @@
 - [ ] 停止 MySQL 后 `/readyz` 返回 503，`/livez` 仍为 200
 - [ ] Prometheus 可抓取 `/metrics`，5xx、事件写入、AI 失败有告警
 - [ ] 备份任务失败、`/readyz` 连续失败有告警通道
+- [ ] 连续两次提问相同问题，`ai_query_audit` 均新增记录（页面不复用旧答案）
+- [ ] AI 额度耗尽后 `/api/ai/test` 返回 429，且未发生模型调用
 - [ ] 日志不包含密码、Bearer、`sk-*`、`x-api-key` 明文
 
 ## G. 回滚预案

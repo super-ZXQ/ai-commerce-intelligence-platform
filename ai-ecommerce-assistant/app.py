@@ -90,36 +90,6 @@ def is_sensitive_query(query: str) -> bool:
     return False
 
 
-# 会话内查询缓存：TTL 防止长会话后数据/配置已变仍命中旧答案；
-# 容量上限防止消息携带全量 records 导致 session 无界膨胀。
-QUERY_CACHE_TTL_SECONDS = 1800
-QUERY_CACHE_MAX_ENTRIES = 50
-
-
-def get_cache_key(question: str, fingerprint: str = "") -> str:
-    """缓存 key 必须绑定模型指纹（key:base_url:model 的哈希），
-    否则换模型/API Key 后同一问题会直接命中旧模型的缓存答案。"""
-    return hashlib.md5(f"{fingerprint}:{question}".encode()).hexdigest()
-
-
-def _cache_lookup(cache: dict, key: str) -> dict | None:
-    """带 TTL 的缓存读取；过期条目即时清除。"""
-    entry = cache.get(key)
-    if entry is None:
-        return None
-    if time.time() - entry["ts"] > QUERY_CACHE_TTL_SECONDS:
-        cache.pop(key, None)
-        return None
-    return entry["data"]
-
-
-def _cache_store(cache: dict, key: str, data: dict) -> None:
-    """写入缓存；超出上限时按写入顺序淘汰最旧条目。"""
-    while len(cache) >= QUERY_CACHE_MAX_ENTRIES:
-        cache.pop(next(iter(cache)))
-    cache[key] = {"ts": time.time(), "data": data}
-
-
 st.set_page_config(page_title="AI Commerce Intelligence Platform", layout="wide",
                    initial_sidebar_state="expanded")
 
@@ -297,9 +267,6 @@ if "messages" not in st.session_state:
         }
     ]
 
-if "query_cache" not in st.session_state:
-    st.session_state.query_cache = {}
-
 if "query_history" not in st.session_state:
     st.session_state.query_history = []
 
@@ -433,23 +400,6 @@ def current_model_name(config: dict | None) -> str:
     if config.get("mode") == "managed":
         return str(config.get("model") or "待配置")
     return st.session_state.get("byok_model") or "BYOK 待配置"
-
-
-def _model_fingerprint(config: dict | None) -> str:
-    """查询缓存键绑定后端模型模式与实际模型，切换模型后不得命中旧答案。"""
-    if not config:
-        return ""
-    mode = str(config.get("mode") or "")
-    if mode == "managed":
-        base_url = str(config.get("base_url") or "")
-        model = str(config.get("model") or "")
-        key_hash = ""
-    else:
-        base_url = str(st.session_state.get("byok_base_url") or "")
-        model = str(st.session_state.get("byok_model") or "")
-        api_key = str(st.session_state.get("byok_api_key") or "")
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16] if api_key else ""
-    return hashlib.sha256(f"{mode}:{key_hash}:{base_url}:{model}".encode()).hexdigest()[:16]
 
 
 def verify_session() -> dict | None:
@@ -920,7 +870,6 @@ def main() -> None:
                     st.success("BYOK 密钥仅保存在当前浏览器会话")
                     if st.button("清除 BYOK 密钥", use_container_width=True):
                         st.session_state.pop("byok_api_key", None)
-                        st.session_state.query_cache = {}
                         st.rerun()
                 else:
                     st.info("选择允许的提供方并填写 API Key 后即可开始查询")
@@ -985,7 +934,6 @@ def main() -> None:
                  "chart_title": "", "result_data": None, "sql": None, "query_time": None,
                  "rag_sources": []}
             ]
-            st.session_state.query_cache = {}
             # 轮换 thread_id：Agent 会话存储按 owner+thread_id 记忆上下文，
             # 只清 UI 消息会导致"清空"后下一问仍注入最多 6 轮旧对话。
             st.session_state.thread_id = str(uuid4())
@@ -1154,51 +1102,6 @@ def main() -> None:
                                               "sql": None, "query_time": None})
             st.stop()
 
-        cache_key = get_cache_key(prompt, _model_fingerprint(ai_config))
-        cached = _cache_lookup(st.session_state.query_cache, cache_key)
-        if cached is not None:
-            st.session_state.messages.append({"role": "user", "content": prompt,
-                                              "chart_title": "", "result_data": None,
-                                              "sql": None, "query_time": None})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            with st.chat_message("assistant"):
-                st.info("从缓存读取")
-                render_answer_with_highlights(cached["answer"])
-                try:
-                    # result_data 为空也走共用函数：SQL 块仍需展示（与历史回放一致）
-                    result_df = pd.DataFrame(cached["result_data"]) if cached.get("result_data") else None
-                    render_result_block(
-                        result_df,
-                        sql=cached.get("sql"),
-                        query_time=cached.get("query_time"),
-                        question=prompt,
-                        chart_title=cached.get("chart_title", ""),
-                        key_prefix=f"cache_{cache_key}",
-                    )
-                except Exception as e:
-                    st.caption(f"缓存图表加载失败：{str(e)[:50]}")
-                render_agent_steps(cached.get("agent_steps") or [])
-                if cached.get("analysis_evidence"):
-                    with st.expander("多步分析数据依据", expanded=False):
-                        for item in cached["analysis_evidence"]:
-                            st.markdown(f"**{item['label']}**")
-                            st.code(item["sql"], language="sql")
-                            st.dataframe(pd.DataFrame(item["rows"]), use_container_width=True)
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": cached["answer"],
-                "chart_title": cached.get("chart_title"),
-                "result_data": cached.get("result_data"),
-                "sql": cached.get("sql"),
-                "query_time": cached.get("query_time"),
-                "question": prompt,
-                "rag_sources": cached.get("rag_sources") or [],
-                "agent_steps": cached.get("agent_steps") or [],
-                "analysis_evidence": cached.get("analysis_evidence") or [],
-            })
-            st.stop()
-
         st.session_state.messages.append({"role": "user", "content": prompt,
                                           "chart_title": "", "result_data": None,
                                           "sql": None, "query_time": None})
@@ -1295,7 +1198,7 @@ def main() -> None:
                 query_time=query_time,
                 question=prompt,
                 chart_title=chart_title,
-                key_prefix=f"live_{cache_key}",
+                key_prefix=f"live_{len(st.session_state.messages)}",
                 show_metric=True,
                 warn_empty=True,
             )
@@ -1313,17 +1216,6 @@ def main() -> None:
                 "analysis_evidence": analysis_evidence,
             }
             st.session_state.messages.append(msg_data)
-
-            _cache_store(st.session_state.query_cache, cache_key, {
-                "answer": answer,
-                "chart_title": chart_title,
-                "result_data": result_data,
-                "sql": extracted_sql,
-                "query_time": query_time,
-                "rag_sources": rag_sources,
-                "agent_steps": agent_steps,
-                "analysis_evidence": analysis_evidence,
-            })
 
             st.session_state.query_history.append({
                 "question": prompt,

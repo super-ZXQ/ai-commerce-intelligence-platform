@@ -156,6 +156,8 @@ class TestSystem:
         assert "/api/auth/login" in schema["paths"]
         assert "/api/orders" in schema["paths"]
         assert "/api/analytics/sales-overview" in schema["paths"]
+        assert "/api/bi/orders" in schema["paths"]
+        assert "/api/export/rfm-segment" in schema["paths"]
 
     @pytest.mark.asyncio
     async def test_public_monitor_aliases(self, client: AsyncClient):
@@ -307,6 +309,146 @@ class TestProductsUsers:
         r = await authed_client.get("/api/users?limit=3")
         assert r.status_code == 200
         assert len(r.json()) <= 3
+
+
+class TestBIDataAccess:
+    @pytest.mark.asyncio
+    async def test_bi_snapshot_matches_sales_overview_and_paginates(
+        self, authed_client: AsyncClient
+    ):
+        overview = (await authed_client.get("/api/analytics/sales-overview")).json()
+        first = await authed_client.get("/api/bi/orders", params={"page": 1, "page_size": 3})
+        assert first.status_code == 200
+        data = first.json()
+        # 跨接口一致性：BI 快照订单数必须等于销售总览的非取消订单数。
+        assert data["total"] == overview["total_orders"]
+        assert data["page"] == 1
+        assert len(data["items"]) <= 3
+        assert data["total_pages"] == (data["total"] + 2) // 3
+
+        if data["total"] > 3:
+            second = (
+                await authed_client.get("/api/bi/orders", params={"page": 2, "page_size": 3})
+            ).json()
+            assert second["page"] == 2
+            assert len(second["items"]) <= 3
+            # order_no 唯一，翻页结果不能重复。
+            assert {item["order_no"] for item in data["items"]}.isdisjoint(
+                {item["order_no"] for item in second["items"]}
+            )
+
+    @pytest.mark.asyncio
+    async def test_bi_snapshot_rejects_rows_over_page_limit(
+        self, authed_client: AsyncClient, monkeypatch
+    ):
+        from types import SimpleNamespace
+
+        from backend.routes import bi as bi_routes
+
+        monkeypatch.setattr(bi_routes, "settings", SimpleNamespace(export_max_rows=0))
+        r = await authed_client.get("/api/bi/orders?page_size=1")
+        assert r.status_code == 413
+        assert r.json()["detail"]["error_code"] == "BI_SNAPSHOT_TOO_LARGE"
+
+
+class TestMetricConsistency:
+    @pytest.mark.asyncio
+    async def test_rankings_share_cancelled_order_rule_with_overview(self, authed_client: AsyncClient):
+        """新增→取消订单时，总览、商品/用户排行和 BI 快照必须同步进退。"""
+        suffix = uuid4().hex[:12]
+        product_id = f"RANK-PRODUCT-{suffix}"
+        user_name = f"rank_user_{suffix}"
+        order_id = f"RANK-ORDER-{suffix}"
+        amount = 9_999_999.0
+
+        before = (await authed_client.get("/api/analytics/sales-overview")).json()
+        created = _created_event(order_id)
+        created["payload"].update(
+            {
+                "user_name": user_name,
+                "product_id": product_id,
+                "order_amount": f"{amount:.2f}",
+                "payment_amount": f"{amount:.2f}",
+                "discount_amount": "0.00",
+            }
+        )
+        assert (await authed_client.post("/api/order-events", json=created)).json()["processed"] == 1
+
+        try:
+            after = (await authed_client.get("/api/analytics/sales-overview")).json()
+            assert after["total_sales"] == pytest.approx(before["total_sales"] + amount)
+            assert after["total_orders"] == before["total_orders"] + 1
+
+            products = (await authed_client.get("/api/products?limit=100")).json()
+            product = next((p for p in products if p["product_id"] == product_id), None)
+            assert product is not None, "新订单应进入商品排行"
+            assert product["total_sales"] == pytest.approx(amount)
+            assert product["order_count"] == 1
+
+            users = (await authed_client.get("/api/users?limit=100")).json()
+            user = next((u for u in users if u["user_name"] == user_name), None)
+            assert user is not None, "新订单应进入用户排行"
+            assert user["total_spent"] == pytest.approx(amount)
+            assert user["order_count"] == 1
+
+            bi_total = (
+                await authed_client.get("/api/bi/orders", params={"page_size": 1})
+            ).json()["total"]
+            assert bi_total == after["total_orders"]
+        finally:
+            cancel = {
+                "event_id": str(uuid4()),
+                "order_id": order_id,
+                "event_type": "ORDER_CANCELLED",
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "version": 2,
+                "source": "pytest",
+                "payload": {},
+            }
+            assert (
+                await authed_client.post("/api/order-events", json=cancel)
+            ).json()["processed"] == 1
+
+        after_cancel = (await authed_client.get("/api/analytics/sales-overview")).json()
+        # 取消订单不得残留在任何经营聚合中。
+        assert after_cancel["total_sales"] == pytest.approx(before["total_sales"])
+        assert after_cancel["total_orders"] == before["total_orders"]
+
+        products = (await authed_client.get("/api/products?limit=100")).json()
+        assert all(p["product_id"] != product_id for p in products)
+        users = (await authed_client.get("/api/users?limit=100")).json()
+        assert all(u["user_name"] != user_name for u in users)
+        bi_total = (
+            await authed_client.get("/api/bi/orders", params={"page_size": 1})
+        ).json()["total"]
+        assert bi_total == before["total_orders"]
+
+
+class TestRFMExport:
+    @pytest.mark.asyncio
+    async def test_rfm_segment_export_csv_and_validation(self, authed_client: AsyncClient):
+        r = await authed_client.get(
+            "/api/export/rfm-segment",
+            params={"segment": "重要价值客户", "n_bins": 5, "limit": 5},
+        )
+        assert r.status_code == 200, r.text
+        assert "text/csv" in r.headers["content-type"]
+        assert r.content.startswith("\ufeff客户ID".encode("utf-8"))
+        assert "filename*=UTF-8''" in r.headers["content-disposition"]
+        assert r.headers["cache-control"] == "no-store"
+        lines = r.content.decode("utf-8-sig").splitlines()
+        assert len(lines) <= 6  # 表头 + 最多 limit 条
+
+        invalid_segment = await authed_client.get(
+            "/api/export/rfm-segment", params={"segment": "不存在的分群"}
+        )
+        assert invalid_segment.status_code == 400
+
+        invalid_threshold = await authed_client.get(
+            "/api/export/rfm-segment",
+            params={"segment": "重要价值客户", "n_bins": 3, "r_threshold": 5},
+        )
+        assert invalid_threshold.status_code == 400
 
 
 class TestAI:

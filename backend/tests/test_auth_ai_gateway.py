@@ -25,7 +25,7 @@ from sqlalchemy import delete, select, update
 from backend.config import Settings
 from backend.database import auth_session_factory
 from backend.main import app
-from backend.models.database_models import AIQueryAudit, AuthUser, ServiceClient
+from backend.models.database_models import AIQueryAudit, AuthAuditLog, AuthUser, ServiceClient
 from backend.models.schemas import AgentUsage, AIQueryResponse
 from backend.scripts.manage_auth import _parse_scopes
 from backend.services import ai_limits, ai_service
@@ -198,6 +198,9 @@ class TestRoleAndAccountState:
         token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
         headers = {"Authorization": f"Bearer {token}"}
         assert (await client.get("/api/orders", headers=headers)).status_code == 200
+        assert (
+            await client.get("/api/bi/orders?page_size=1", headers=headers)
+        ).status_code == 200
 
         async with auth_session_factory() as session:
             await session.execute(
@@ -208,6 +211,10 @@ class TestRoleAndAccountState:
             await session.commit()
 
         assert (await client.get("/api/orders", headers=headers)).status_code == 401
+        # BI 数据入口同样按请求重新校验账号状态，不只依赖入口认证。
+        assert (
+            await client.get("/api/bi/orders?page_size=1", headers=headers)
+        ).status_code == 401
 
     @pytest.mark.asyncio
     async def test_token_version_revokes_old_tokens(self, client: AsyncClient, temp_identity: dict):
@@ -234,6 +241,54 @@ class TestRoleAndAccountState:
         assert (
             await client.get("/api/orders", headers={"X-API-Key": "wrong-key"})
         ).status_code == 401
+
+
+class TestBIAuthorization:
+    @pytest.mark.asyncio
+    async def test_viewer_reads_bi_but_cannot_export(self, client: AsyncClient, temp_identity: dict):
+        token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        assert (
+            await client.get("/api/bi/orders?page_size=1", headers=headers)
+        ).status_code == 200
+        # 导出必须在后端按 data:export 拒绝，而不是靠页面隐藏按钮。
+        denied = await client.get(
+            "/api/export/rfm-segment",
+            params={"segment": "重要价值客户"},
+            headers=headers,
+        )
+        assert denied.status_code == 403
+        assert "data:export" in denied.text
+
+    @pytest.mark.asyncio
+    async def test_ingest_role_cannot_read_bi(self, client: AsyncClient, temp_identity: dict):
+        token = await _login(client, temp_identity["ingest"], "ingest-pass-123")
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (
+            await client.get("/api/bi/orders?page_size=1", headers=headers)
+        ).status_code == 403
+        assert (
+            await client.get(
+                "/api/export/rfm-segment",
+                params={"segment": "重要价值客户"},
+                headers=headers,
+            )
+        ).status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_service_key_scopes_apply_to_bi(self, client: AsyncClient, temp_identity: dict):
+        headers = {"X-API-Key": temp_identity["service_key"]}
+        assert (
+            await client.get("/api/bi/orders?page_size=1", headers=headers)
+        ).status_code == 200
+        assert (
+            await client.get(
+                "/api/export/rfm-segment",
+                params={"segment": "重要价值客户"},
+                headers=headers,
+            )
+        ).status_code == 403
 
 
 class TestBackendAIConfig:
@@ -327,6 +382,140 @@ class TestAIStreamGateway:
         assert response.json() == {"removed": True}
 
 
+class TestAIModelConnectionTest:
+    """连接测试入口必须与 AI 查询共用额度、并发和审计。"""
+
+    @staticmethod
+    def _fake_config():
+        return SimpleNamespace(mode="managed", model="test-model", api_key="test-key")
+
+    @staticmethod
+    async def _cleanup(principal: str) -> None:
+        async with auth_session_factory() as session:
+            await session.execute(
+                delete(AIQueryAudit).where(AIQueryAudit.principal_name == principal)
+            )
+            await session.execute(
+                delete(AuthAuditLog).where(AuthAuditLog.principal_name == principal)
+            )
+            await session.commit()
+
+    @pytest.mark.asyncio
+    async def test_acquires_slot_releases_and_writes_usage_audit(
+        self, admin_client: AsyncClient, temp_admin: dict, monkeypatch: pytest.MonkeyPatch
+    ):
+        from backend.routes import ai as ai_routes
+
+        acquired: list[str] = []
+
+        class FakeSlot:
+            released = False
+
+            def release(self):
+                self.released = True
+
+        slot = FakeSlot()
+
+        async def fake_acquire(principal_name, _auth_db):
+            acquired.append(principal_name)
+            return slot
+
+        async def fake_test(_config):
+            return True
+
+        monkeypatch.setattr(ai_routes, "acquire_ai_slot", fake_acquire)
+        monkeypatch.setattr(
+            ai_service, "resolve_model_config", lambda **_kwargs: self._fake_config()
+        )
+        monkeypatch.setattr(ai_service, "test_model_connection", fake_test)
+
+        try:
+            response = await admin_client.post("/api/ai/test")
+            assert response.status_code == 200, response.text
+            assert response.json() == {
+                "ok": True,
+                "mode": "managed",
+                "model": "test-model",
+            }
+            assert acquired == [temp_admin["username"]]
+            assert slot.released is True
+
+            async with auth_session_factory() as session:
+                row = (
+                    await session.execute(
+                        select(AIQueryAudit).where(
+                            AIQueryAudit.principal_name == temp_admin["username"],
+                            AIQueryAudit.query_sha256
+                            == hashlib.sha256(ai_routes._TEST_QUERY.encode()).hexdigest(),
+                        )
+                    )
+                ).scalar_one()
+                assert row.outcome == "success"
+                assert row.model_mode == "managed"
+                assert row.query_length == len(ai_routes._TEST_QUERY)
+        finally:
+            await self._cleanup(temp_admin["username"])
+
+    @pytest.mark.asyncio
+    async def test_quota_denied_prevents_model_call_and_audits_denial(
+        self, admin_client: AsyncClient, temp_admin: dict, monkeypatch: pytest.MonkeyPatch
+    ):
+        from backend.routes import ai as ai_routes
+
+        model_calls: list[str] = []
+
+        async def fake_test(_config):
+            model_calls.append("called")
+            return True
+
+        monkeypatch.setattr(
+            ai_limits,
+            "settings",
+            SimpleNamespace(
+                ai_daily_request_limit=0,
+                ai_max_concurrency=1,
+                ai_max_inflight_per_user=1,
+                ai_queue_timeout_seconds=0.05,
+            ),
+        )
+        monkeypatch.setattr(
+            ai_service, "resolve_model_config", lambda **_kwargs: self._fake_config()
+        )
+        monkeypatch.setattr(ai_service, "test_model_connection", fake_test)
+
+        try:
+            response = await admin_client.post("/api/ai/test")
+            assert response.status_code == 429
+            assert response.json()["detail"]["error_code"] == "AI_DAILY_QUOTA_EXCEEDED"
+            assert model_calls == []
+
+            async with auth_session_factory() as session:
+                row = (
+                    await session.execute(
+                        select(AIQueryAudit).where(
+                            AIQueryAudit.principal_name == temp_admin["username"]
+                        )
+                    )
+                ).scalar_one()
+                assert row.outcome == "denied"
+                assert row.error_category == "AI_DAILY_QUOTA_EXCEEDED"
+                assert row.query_sha256 == hashlib.sha256(
+                    ai_routes._TEST_QUERY.encode()
+                ).hexdigest()
+
+                audit = (
+                    await session.execute(
+                        select(AuthAuditLog).where(
+                            AuthAuditLog.principal_name == temp_admin["username"],
+                            AuthAuditLog.action == "ai.test",
+                        )
+                    )
+                ).scalar_one()
+                assert audit.outcome == "denied"
+        finally:
+            await self._cleanup(temp_admin["username"])
+
+
 class TestAILimits:
     @pytest.mark.asyncio
     async def test_daily_quota_exceeded(self, monkeypatch: pytest.MonkeyPatch):
@@ -408,6 +597,42 @@ class TestNginxAuthClosure:
         assert "proxy_buffering off;" in stream_block
         login_block = source.split("location = /login {", 1)[1].split("\n        }", 1)[0]
         assert "auth_request" not in login_block
+
+
+class TestFrontendBoundaries:
+    @staticmethod
+    def _source(relative: str) -> str:
+        root = __import__("pathlib").Path(__file__).resolve().parents[2]
+        return (root / relative).read_text(encoding="utf-8")
+
+    def test_ai_page_has_no_business_answer_cache(self):
+        source = self._source("ai-ecommerce-assistant/app.py")
+        for forbidden in (
+            "query_cache",
+            "get_cache_key",
+            "_cache_lookup",
+            "_cache_store",
+            "QUERY_CACHE_TTL_SECONDS",
+            "model_fingerprint",
+        ):
+            assert forbidden not in source
+        # 回答必须由后端实时生成，同一页面内不按问题文本复用旧结果。
+        assert 'key_prefix=f"live_' in source
+
+    def test_bi_page_reads_and_exports_only_through_backend(self):
+        source = self._source("streamlit_app.py")
+        for forbidden in (
+            "pymysql",
+            "sqlalchemy",
+            "create_async_engine",
+            "BI_DATA_SOURCE",
+            "_load_orders_from_db",
+        ):
+            assert forbidden not in source
+        assert "BiApiClient" in source
+        assert "fetch_orders" in source
+        assert "fetch_rfm_export" in source
+        assert "data:export" in source
 
 
 class TestManageAuthScopes:

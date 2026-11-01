@@ -38,6 +38,26 @@ class OrderResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BIOrderItem(BaseModel):
+    """BI 页面所需的最小订单字段；不返回额度、状态事件等无关列。"""
+
+    order_no: str = Field(..., description="订单号")
+    order_time: datetime = Field(..., description="下单时间")
+    payment_time: datetime | None = Field(None, description="付款时间")
+    payment_amount: float | None = Field(None, description="付款金额")
+    user_name: str | None = Field(None, description="用户名")
+    product_id: str | None = Field(None, description="商品编号")
+    platform_type: str | None = Field(None, description="平台类型")
+
+
+class BIOrderPage(BaseModel):
+    total: int = Field(..., description="非取消订单总数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    total_pages: int = Field(..., description="总页数")
+    items: list[BIOrderItem] = Field(..., description="订单列表")
+
+
 class OrderFilterParams(BaseModel):
     start_date: date | None = Field(None, description="开始日期")
     end_date: date | None = Field(None, description="结束日期")

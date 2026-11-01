@@ -306,6 +306,55 @@ async def get_rfm_segment_detail(
     }
 
 
+async def get_rfm_segment_export_rows(
+    db: AsyncSession,
+    segment: str,
+    reference_date: str | None = None,
+    n_bins: int = 5,
+    r_threshold: int | None = None,
+    f_threshold: int | None = None,
+    m_threshold: int | None = None,
+    limit: int = 200,
+) -> list[dict]:
+    """按 BI 页面当前阈值重新分层并返回导出明细。
+
+    快照里的 segment 使用固定阈值缓存，不能直接复用；这里只在内存中重新
+    计算分层，避免为不同阈值重复扫描数据库。
+    """
+    default_threshold = max(2, math.ceil(n_bins * 0.6))
+    thresholds = (
+        r_threshold or default_threshold,
+        f_threshold or default_threshold,
+        m_threshold or default_threshold,
+    )
+    snapshot = await _get_rfm_snapshot(
+        db,
+        reference_date=reference_date,
+        n_bins=n_bins,
+    )
+    rows = []
+    for user in snapshot["users"]:
+        assigned = assign_segment(
+            user["r_score"],
+            user["f_score"],
+            user["m_score"],
+            *thresholds,
+        )
+        if assigned != segment:
+            continue
+        rows.append({
+            "user_name": user["user_name"],
+            "r_score": user["r_score"],
+            "f_score": user["f_score"],
+            "m_score": user["m_score"],
+            "recency_days": user["recency_days"],
+            "frequency": user["frequency"],
+            "monetary": user["monetary"],
+        })
+    rows.sort(key=lambda item: item["monetary"], reverse=True)
+    return rows[:limit]
+
+
 @cached(ttl=300, tags=("rfm",), versioned=True)
 async def get_rfm_top_users(
     db: AsyncSession,
