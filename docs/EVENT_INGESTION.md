@@ -69,13 +69,15 @@ Agent 不读取事件写账号的连接串，LLM 也不会获得任何写库工�
 
 ## 已有数据卷迁移
 
-Docker 空卷会执行 `sql/01_create_table.sql`。已有 MySQL 数据卷不会重新执行 initdb，先备份后手动运行：
+Docker 空卷由 `db-migrate` 执行 `alembic upgrade head`，不会再运行 MySQL `initdb.d`。已有数据卷不会自动迁移，先备份后手动执行：
 
-```powershell
-.venv\Scripts\python.exe backend/scripts/migrate_event_schema.py
+```bash
+python -m alembic -c backend/alembic.ini upgrade head
 ```
 
-该脚本只创建 `order_events`，并为 `orders` 补齐 `order_status`、`event_version`、`updated_at`；已有订单保留并初始化为 `ACTIVE/version=0`，不会重导或删除 CSV 数据。
+`0001_baseline` 创建 `order_events` 并为存量 `orders` 补齐 `order_status`、`event_version`、`updated_at`；已有订单保留并初始化为 `ACTIVE/version=0`，不会重导或删除 CSV 数据。
+`0002_order_auto_increment` 为存量订单主键补齐自增；`0003_data_protection` 增加 `data_state`、`data_import_runs`、`order_status_reconciliation` 审计表。
+需要导入公开快照时使用 `python backend/scripts/import_orders.py --mode bootstrap`；已有运行期订单或事件账本时禁止全量替换。
 
 ## 可复现实验流量
 

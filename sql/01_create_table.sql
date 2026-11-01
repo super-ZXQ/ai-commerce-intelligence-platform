@@ -8,8 +8,8 @@
 -- 本文件保留为人工审阅与一致性测试的「参考 DDL」，
 -- 必须与 Alembic baseline 保持一致；不要在新环境中直接 SOURCE 本文件作为唯一初始化。
 --
--- 订单主数据通过 backend/scripts/sync_orders.py（ea_sync + LOAD DATA）导入，
--- 不在 MySQL entrypoint initdb 中执行。
+-- 订单主数据只能通过 backend/scripts/import_orders.py 显式导入（应用侧批量 INSERT），
+-- 后端启动与 MySQL entrypoint initdb 都不导入订单数据。
 
 CREATE TABLE IF NOT EXISTS orders (
     -- 事件摄入会创建新订单；主键必须可由 MySQL 自增，否则 INSERT 不带 order_seq_id 会失败

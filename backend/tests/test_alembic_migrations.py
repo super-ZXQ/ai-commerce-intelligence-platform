@@ -17,6 +17,8 @@ _VERSIONS = _BACKEND / "alembic" / "versions"
 _REF_SQL = _ROOT / "sql" / "01_create_table.sql"
 _SEED = _BACKEND / "scripts" / "seed_ci_data.py"
 _BOOTSTRAP_SH = _ROOT / "deploy" / "mysql" / "bootstrap-users.sh"
+# Alembic head 由迁移树决定；测试不再写死单一 revision，避免新增迁移后漏改。
+_HEAD = "0003_data_protection"
 # alembic CLI must run from repo root: backend/alembic/ can shadow the package
 _ALEMBIC_CWD = _ROOT
 
@@ -77,7 +79,7 @@ def test_alembic_ini_and_versions_tree_exist():
 def test_alembic_single_head_follows_baseline():
     script = _script()
     heads = script.get_heads()
-    assert heads == ["0002_order_auto_increment"], f"unexpected heads: {heads}"
+    assert heads == [_HEAD], f"unexpected heads: {heads}"
     revision = script.get_revision("0001_baseline")
     assert revision.down_revision is None
 
@@ -101,6 +103,20 @@ def test_baseline_migration_declares_core_tables_and_indexes():
         assert marker in source, f"baseline missing: {marker}"
     assert "INSERT INTO orders" not in source
     assert "CI00001" not in source
+
+
+def test_data_protection_migration_declares_audit_tables():
+    source = (_VERSIONS / "0003_data_protection.py").read_text(encoding="utf-8")
+    for marker in (
+        "CREATE TABLE IF NOT EXISTS data_state",
+        "CREATE TABLE IF NOT EXISTS data_import_runs",
+        "CREATE TABLE IF NOT EXISTS order_status_reconciliation",
+        "INSERT INTO data_state (id, data_version) VALUES (1, 1)",
+        "source_sha256 CHAR(64)",
+        "backup_table VARCHAR(64)",
+    ):
+        assert marker in source, f"0003 missing: {marker}"
+    assert "UPDATE orders" not in source
 
 
 def test_reference_sql_and_baseline_stay_consistent():
@@ -139,6 +155,7 @@ def test_bootstrap_role_separation():
     for ddl in ("CREATE,", "DROP,", "ALTER,"):
         assert ddl not in ai_block.replace("CREATE USER", ""), "ea_ai must not get DDL grants"
     assert "ON \\`${DB_NAME}\\`.*" in sh or "ON `${DB_NAME}`.*" in sh
+    assert "GRANT FILE" not in sh, "import must not depend on MySQL FILE privilege"
 
 
 def test_migration_url_never_defaults_to_ai_readonly_account(monkeypatch):
@@ -201,11 +218,19 @@ def test_alembic_upgrade_head_on_mysql_if_available():
     engine = create_engine(s.database_url)
     with engine.connect() as c:
         tables = {row[0] for row in c.execute(text("SHOW TABLES")).fetchall()}
-        assert {"orders", "order_events", "app_metadata", "alembic_version"} <= tables
+        assert {
+            "orders",
+            "order_events",
+            "app_metadata",
+            "alembic_version",
+            "data_state",
+            "data_import_runs",
+            "order_status_reconciliation",
+        } <= tables
         cols = {row[0] for row in c.execute(text("SHOW COLUMNS FROM orders")).fetchall()}
         assert {"order_seq_id", "order_id", "order_status", "event_version"} <= cols
         version = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert version == "0002_order_auto_increment"
+        assert version == _HEAD
         event_cols = {
             row[0] for row in c.execute(text("SHOW COLUMNS FROM order_events")).fetchall()
         }
@@ -274,7 +299,7 @@ def test_migration_preserves_existing_rows_on_mysql_if_available():
         assert after == 1, "upgrade head must not delete existing rows"
         c.execute(text("DELETE FROM orders WHERE order_id = 'ALEMBIC_KEEP_ME'"))
         ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert ver == "0002_order_auto_increment"
+        assert ver == _HEAD
     engine.dispose()
 
 
@@ -329,10 +354,23 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
         )
         with engine.connect() as c:
             tables = {r[0] for r in c.execute(text("SHOW TABLES")).fetchall()}
-            assert {"orders", "order_events", "app_metadata", "alembic_version"} <= tables
+            assert {
+                "orders",
+                "order_events",
+                "app_metadata",
+                "alembic_version",
+                "data_state",
+                "data_import_runs",
+                "order_status_reconciliation",
+            } <= tables
+            assert c.execute(text("SELECT COUNT(*) FROM data_state")).scalar() == 1
+            assert (
+                c.execute(text("SELECT data_version FROM data_state WHERE id=1")).scalar()
+                >= 1
+            )
             assert (
                 c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-                == "0002_order_auto_increment"
+                == _HEAD
             )
             assert c.execute(text("SELECT COUNT(*) FROM orders")).scalar() == 0
         # 模拟旧卷：已有订单但主键未启用自增，升级后保留数据并能自动分配新编号。

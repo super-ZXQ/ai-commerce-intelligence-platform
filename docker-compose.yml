@@ -14,8 +14,7 @@ services:
       - mysql_data:/var/lib/mysql
       # Schema 由 db-migrate（Alembic）创建，不在 initdb 执行业务 DDL。
       # sql/01_create_table.sql 仅作参考 DDL，与 backend/alembic 对齐并由测试校验。
-      # 订单 CSV 仍挂载给 mysql-files：backend sync_orders（ea_sync）做 LOAD DATA 导入。
-      - ./data/cleaned_orders.csv:/var/lib/mysql-files/cleaned_orders.csv
+      # 订单数据只能由 data-import profile 显式导入，后端启动不再写入 orders。
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:?请设置 DB_ROOT_PASSWORD}"]
       interval: 10s
@@ -101,8 +100,6 @@ services:
       DB_PORT: 3306
       DB_USER: ea_app
       DB_PASSWORD: ${DB_APP_PASSWORD:?请设置 DB_APP_PASSWORD}
-      DB_SYNC_USER: ea_sync
-      DB_SYNC_PASSWORD: ${DB_SYNC_PASSWORD:?请设置 DB_SYNC_PASSWORD}
       DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -117,8 +114,10 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_MODE: ${LLM_MODE:-managed}
+      ALLOW_BYOK: ${ALLOW_BYOK:-false}
+      LLM_PROVIDER_ALLOWLIST: ${LLM_PROVIDER_ALLOWLIST:-api.deepseek.com}
       TRUST_PROXY_HEADERS: "true"
-      SYNC_ORDERS_ON_STARTUP: "true"
       RAG_STATS_PATH: /app/ai-ecommerce-assistant/data/rag_stats.json
       DEBUG: ${DEBUG:-false}
       AI_DB_USER: ${AI_DB_USER:-ea_ai}
@@ -139,11 +138,41 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+    networks:
+      - ea-network
+
+  # 显式数据导入：默认 dry-run，不会在 docker compose up 时自动执行。
+  # 用法：
+  #   docker compose --profile data-import run --rm data-import --mode dry-run
+  #   docker compose --profile data-import run --rm data-import --mode bootstrap
+  data-import:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ea-data-import
+    profiles: ["data-import"]
+    restart: "no"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      MIGRATION_DB_USER: ea_sync
+      MIGRATION_DB_PASSWORD: ${DB_SYNC_PASSWORD:?请设置 DB_SYNC_PASSWORD}
+      IMPORT_OPERATOR: ${IMPORT_OPERATOR:-operator}
+    volumes:
+      - ./data:/app/data:ro
+    entrypoint: ["python", "backend/scripts/import_orders.py"]
+    command: ["--mode", "dry-run"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     networks:
       - ea-network
 

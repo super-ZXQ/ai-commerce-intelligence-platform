@@ -42,16 +42,20 @@ def main() -> int:
 
     cfg = Config(str(_INI))
     try:
+        from alembic.script import ScriptDirectory
+
+        expected_head = ScriptDirectory.from_config(cfg).get_current_head()
+        if expected_head is None:
+            print("FAIL: no alembic head revision")
+            return 1
+        print(f"alembic_expected_head={expected_head}")
         command.upgrade(cfg, "head")
         print("OK alembic upgrade head")
         command.current(cfg)
         print("OK alembic current")
-        from alembic.script import ScriptDirectory
-
-        script = ScriptDirectory.from_config(cfg)
-        heads = script.get_heads()
+        heads = ScriptDirectory.from_config(cfg).get_heads()
         print(f"alembic_heads={heads}")
-        if heads != ["0002_order_auto_increment"]:
+        if heads != [expected_head]:
             print(f"FAIL: unexpected heads {heads}")
             return 1
     except Exception:
@@ -70,14 +74,22 @@ def main() -> int:
         eng = create_engine(s.database_url)
         with eng.connect() as c:
             tables = {r[0] for r in c.execute(text("SHOW TABLES")).fetchall()}
-            need = {"orders", "order_events", "app_metadata", "alembic_version"}
+            need = {
+                "orders",
+                "order_events",
+                "app_metadata",
+                "alembic_version",
+                "data_state",
+                "data_import_runs",
+                "order_status_reconciliation",
+            }
             missing = need - tables
             if missing:
                 print(f"FAIL: missing tables {sorted(missing)}; have={sorted(tables)}")
                 return 1
             ver = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            if ver != "0002_order_auto_increment":
-                print(f"FAIL: unexpected alembic_version {ver!r}")
+            if ver != expected_head:
+                print(f"FAIL: unexpected alembic_version {ver!r}; expected {expected_head}")
                 return 1
         eng.dispose()
         print("OK alembic schema sanity")

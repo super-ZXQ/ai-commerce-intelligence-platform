@@ -7,7 +7,6 @@ import pytest
 
 from backend.config import Settings
 from backend.models.schemas import SalesOverviewResponse
-from backend.scripts.sync_orders import build_import_sql
 from backend.services import ai_service, rfm_service
 from backend.services.rfm_service import (
     _score_users,
@@ -313,11 +312,8 @@ def test_production_rejects_insecure_credentials(jwt_secret, admin_password):
         )
 
 
-def test_order_sync_targets_staging_table():
-    sql = (
-        "LOAD DATA INFILE '/var/lib/mysql-files/cleaned_orders.csv' "
-        "INTO TABLE orders"
-    )
-    result = build_import_sql(sql, "orders_staging")
-    assert "INTO TABLE orders_staging" in result
-    assert "INTO TABLE orders " not in result
+def test_order_sync_entrypoint_fails_closed():
+    from backend.scripts import sync_orders as legacy_sync
+
+    with pytest.raises(RuntimeError, match="启动时订单同步已停用"):
+        legacy_sync.sync_orders()

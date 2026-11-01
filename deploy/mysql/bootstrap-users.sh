@@ -45,9 +45,10 @@ GRANT SELECT ON \`${DB_NAME}\`.* TO 'ea_ai'@'%';
 
 CREATE USER IF NOT EXISTS 'ea_sync'@'%' IDENTIFIED BY '${SYNC_PASSWORD_ESCAPED}';
 ALTER USER 'ea_sync'@'%' IDENTIFIED BY '${SYNC_PASSWORD_ESCAPED}';
+-- 仅显式导入脚本使用：staging 建表、原子换表与备份表需要 DDL。
+-- 不再授予 FILE；导入改为应用侧批量 INSERT，不依赖 LOAD DATA。
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX
   ON \`${DB_NAME}\`.* TO 'ea_sync'@'%';
-GRANT FILE ON *.* TO 'ea_sync'@'%';
 
 CREATE USER IF NOT EXISTS 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
 ALTER USER 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
@@ -61,5 +62,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES
 
 FLUSH PRIVILEGES;
 SQL
+
+# 旧数据卷升级：移除历史授予的 FILE 权限；未授予时忽略错误。
+mysql --protocol=TCP -h mysql -uroot \
+  -e "REVOKE FILE ON *.* FROM 'ea_sync'@'%';" >/dev/null 2>&1 || true
 
 echo "数据库最小权限账号已就绪"

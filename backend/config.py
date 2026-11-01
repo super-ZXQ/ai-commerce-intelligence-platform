@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
+    # managed：只用服务端平台密钥；byok：只用用户自带密钥。两者不能混用。
+    llm_mode: str = "managed"
+    allow_byok: bool = False
+    # 逗号分隔的精确主机名列表；托管与 BYOK 共用同一出站白名单。
+    llm_provider_allowlist: str = "api.deepseek.com"
 
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
@@ -86,7 +91,19 @@ class Settings(BaseSettings):
 
     cache_ttl_seconds: int = 300
 
+    @property
+    def llm_allowed_hosts(self) -> tuple[str, ...]:
+        return tuple(
+            item.strip().lower().rstrip(".")
+            for item in self.llm_provider_allowlist.split(",")
+            if item.strip()
+        )
+
     def model_post_init(self, __context) -> None:  # noqa: PYI063
+        if self.llm_mode not in {"managed", "byok"}:
+            raise ValueError("LLM_MODE 只能是 managed 或 byok")
+        if self.allow_byok and not self.llm_allowed_hosts:
+            raise ValueError("启用 BYOK 时必须配置 LLM_PROVIDER_ALLOWLIST")
         if not self.jwt_secret:
             if self.debug:
                 self.jwt_secret = "dev-only-insecure-secret-do-not-use-in-production"

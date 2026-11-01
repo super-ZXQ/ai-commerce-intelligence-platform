@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import json
+import socket
+from collections.abc import Callable, Sequence
 
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from typing import Literal
 
 from agent_core.models import AgentIntent, AgentSource, ModelResponse
+from agent_core.provider_policy import (
+    build_http_client,
+    build_http_clients,
+    validate_model_name,
+    validate_provider_url,
+)
 from agent_core.session import Message
 from agent_core.streaming import emit_token
 
@@ -32,23 +40,70 @@ def _response(message) -> ModelResponse:
 
 
 class OpenAIModelAdapter:
-    def __init__(self, *, api_key: str, base_url: str, model: str, business_context: str):
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        model: str,
+        business_context: str,
+        allowed_hosts: Sequence[str] = (),
+        resolver: Callable[..., list] = socket.getaddrinfo,
+        timeout: float = 120.0,
+        max_retries: int = 1,
+    ):
         self._api_key = api_key
-        self._base_url = base_url
-        self._model = model
         self._business_context = business_context
+        self._allowed_hosts = tuple(allowed_hosts)
+        self._resolver = resolver
+        self._timeout = timeout
+        self._max_retries = max_retries
+        self._http_client = None
+        self._http_async_client = None
+        # 构造时先做不解析 DNS 的静态校验，尽早拒绝 http/内网字面量；
+        # 真正连接前再解析一次，降低 DNS 重绑定风险。
+        self._base_url = validate_provider_url(
+            base_url,
+            allowed_hosts=self._allowed_hosts,
+            resolve_dns=False,
+        )
+        self._model = validate_model_name(model)
+
+    def _clients(self):
+        if self._http_client is None or self._http_async_client is None:
+            self._http_client, self._http_async_client = build_http_clients(self._timeout)
+        return self._http_client, self._http_async_client
+
+    def _validated_base_url(self) -> str:
+        return validate_provider_url(
+            self._base_url,
+            allowed_hosts=self._allowed_hosts,
+            resolve_dns=True,
+            resolver=self._resolver,
+        )
+
+    async def aclose(self) -> None:
+        if self._http_client is not None:
+            self._http_client.close()
+        if self._http_async_client is not None:
+            await self._http_async_client.aclose()
+        self._http_client = None
+        self._http_async_client = None
 
     def _client(self, *, stream_usage: bool = False) -> ChatOpenAI:
         if not self._api_key:
             raise RuntimeError("模型未配置")
+        http_client, http_async_client = self._clients()
         return ChatOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
+            base_url=self._validated_base_url(),
             model=self._model,
             temperature=0,
-            timeout=120,
-            max_retries=1,
+            timeout=self._timeout,
+            max_retries=self._max_retries,
             stream_usage=stream_usage,
+            http_client=http_client,
+            http_async_client=http_async_client,
         )
 
     async def choose_refund_analysis(self, query: str, evidence: list[dict]) -> ModelResponse:
@@ -186,12 +241,18 @@ SQL：{sql or '未执行'}
     def test_connection(self) -> None:
         if not self._api_key:
             raise RuntimeError("模型未配置")
-        ChatOpenAI(
-            api_key=self._api_key,
-            base_url=self._base_url,
-            model=self._model,
-            temperature=0,
-            timeout=15,
-            max_retries=0,
-            max_tokens=1,
-        ).invoke("仅回复 OK")
+        # 同步探活只需要 sync client，避免创建后无人关闭的 AsyncClient。
+        http_client = build_http_client(15)
+        try:
+            ChatOpenAI(
+                api_key=self._api_key,
+                base_url=self._validated_base_url(),
+                model=self._model,
+                temperature=0,
+                timeout=15,
+                max_retries=0,
+                max_tokens=1,
+                http_client=http_client,
+            ).invoke("仅回复 OK")
+        finally:
+            http_client.close()

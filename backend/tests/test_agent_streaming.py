@@ -142,7 +142,10 @@ async def test_astream_answer_streams_tokens_and_usage(monkeypatch: pytest.Monke
     from agent_core.model_adapter import OpenAIModelAdapter
 
     adapter = OpenAIModelAdapter(
-        api_key="test-key", base_url="http://localhost", model="test-model", business_context="ctx"
+        api_key="test-key",
+        base_url="https://api.deepseek.com",
+        model="test-model",
+        business_context="ctx",
     )
     client = _FakeStreamClient([
         _FakeChunk("共 "),
@@ -168,7 +171,12 @@ async def test_astream_answer_streams_tokens_and_usage(monkeypatch: pytest.Monke
 async def test_astream_answer_without_api_key_delegates_to_answer(monkeypatch: pytest.MonkeyPatch) -> None:
     from agent_core.model_adapter import OpenAIModelAdapter
 
-    adapter = OpenAIModelAdapter(api_key="", base_url="http://localhost", model="m", business_context="ctx")
+    adapter = OpenAIModelAdapter(
+        api_key="",
+        base_url="https://api.deepseek.com",
+        model="m",
+        business_context="ctx",
+    )
     client = _FakeStreamClient([_FakeChunk("不应被调用")])
     monkeypatch.setattr(adapter, "_client", lambda **_kwargs: client)
 

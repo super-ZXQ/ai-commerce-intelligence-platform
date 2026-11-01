@@ -93,9 +93,19 @@ def record_feedback(question: str, answer: str, rating: str,
         logger.warning("反馈落盘失败: %s", e)
         return False
 
-API_KEY = os.getenv("LLM_API_KEY")
+LLM_MODE = os.getenv("LLM_MODE", "managed").strip().lower()
+if LLM_MODE not in {"managed", "byok"}:
+    logger.warning("未知 LLM_MODE=%s，回落到 managed", LLM_MODE)
+    LLM_MODE = "managed"
+ALLOW_BYOK = os.getenv("ALLOW_BYOK", "false").strip().lower() == "true"
+SERVER_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
 MODEL_NAME = os.getenv("LLM_MODEL", "deepseek-chat")
+PROVIDER_ALLOWLIST = tuple(
+    item.strip().lower().rstrip(".")
+    for item in os.getenv("LLM_PROVIDER_ALLOWLIST", "api.deepseek.com").split(",")
+    if item.strip()
+)
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -367,12 +377,15 @@ if "query_cache" not in st.session_state:
 if "query_history" not in st.session_state:
     st.session_state.query_history = []
 
-if "model_api_key" not in st.session_state:
-    st.session_state.model_api_key = API_KEY or ""
-if "model_base_url" not in st.session_state:
-    st.session_state.model_base_url = BASE_URL
-if "model_name" not in st.session_state:
-    st.session_state.model_name = MODEL_NAME
+if "model_api_key" in st.session_state:
+    # 旧会话可能残留平台密钥；启动时立即清除，避免继续出现在组件默认值中。
+    st.session_state.pop("model_api_key", None)
+if "byok_model" not in st.session_state:
+    st.session_state.byok_model = MODEL_NAME
+if "byok_base_url" not in st.session_state:
+    st.session_state.byok_base_url = (
+        f"https://{PROVIDER_ALLOWLIST[0]}" if PROVIDER_ALLOWLIST else ""
+    )
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid4())
 
@@ -477,15 +490,43 @@ class _LazyRetriever:
             self._inner.dump_stats()
 
 
+def _active_model_config() -> tuple[str, str, str, str] | None:
+    """返回 (mode, api_key, base_url, model)；平台密钥只存在于服务端配置。"""
+    if LLM_MODE == "managed":
+        if not SERVER_API_KEY:
+            return None
+        return "managed", SERVER_API_KEY, BASE_URL, MODEL_NAME
+    if not ALLOW_BYOK or not PROVIDER_ALLOWLIST:
+        return None
+    api_key = st.session_state.get("byok_api_key", "").strip()
+    if not api_key:
+        return None
+    base_url = st.session_state.get("byok_base_url", "").strip()
+    model_name = st.session_state.get("byok_model", MODEL_NAME).strip() or MODEL_NAME
+    return "byok", api_key, base_url, model_name
+
+
+def has_model_credentials() -> bool:
+    return _active_model_config() is not None
+
+
+def current_model_name() -> str:
+    config = _active_model_config()
+    return config[3] if config else "待配置"
+
+
 def get_session_runtime(_engine, _retriever):
-    """按当前 Streamlit 会话创建共享 Runtime；API Key 不进入全局缓存。"""
-    api_key = st.session_state.get("model_api_key", "").strip()
-    if _engine is None or not api_key:
+    """按当前 Streamlit 会话创建共享 Runtime；平台密钥不进入全局缓存。"""
+    config = _active_model_config()
+    if _engine is None or config is None:
         return None
 
-    base_url = st.session_state.get("model_base_url", BASE_URL).strip()
-    model_name = st.session_state.get("model_name", MODEL_NAME).strip()
-    fingerprint = hashlib.sha256(f"{api_key}:{base_url}:{model_name}".encode()).hexdigest()
+    mode, api_key, base_url, model_name = config
+    # 指纹只保留密钥哈希，session_state 中不出现平台密钥原文。
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    fingerprint = hashlib.sha256(
+        f"{mode}:{key_hash}:{base_url}:{model_name}".encode()
+    ).hexdigest()
     if st.session_state.get("runtime_fingerprint") == fingerprint:
         return st.session_state.get("runtime_instance")
 
@@ -494,6 +535,7 @@ def get_session_runtime(_engine, _retriever):
         base_url=base_url,
         model=model_name,
         business_context=BUSINESS_CONTEXT,
+        allowed_hosts=PROVIDER_ALLOWLIST,
     )
 
     async def retrieve_knowledge(query: str) -> list[AgentSource]:
@@ -544,16 +586,23 @@ def get_session_runtime(_engine, _retriever):
 
 def render_runtime_status(db_engine, rag_status: dict) -> None:
     """在主区域展示模型、数据库、RAG 三类可观察状态，便于无 Key/降级时快速定位。"""
-    has_key = bool(st.session_state.get("model_api_key", "").strip())
+    has_model = has_model_credentials()
     db_ok = db_engine is not None
     rag_count = int(rag_status.get("count") or 0)
     rag_ready = bool(rag_status.get("ok")) and rag_count > 0
+    model_note = (
+        "平台托管，密钥不下发浏览器"
+        if LLM_MODE == "managed"
+        else "BYOK 仅保存在当前会话"
+    )
     items = [
         {
             "label": "MODEL",
-            "state": "ok" if has_key else "warn",
-            "value": st.session_state.get("model_name", MODEL_NAME) if has_key else "待配置",
-            "note": "凭据仅保存在当前浏览器会话" if has_key else "在侧栏填写兼容 OpenAI API 的 Key",
+            "state": "ok" if has_model else "warn",
+            "value": current_model_name() if has_model else "待配置",
+            "note": model_note if has_model else (
+                "联系部署方配置平台模型" if LLM_MODE == "managed" else "在侧栏填写 API Key"
+            ),
         },
         {
             "label": "DATABASE",
@@ -581,23 +630,26 @@ def render_runtime_status(db_engine, rag_status: dict) -> None:
 
 
 def render_setup_guide(db_engine) -> None:
-    """无 API Key 或数据库不可用时，在主区域给出可恢复的下一步。"""
-    has_key = bool(st.session_state.get("model_api_key", "").strip())
-    if has_key and db_engine is not None:
+    """无模型凭据或数据库不可用时，在主区域给出可恢复的下一步。"""
+    has_model = has_model_credentials()
+    if has_model and db_engine is not None:
         return
     if db_engine is None:
         title = "数据库连接不可用"
         body = "页面仍可查看配置与历史状态；恢复数据库连接后即可继续发起只读查询。"
+    elif LLM_MODE == "managed":
+        title = "平台模型尚未配置"
+        body = "当前为服务端托管模式，请联系部署方配置 LLM_API_KEY；用户无需也不能在页面填写平台密钥。"
     else:
         title = "完成模型配置后开始查询"
-        body = "当前处于无 Key 降级状态。配置兼容 OpenAI API 的模型后，助手会展示路由、检索、SQL 与结果证据。"
+        body = "当前为 BYOK 模式。填写部署方允许的提供方与自己的 API Key 后，助手会展示路由、检索、SQL 与结果证据。"
     st.markdown(f"""
     <div class="setup-panel">
         <div class="setup-title">{title}</div>
         <div class="setup-body">{body}</div>
         <div class="setup-actions">
-            <div class="setup-action"><span class="setup-step">01</span><strong>配置模型</strong><span>在侧栏填写 Base URL、模型名称与 API Key。</span></div>
-            <div class="setup-action"><span class="setup-step">02</span><strong>测试连接</strong><span>先验证模型可用性，再应用配置。</span></div>
+            <div class="setup-action"><span class="setup-step">01</span><strong>配置模型</strong><span>{"由部署方配置服务端密钥。" if LLM_MODE == "managed" else "在侧栏选择允许的提供方并填写 API Key。"}</span></div>
+            <div class="setup-action"><span class="setup-step">02</span><strong>测试连接</strong><span>先验证模型可用性，再开始查询。</span></div>
             <div class="setup-action"><span class="setup-step">03</span><strong>检查状态</strong><span>确认数据库为只读可用，RAG 失败时自动降级。</span></div>
         </div>
     </div>
@@ -824,54 +876,88 @@ render_runtime_status(db_engine, rag_status)
 render_setup_guide(db_engine)
 
 with st.sidebar:
-    with st.expander("模型连接", expanded=not bool(st.session_state.model_api_key)):
-        with st.form("model_connection_form"):
-            model_base_url = st.text_input(
-                "API Base URL",
-                value=st.session_state.model_base_url,
-                placeholder="https://api.deepseek.com",
+    with st.expander("模型连接", expanded=not has_model_credentials()):
+        if LLM_MODE == "managed":
+            st.caption(
+                f"模式：服务端托管\n\n"
+                f"提供方：`{BASE_URL}`\n\n"
+                f"模型：`{MODEL_NAME}`"
             )
-            model_name = st.text_input(
-                "模型名称",
-                value=st.session_state.model_name,
-                placeholder="deepseek-chat",
-            )
-            model_api_key = st.text_input(
-                "API Key",
-                value=st.session_state.model_api_key,
-                type="password",
-                help="仅保存在当前浏览器会话，不写入文件或日志。",
-            )
-            apply_config = st.form_submit_button("应用配置", use_container_width=True)
-            test_connection = st.form_submit_button("测试连接", use_container_width=True)
-            if apply_config or test_connection:
-                st.session_state.model_base_url = model_base_url.strip()
-                st.session_state.model_name = model_name.strip()
-                st.session_state.model_api_key = model_api_key.strip()
-                st.session_state.pop("runtime_instance", None)
-                st.session_state.pop("runtime_fingerprint", None)
-            if test_connection:
-                if not model_api_key.strip():
-                    st.warning("请先填写 API Key")
+            st.caption("平台密钥只保存在服务端，不会显示或写入浏览器会话。")
+            if st.button("测试托管模型连接", use_container_width=True):
+                if not SERVER_API_KEY:
+                    st.warning("服务端未配置 LLM_API_KEY，请联系部署方")
                 else:
                     try:
                         probe = OpenAIModelAdapter(
-                            api_key=model_api_key.strip(),
-                            base_url=model_base_url.strip(),
-                            model=model_name.strip(),
+                            api_key=SERVER_API_KEY,
+                            base_url=BASE_URL,
+                            model=MODEL_NAME,
                             business_context=BUSINESS_CONTEXT,
+                            allowed_hosts=PROVIDER_ALLOWLIST,
                         )
                         probe.test_connection()
                         st.success("连接成功，模型已响应")
                     except Exception as exc:
                         st.error(f"连接失败：{sanitize_error(exc)}")
-            if apply_config:
-                st.rerun()
-
-        if st.session_state.model_api_key:
-            st.success("模型凭据已在当前会话中配置")
+        elif not ALLOW_BYOK:
+            st.info("BYOK 未启用；请联系部署方配置平台模型。")
         else:
-            st.info("配置兼容 OpenAI API 的模型后即可开始查询")
+            with st.form("byok_form"):
+                provider = st.selectbox(
+                    "模型提供方",
+                    PROVIDER_ALLOWLIST,
+                    index=0,
+                    help="只能选择部署方允许的提供方主机。",
+                )
+                model_name = st.text_input(
+                    "模型名称",
+                    value=st.session_state.get("byok_model", MODEL_NAME),
+                    placeholder="deepseek-chat",
+                )
+                model_api_key = st.text_input(
+                    "API Key",
+                    value="",
+                    type="password",
+                    help="只保存在当前浏览器会话，不写入文件或日志。",
+                )
+                apply_config = st.form_submit_button("应用配置", use_container_width=True)
+                test_connection = st.form_submit_button("测试连接", use_container_width=True)
+                if apply_config or test_connection:
+                    if not model_api_key.strip() and not st.session_state.get("byok_api_key"):
+                        st.warning("请填写 API Key")
+                    else:
+                        if model_api_key.strip():
+                            st.session_state.byok_api_key = model_api_key.strip()
+                        st.session_state.byok_model = model_name.strip() or MODEL_NAME
+                        st.session_state.byok_base_url = f"https://{provider}"
+                        st.session_state.pop("runtime_instance", None)
+                        st.session_state.pop("runtime_fingerprint", None)
+                        if test_connection:
+                            try:
+                                probe = OpenAIModelAdapter(
+                                    api_key=st.session_state.byok_api_key,
+                                    base_url=st.session_state.byok_base_url,
+                                    model=st.session_state.byok_model,
+                                    business_context=BUSINESS_CONTEXT,
+                                    allowed_hosts=PROVIDER_ALLOWLIST,
+                                )
+                                probe.test_connection()
+                                st.success("连接成功，模型已响应")
+                            except Exception as exc:
+                                st.error(f"连接失败：{sanitize_error(exc)}")
+                        if apply_config:
+                            st.rerun()
+
+            if st.session_state.get("byok_api_key"):
+                st.success("BYOK 密钥仅保存在当前会话")
+                if st.button("清除 BYOK 密钥", use_container_width=True):
+                    st.session_state.pop("byok_api_key", None)
+                    st.session_state.pop("runtime_instance", None)
+                    st.session_state.pop("runtime_fingerprint", None)
+                    st.rerun()
+            else:
+                st.info("选择允许的提供方并填写 API Key 后即可开始查询")
 
     st.divider()
     with st.expander("RAG 知识库", expanded=False):
@@ -978,7 +1064,7 @@ with st.sidebar:
     db_type = "MySQL" if USE_MYSQL else "SQLite"
     db_label = "MySQL (ai_commerce_intelligence_platform)" if USE_MYSQL else "SQLite (本地)"
     st.caption(f"数据库：{db_label}")
-    st.caption(f"模型：{st.session_state.model_name}")
+    st.caption(f"模型：{current_model_name()}")
 
 for msg_idx, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):

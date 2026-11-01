@@ -31,7 +31,7 @@
 
 | 缺陷 | 现象 | 修复 |
 |---|---|---|
-| `orders.order_seq_id` 无 AUTO_INCREMENT，且事件路径未显式分配 PK | `ORDER_CREATED` API 返回 503 `EVENT_WRITE_UNAVAILABLE` | `sql/01_create_table.sql` 增加 AUTO_INCREMENT；`order_event_service` 创建时 `max(id)+1` 显式赋值；`migrate_event_schema.py` 幂等 ALTER |
+| `orders.order_seq_id` 无 AUTO_INCREMENT，且事件路径未显式分配 PK | `ORDER_CREATED` API 返回 503 `EVENT_WRITE_UNAVAILABLE` | Alembic `0002_order_auto_increment` 为存量表补齐自增；事件路径不再读取 `max(id)`，由数据库分配；`sql/01_create_table.sql` 仅保留为参考 DDL |
 | `sales-trend` 对 `order_time IS NULL` 的 `date_format` 结果 | API 500 `SalesTrendItem.period` 校验失败 | `analytics_service.get_sales_trend` 跳过 `period is None` 行 |
 
 回归测试：`backend/tests/test_order_event_create_pk.py`（3 项，本地 pytest 通过）。

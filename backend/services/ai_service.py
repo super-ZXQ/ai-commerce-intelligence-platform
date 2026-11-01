@@ -140,6 +140,7 @@ _model_adapter = OpenAIModelAdapter(
     base_url=settings.llm_base_url,
     model=settings.llm_model,
     business_context=BUSINESS_CONTEXT,
+    allowed_hosts=settings.llm_allowed_hosts,
 )
 
 

@@ -70,20 +70,98 @@ jobs:
             -uroot -pci-root-password -Nse \
             'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
           echo "alembic_version=$version"
-          test "$version" = "0002_order_auto_increment"
+          test "$version" = "0003_data_protection"
 
-          for t in orders order_events app_metadata alembic_version; do
+          for t in orders order_events app_metadata alembic_version data_state \
+                   data_import_runs order_status_reconciliation; do
             docker compose exec -T mysql mysql \
               -uroot -pci-root-password -Nse \
               "SHOW TABLES FROM ai_commerce_intelligence_platform LIKE '$t'" | grep -q "$t"
           done
 
-          # 订单数据：由 backend sync_orders 在 schema 就绪后导入
+          # 订单数据只能由显式 data-import 导入；后端启动不得触碰 orders。
+          docker compose --profile data-import run --rm data-import --mode bootstrap
+
           row_count="$(docker compose exec -T mysql mysql \
             -uroot -pci-root-password -Nse \
             'SELECT COUNT(*) FROM ai_commerce_intelligence_platform.orders')"
           test "$row_count" = "102287"
           echo "订单数据行数：$row_count"
+
+          import_status="$(docker compose exec -T mysql mysql \
+            -uroot -pci-root-password -Nse \
+            'SELECT status FROM ai_commerce_intelligence_platform.data_import_runs ORDER BY id DESC LIMIT 1')"
+          test "$import_status" = "completed"
+
+          # 运行期创建/退款/取消后重启：订单与事件账本必须保留。
+          docker compose exec -T backend python - <<'PY'
+          import json
+          import httpx
+
+          base = "http://localhost:8000"
+          token = httpx.post(
+              f"{base}/api/auth/login",
+              json={"username": "admin", "password": "admin123"},
+          ).json()["access_token"]
+          headers = {"Authorization": f"Bearer {token}"}
+
+          def send(order_id, event_type, version, payload):
+              response = httpx.post(
+                  f"{base}/api/order-events",
+                  headers=headers,
+                  json={
+                      "event_id": f"{order_id}-{version}",
+                      "order_id": order_id,
+                      "event_type": event_type,
+                      "occurred_at": "2026-11-01T10:00:00+00:00",
+                      "version": version,
+                      "source": "docker-smoke",
+                      "payload": payload,
+                  },
+                  timeout=30,
+              )
+              response.raise_for_status()
+              assert response.json()["processed"] == 1, response.text
+
+          created = "CI-RETENTION-CREATED"
+          refunded = "CI-RETENTION-REFUNDED"
+          cancelled = "CI-RETENTION-CANCELLED"
+          payload = {
+              "user_name": "ci-retention",
+              "product_id": "CI-PRODUCT",
+              "order_amount": "10.00",
+              "payment_amount": "10.00",
+              "discount_amount": "0.00",
+              "platform_type": "APP",
+          }
+          send(created, "ORDER_CREATED", 1, payload)
+          send(refunded, "ORDER_CREATED", 1, payload)
+          send(refunded, "ORDER_REFUNDED", 2, {})
+          send(cancelled, "ORDER_CREATED", 1, payload)
+          send(cancelled, "ORDER_CANCELLED", 2, {})
+          print("runtime orders sent")
+          PY
+
+          docker compose restart backend
+          for i in {1..60}; do
+            if curl --fail --silent --max-time 5 http://localhost/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+
+          retention_rows="$(docker compose exec -T mysql mysql \
+            -uroot -pci-root-password -Nse \
+            "SELECT COUNT(*) FROM ai_commerce_intelligence_platform.orders WHERE order_id LIKE 'CI-RETENTION-%'")"
+          test "$retention_rows" = "3"
+          retention_status="$(docker compose exec -T mysql mysql \
+            -uroot -pci-root-password -Nse \
+            "SELECT GROUP_CONCAT(order_status ORDER BY order_id) FROM ai_commerce_intelligence_platform.orders WHERE order_id LIKE 'CI-RETENTION-%'")"
+          test "$retention_status" = "ACTIVE,CANCELLED,REFUNDED"
+          ledger_rows="$(docker compose exec -T mysql mysql \
+            -uroot -pci-root-password -Nse \
+            "SELECT COUNT(*) FROM ai_commerce_intelligence_platform.order_events WHERE order_id LIKE 'CI-RETENTION-%'")"
+          test "$ledger_rows" = "5"
 
           # db-migrate 应已成功退出
           migrate_status="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' ea-db-migrate)"

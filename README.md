@@ -166,20 +166,23 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS ai_commerce_intelligence_plat
 # 2) Schema 版本化升级（唯一权威路径；务必在仓库根执行，避免 backend/alembic/ 目录遮蔽包）
 python -m alembic -c backend/alembic.ini upgrade head
 
-# 3) 可选：导入公开订单快照（首次 bootstrap）
-mysql -u root -p ai_commerce_intelligence_platform < sql/02_import_data.sql
-# 或 SOURCE sql/02_import_data.sql;
+# 3) 首次导入公开订单快照（显式、可审计；先 dry-run 校验再 bootstrap）
+python backend/scripts/import_orders.py --mode dry-run
+python backend/scripts/import_orders.py --mode bootstrap
 
-# Docker Compose：mysql redis → db-bootstrap → db-migrate(alembic) → backend(sync CSV)
+# Docker Compose：mysql redis → db-bootstrap → db-migrate(alembic) → 显式导入 → 应用
 docker compose up -d mysql redis
 docker compose up -d db-bootstrap db-migrate
+# 默认 dry-run；确认输出后再执行 bootstrap
+docker compose --profile data-import run --rm data-import --mode bootstrap
 docker compose up -d backend streamlit ai-assistant nginx
 ```
 
 **Alembic 是 schema evolution source of truth**（`backend/alembic/`）。
 `sql/01_create_table.sql` 仅保留为参考 DDL，**不再**挂载到 MySQL `initdb.d`；一致性由 `test_alembic_migrations.py` 校验。
-历史数据库需先升级到 Alembic head：`0002_order_auto_increment` 为旧订单主键补齐自增，事件创建依赖数据库分配编号。
-订单 CSV 由 `backend/scripts/sync_orders.py`（`ea_sync` + LOAD DATA）在 schema 就绪后导入。
+历史数据库需先升级到 Alembic head（当前 `0003_data_protection`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表。
+订单 CSV 只能由 `backend/scripts/import_orders.py` 显式导入（应用侧批量 INSERT，不依赖 `LOAD DATA`/`FILE` 权限）；后端启动不再同步或覆盖订单。
+已有运行期订单或事件账本时禁止全量替换；历史退款状态通过 `backend/scripts/reconcile_orders.py` 独立对账（默认 dry-run）。
 
 ### Database Schema Management
 
@@ -192,7 +195,7 @@ docker compose up -d backend streamlit ai-assistant nginx
 | `ea_ai` | Text-to-SQL 只读账号（**禁止**用于 migration） |
 | `ea_events` | 订单事件写账号（仅 `orders`/`order_events`） |
 | `ea_migrate` | Alembic DDL 账号（Docker / 生产） |
-| `ea_sync` | CSV 同步 / 原子换表 |
+| `ea_sync` | 显式订单导入 / staging 建表与原子换表（**无** `FILE` 权限） |
 | Redis | 缓存与会话（可降级内存） |
 
 Migration 过程：
@@ -721,7 +724,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── alembic/               # migrations + env.py
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
-│   │   └── sync_orders.py        # CSV 哈希校验 + 原子换表
+│   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
 │   ├── tests/                    # 164 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖

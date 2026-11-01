@@ -1,5 +1,12 @@
 -- AI Commerce Intelligence Platform - 首次导入清洗后的订单数据
--- docker-compose 将 CSV 挂载到 /var/lib/mysql-files/cleaned_orders.csv。
+--
+-- 【已停用】Docker / CI / 生产统一使用应用侧导入，不再对该文件挂载 CSV：
+--   python backend/scripts/import_orders.py --mode dry-run
+--   python backend/scripts/import_orders.py --mode bootstrap
+-- import_orders.py 会做流式校验、staging 表、备份表、审计记录与原子换表。
+--
+-- 本文件仅保留为人工排查时的参考 SQL；直接 LOAD DATA 需要 MySQL FILE 权限，
+-- 而 ea_sync 已显式撤销 FILE 权限，不能作为部署入口。
 
 LOAD DATA INFILE '/var/lib/mysql-files/cleaned_orders.csv'
 INTO TABLE orders

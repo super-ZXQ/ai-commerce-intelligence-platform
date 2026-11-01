@@ -4,7 +4,7 @@ Revision ID: 0001_baseline
 Revises:
 Create Date: 2026-09-18
 
-与 sql/01_create_table.sql / sync_orders.app_metadata 对齐：
+与 sql/01_create_table.sql / import_orders.app_metadata 对齐：
 - 不使用 ORM autogenerate（复合索引与 ORM index=True 不一致）
 - 空库：CREATE TABLE IF NOT EXISTS 一次到位
 - 存量库：对缺失列做 information_schema 判断后的 ALTER（幂等升级）
@@ -69,7 +69,7 @@ def _column_exists(bind, table: str, column: str) -> bool:
 def _ensure_columns(bind, table: str, columns: list[tuple[str, str]]) -> None:
     for name, ddl in columns:
         if name == "order_seq_id":
-            continue  # PK/AUTO_INCREMENT 在 CREATE 中处理；存量库用 migrate_event_schema
+            continue  # PK/AUTO_INCREMENT 由 0002_order_auto_increment 处理
         if not _column_exists(bind, table, name):
             # 去掉列名前缀重复：ddl 形如 "order_status VARCHAR..."
             bind.exec_driver_sql(f"ALTER TABLE `{table}` ADD COLUMN {ddl}")
