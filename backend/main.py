@@ -29,7 +29,7 @@ from backend.routes.monitor import (
     render_rag_prometheus,
 )
 from backend.services.rfm_service import RfmDataUnavailableError
-from backend.utils.auth import ensure_bootstrap_users
+from backend.utils.auth import SCOPE_DATA_READ, ensure_bootstrap_users, load_principal_from_token
 from backend.utils.cache import cleanup_memory_cache, close_redis, init_redis
 from backend.utils.cache import clear as clear_cache
 from backend.utils.rate_limiter import check_rate_limit
@@ -252,8 +252,30 @@ async def root() -> FileResponse:
 
 @app.get("/login", include_in_schema=False)
 async def login_page() -> FileResponse:
-    """统一登录页：写入 HttpOnly Cookie，供 /ai/ 与 /BI/ 的 auth_request 使用。"""
-    return FileResponse(os.path.join(_STATIC_DIR, "login.html"))
+    """统一登录页：写入 HttpOnly Cookie，供 /ai/ 与 /BI/ 的 auth_request 使用。
+
+    页面本身包含认证交互，必须禁用缓存，避免升级后浏览器继续使用旧版表单。
+    """
+    response = FileResponse(os.path.join(_STATIC_DIR, "login.html"))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/workspace", include_in_schema=False, response_model=None)
+async def workspace_page(request: Request) -> FileResponse | RedirectResponse:
+    """经营工作台在服务端校验浏览器会话，未登录时返回安全登录回跳。"""
+    token = request.cookies.get(settings.auth_cookie_name, "").strip()
+    principal = None
+    if token:
+        async with auth_session_factory() as auth_db:
+            principal = await load_principal_from_token(auth_db, token)
+    if principal is None:
+        return RedirectResponse("/login?next=/workspace", status_code=303)
+    if not principal.has_scope(SCOPE_DATA_READ):
+        raise HTTPException(status_code=403, detail="缺少权限：data:read")
+    response = FileResponse(os.path.join(_STATIC_DIR, "workspace.html"))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/logout", include_in_schema=False)

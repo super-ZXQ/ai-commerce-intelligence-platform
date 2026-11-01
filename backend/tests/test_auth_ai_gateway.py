@@ -706,3 +706,70 @@ class TestAuthConfigValidation:
                 jwt_secret="a" * 40,
                 admin_password="$2b$12$",
             )
+
+
+class TestWorkspacePage:
+    """新工作台的浏览器会话边界与静态资源回归。"""
+
+    @pytest.mark.asyncio
+    async def test_anonymous_workspace_redirects_to_safe_login(self, client: AsyncClient):
+        response = await client.get("/workspace")
+        assert response.status_code in (302, 303, 307)
+        assert response.headers["location"].endswith("/login?next=/workspace")
+
+    @pytest.mark.asyncio
+    async def test_viewer_with_cookie_can_open_workspace(self, client: AsyncClient, temp_identity: dict):
+        login = await client.post(
+            "/api/auth/login",
+            json={"username": temp_identity["viewer"], "password": "viewer-pass-123"},
+        )
+        assert login.status_code == 200
+        page = await client.get("/workspace")
+        assert page.status_code == 200
+        assert "text/html" in page.headers["content-type"]
+        assert "经营工作台" in page.text
+        assert "/static/css/workspace.css" in page.text
+        assert "/static/js/workspace.js" in page.text
+        assert page.headers["cache-control"] == "no-store"
+
+    @pytest.mark.asyncio
+    async def test_role_without_data_read_is_rejected(self, client: AsyncClient, temp_identity: dict):
+        login = await client.post(
+            "/api/auth/login",
+            json={"username": temp_identity["ingest"], "password": "ingest-pass-123"},
+        )
+        assert login.status_code == 200
+        response = await client.get("/workspace")
+        assert response.status_code == 403
+        assert "data:read" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_login_page_is_not_cached_and_keeps_role_scene(self, client: AsyncClient):
+        response = await client.get("/login")
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-store"
+        # 旧版登录页没有角色区；缓存旧页面会让密码隐私态交互整体失效。
+        assert 'id="char-scene"' in response.text
+        assert "/static/css/login.css" in response.text
+        assert "/static/js/login.js" in response.text
+
+    @pytest.mark.asyncio
+    async def test_workspace_assets_are_served_and_never_store_tokens(self, client: AsyncClient):
+        assets = (
+            "/static/css/workspace.css",
+            "/static/js/workspace.js",
+            "/static/js/workspace-api.js",
+            "/static/js/workspace-charts.js",
+            "/static/css/login.css",
+            "/static/js/login.js",
+        )
+        for path in assets:
+            response = await client.get(path)
+            assert response.status_code == 200, f"{path} 未被静态服务返回"
+        workspace_js = (await client.get("/static/js/workspace.js")).text
+        login_js = (await client.get("/static/js/login.js")).text
+        # 浏览器只依赖 HttpOnly Cookie，令牌不得写入 localStorage/sessionStorage。
+        for source in (workspace_js, login_js):
+            assert "localStorage" not in source
+            assert "sessionStorage" not in source
+        assert "credentials: 'same-origin'" in (await client.get("/static/js/workspace-api.js")).text

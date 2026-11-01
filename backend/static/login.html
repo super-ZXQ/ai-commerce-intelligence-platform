@@ -2,102 +2,72 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>登录 · AI Commerce Intelligence Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19191f">
+  <title>登录 · AI 电商智能分析平台</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <style>
-    :root {
-      --brand: #1565C0;
-      --bg: #F6F8FC;
-      --surface: #FFFFFF;
-      --line: #E2E8F0;
-      --ink: #0F172A;
-      --muted: #64748B;
-      --danger: #DC2626;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; display: grid; place-items: center;
-      background: var(--bg); color: var(--ink);
-      font-family: "Noto Sans SC", "Segoe UI", "Microsoft YaHei", sans-serif;
-    }
-    .card {
-      width: min(400px, calc(100vw - 32px)); background: var(--surface);
-      border: 1px solid var(--line); border-radius: 16px; padding: 32px;
-      box-shadow: 0 18px 40px rgba(15, 23, 42, .06);
-    }
-    h1 { font-size: 1.35rem; margin: 0 0 8px; letter-spacing: -.02em; }
-    p.sub { margin: 0 0 24px; color: var(--muted); font-size: .9rem; line-height: 1.6; }
-    label { display: block; font-size: .85rem; font-weight: 600; margin: 16px 0 6px; }
-    input {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-      border-radius: 10px; font-size: 1rem; outline: none;
-    }
-    input:focus { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(21, 101, 192, .14); }
-    button {
-      width: 100%; margin-top: 24px; padding: 11px 12px; border: 0; border-radius: 10px;
-      background: var(--brand); color: #fff; font-size: 1rem; font-weight: 700;
-      cursor: pointer;
-    }
-    button:disabled { opacity: .6; cursor: wait; }
-    .error {
-      display: none; margin-top: 16px; padding: 10px 12px; border-radius: 10px;
-      background: #FEF2F2; color: var(--danger); font-size: .88rem; line-height: 1.5;
-    }
-    .note { margin-top: 20px; color: var(--muted); font-size: .78rem; line-height: 1.6; }
-  </style>
+  <link rel="stylesheet" href="/static/css/login.css">
+  <script src="/static/js/login.js" defer></script>
 </head>
 <body>
-  <main class="card">
-    <h1>登录分析平台</h1>
-    <p class="sub">统一会话由 FastAPI 签发，经 Nginx 校验后访问 BI 看板与 AI 助手。</p>
-    <form id="login-form">
-      <label for="username">用户名</label>
-      <input id="username" name="username" autocomplete="username" required autofocus>
-      <label for="password">密码</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required>
-      <button id="submit" type="submit">登录</button>
-      <div id="error" class="error" role="alert"></div>
-    </form>
-    <p class="note">会话 Cookie 为 HttpOnly，页面脚本无法读取；退出请访问 <a href="/logout">/logout</a>。</p>
+  <main id="auth-screen" aria-label="AI 电商智能分析平台登录">
+    <div class="auth-card">
+      <section class="auth-art" aria-label="四位彩色数据伙伴">
+        <div class="brand-mini">
+          <span class="brand-logo"><span class="brand-emblem" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>
+          AI 电商智能分析
+        </div>
+        <div class="auth-kicker">AI COMMERCE INTELLIGENCE</div>
+        <div class="brand-signal" aria-hidden="true"><i></i><i></i><i></i><i></i>洞察正在发生</div>
+        <div id="char-scene" class="char-scene">
+          <div class="role-tooltip" id="role-tooltip" role="status"><span class="role-dot"></span><span id="role-text"></span></div>
+          <div class="character char-purple" data-tilt="1" data-role="AI 数据问答 · 自然语言理解与 SQL 数据问题" data-role-color="#7c46f3" tabindex="0" role="button" aria-label="认识紫色伙伴，AI 数据问答">
+            <div class="eyes"><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div></div><div class="smile"></div>
+          </div>
+          <div class="character char-black" data-tilt=".82" data-role="销售与趋势分析 · 销售额、订单、商品与趋势" data-role-color="#343540" tabindex="0" role="button" aria-label="认识黑色伙伴，销售与趋势分析">
+            <div class="eyes"><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div></div><div class="smile"></div>
+          </div>
+          <div class="character char-orange" data-tilt=".63" data-role="RFM 客户分层 · 客户群体与消费特征" data-role-color="#ff873c" tabindex="0" role="button" aria-label="认识橙色伙伴，RFM 客户分层">
+            <div class="eyes"><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div></div><div class="smile"></div>
+          </div>
+          <div class="character char-yellow" data-tilt=".72" data-role="订单与数据守护 · 订单数据、身份与安全意识" data-role-color="#ecbf17" tabindex="0" role="button" aria-label="认识黄色伙伴，订单与数据守护">
+            <div class="eyes"><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div><div class="eyeball"><div class="pupil"></div><i class="eye-shut"></i></div></div><div class="smile"></div>
+          </div>
+        </div>
+        <div class="char-caption">
+          <h2>让每笔订单，<br>变成有依据的洞察。</h2>
+          <p>销售分析、AI 数据问答、RFM 客户分层，让数据变得更好懂。</p>
+          <div class="char-tags"><span>电商 BI</span><span>AI 数据问答</span><span>RFM 分层</span></div>
+        </div>
+      </section>
+      <section class="auth-form-pane">
+        <form class="auth-form" id="login-form" novalidate>
+          <div class="form-logo"><span class="brand-emblem" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+          <h1>欢迎回来<span aria-hidden="true">.</span></h1>
+          <p class="auth-desc">登录，继续探索你的经营数据。</p>
+          <div class="field">
+            <label for="username">账户名</label>
+            <div class="input-holder"><input id="username" name="username" placeholder="输入分析平台账户" autocomplete="username" required autofocus></div>
+          </div>
+          <div class="field">
+            <label for="password">密码</label>
+            <div class="input-holder">
+              <input id="password" name="password" type="password" placeholder="输入密码" autocomplete="current-password" required>
+              <button class="eye-toggle" type="button" id="reveal-password" aria-label="显示密码" aria-pressed="false">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="under-fields"><span>HttpOnly Cookie 安全会话</span><button type="button" class="link-btn" id="forgot">忘记密码？</button></div>
+          <button type="submit" class="primary-btn" id="login-button">登录</button>
+          <a class="secondary-btn" href="/">返回项目介绍 ↗</a>
+          <div class="auth-note" id="login-note" role="status" aria-live="polite">仅限已配置的管理员、分析员与查看账号</div>
+          <div class="form-foot">首次了解系统？ <a href="/">查看项目说明</a></div>
+          <div class="auth-legal">登录成功后进入经营工作台；BI 与 AI 高级功能入口保持不变。</div>
+        </form>
+      </section>
+    </div>
   </main>
-  <script>
-    const form = document.getElementById('login-form');
-    const errorBox = document.getElementById('error');
-    const submit = document.getElementById('submit');
-
-    function safeNext() {
-      const value = new URLSearchParams(window.location.search).get('next') || '/';
-      // 只允许站内路径，防止登录后被重定向到外部站点。
-      return value.startsWith('/') && !value.startsWith('//') ? value : '/';
-    }
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      errorBox.style.display = 'none';
-      submit.disabled = true;
-      try {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            username: document.getElementById('username').value.trim(),
-            password: document.getElementById('password').value,
-          }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          const detail = payload.detail;
-          throw new Error(typeof detail === 'string' ? detail : (detail && detail.message) || '登录失败');
-        }
-        window.location.href = safeNext();
-      } catch (err) {
-        errorBox.textContent = err.message || '登录失败，请重试';
-        errorBox.style.display = 'block';
-        submit.disabled = false;
-      }
-    });
-  </script>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

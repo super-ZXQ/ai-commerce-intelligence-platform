@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b24">
+  <title>经营工作台 · AI 电商智能分析平台</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/workspace.css">
+  <script type="module" src="/static/js/workspace.js"></script>
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="ico-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></symbol>
+    <symbol id="ico-spark" viewBox="0 0 24 24"><path d="M12 2 14.4 9.6 22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></symbol>
+    <symbol id="ico-chart" viewBox="0 0 24 24"><path d="M4 20V13m6 7V8m6 12v-5m5 5V4"/></symbol>
+    <symbol id="ico-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2zm13-15a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5"/></symbol>
+    <symbol id="ico-box" viewBox="0 0 24 24"><path d="m3 7 9-4 9 4v10l-9 4-9-4zM3 7l9 5 9-5m-9 5v9"/></symbol>
+    <symbol id="ico-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 6 3.5 9 8 11 4.5-2 8-5 8-11V5zM9 12l2 2 4-4"/></symbol>
+  </svg>
+  <div class="layout">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="返回项目介绍">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span><strong>AI 电商智能分析</strong><small>COMMERCE INTELLIGENCE</small></span>
+      </a>
+      <div class="side-label">经营分析</div>
+      <nav class="nav" aria-label="主功能导航">
+        <button class="nav-btn active" data-view="overview"><svg><use href="#ico-grid"/></svg>经营总览</button>
+        <button class="nav-btn" data-view="assistant"><svg><use href="#ico-spark"/></svg>AI 数据问答<span class="tag">AI</span></button>
+        <button class="nav-btn" data-view="sales"><svg><use href="#ico-chart"/></svg>销售分析</button>
+        <button class="nav-btn" data-view="rfm"><svg><use href="#ico-users"/></svg>RFM 客户分层</button>
+        <button class="nav-btn" data-view="products"><svg><use href="#ico-box"/></svg>订单与商品</button>
+      </nav>
+      <div class="side-label" id="monitor-section" hidden>系统</div>
+      <nav class="nav" id="monitor-nav" hidden aria-label="系统导航"><button class="nav-btn" data-view="monitor"><svg><use href="#ico-shield"/></svg>运行监控</button></nav>
+      <div class="side-bottom">
+        <button class="side-person" data-view="assistant">
+          <span class="mini-purple" aria-hidden="true"><b></b></span>
+          <span><strong>小紫 · AI 数据助手</strong><small id="side-ai-status">正在检查模型与数据状态</small></span>
+        </button>
+      </div>
+    </aside>
+    <div class="shell">
+      <header class="topbar">
+        <div class="crumb"><span>工作区</span><em>/</em><span class="muted" id="crumb-name">经营总览</span></div>
+        <div class="right-actions">
+          <span class="time-label" id="data-freshness">正在读取真实数据</span>
+          <a class="portfolio-link" href="/BI/" title="打开完整 BI 看板">完整 BI</a>
+          <button class="logout-btn" id="logout">退出登录</button>
+          <span class="avatar" id="user-avatar" title="当前用户">—</span>
+        </div>
+      </header>
+      <main class="main" id="main-content">
+        <section class="view active" id="view-overview" aria-labelledby="overview-title">
+          <div class="lead">
+            <div><div class="eyebrow">DATA WORKSPACE</div><h1 id="overview-title">每一笔订单，都值得被读懂。</h1><p>经营问题交给 AI，决策依据交给数据。先从事务口径一致的经营概况开始。</p></div>
+            <div class="lead-person"><div class="little-friends" aria-hidden="true"><div class="char-purple"><i></i></div><div class="char-black"><i></i></div><div class="char-orange"><i></i></div><div class="char-yellow"><i></i></div></div><div><strong>你的数据伙伴已就位</strong><small>AI · 销售 · 客户 · 订单</small></div></div>
+          </div>
+          <div class="ai-search">
+            <div class="search-top"><span class="sparkle">✦</span>问问 AI，最近生意怎么样？</div>
+            <form class="search-main" id="home-ask"><input id="home-query" maxlength="500" placeholder="例如：最近退款率为什么发生变化？" aria-label="向 AI 提问" autocomplete="off"><button class="primary" data-ai-submit type="submit">开始分析 ↗</button></form>
+            <div class="quick"><small>试试这样问</small><button data-q="最近30天的销售额趋势怎么样？">最近30天销售趋势</button><button data-q="哪些商品贡献了最多销售额？">哪些商品贡献最高</button><button data-q="高价值客户有哪些特点？">高价值客户画像</button></div>
+          </div>
+          <div class="label-line"><div><h2>经营概况</h2><span>全部非取消订单 · 退款订单保留在毛销售额与订单数中</span></div><div class="period-wrap"><span>趋势区间</span><div class="period-group" aria-label="销售趋势区间"><button class="active" data-period="7">近 7 天</button><button data-period="30">近 30 天</button></div></div></div>
+          <div class="kpis" id="overview-kpis">
+            <article class="kpi"><div class="kpi-top"><span class="kpi-name">累计销售金额</span><span class="kpi-ico">¥</span></div><div class="kpi-value" id="overview-sales">—</div><div class="kpi-note">支付金额口径</div></article>
+            <article class="kpi"><div class="kpi-top"><span class="kpi-name">成交订单</span><span class="kpi-ico">▤</span></div><div class="kpi-value" id="overview-orders">—</div><div class="kpi-note" id="overview-users">客户数读取中</div></article>
+            <article class="kpi"><div class="kpi-top"><span class="kpi-name">平均客单价</span><span class="kpi-ico">◈</span></div><div class="kpi-value" id="overview-aov">—</div><div class="kpi-note">销售金额 / 成交订单</div></article>
+            <article class="kpi"><div class="kpi-top"><span class="kpi-name">退款订单占比</span><span class="kpi-ico">↩</span></div><div class="kpi-value" id="overview-refund">—</div><div class="kpi-note" id="overview-refund-amount">退款金额读取中</div></article>
+          </div>
+          <div class="grid">
+            <section class="panel"><div class="panel-head"><div><h3 class="panel-title">销售趋势</h3><div class="panel-sub" id="overview-trend-sub">按订单最新日期锚定统计窗口</div></div><span class="legend">销售金额</span></div><div class="chart-holder" id="overview-trend"><div class="state-block">正在加载销售趋势…</div></div></section>
+            <section class="panel"><div class="panel-head"><div><h3 class="panel-title">继续追问 AI</h3><div class="panel-sub">从已加载的数据选择下一个可核验问题</div></div><span class="sparkle">✦</span></div><div id="overview-insights"><div class="state-block">正在整理数据入口…</div></div></section>
+          </div>
+          <div class="grid">
+            <section class="panel"><div class="panel-head"><div><h3 class="panel-title">热销商品</h3><div class="panel-sub">按支付金额排行 · 点击“问 AI”继续分析</div></div><button class="text-cta" data-link="products">查看全部 →</button></div><div id="overview-products"><div class="state-block">正在加载商品排行…</div></div></section>
+            <section class="panel"><div class="panel-head"><div><h3 class="panel-title">RFM 客户结构</h3><div class="panel-sub" id="overview-rfm-sub">八类客户分群</div></div><button class="text-cta" data-link="rfm">详情 →</button></div><div id="overview-rfm"><div class="state-block">正在加载客户分群…</div></div></section>
+          </div>
+          <div class="footer-note">AI COMMERCE INTELLIGENCE · 页面数据来自受权限保护的 FastAPI 接口</div>
+        </section>
+
+        <section class="view subview" id="view-assistant" aria-labelledby="assistant-title">
+          <div class="lead"><div><div class="eyebrow">AI DATA ANALYST</div><h1 id="assistant-title">用一句话，读懂你的经营数据。</h1><p>公开执行步骤、引用来源与查询结果同步呈现，不展示模型隐藏思维链。</p></div><a class="outline-link" href="/ai/">打开完整 AI 助手 →</a></div>
+          <div class="config-strip" id="ai-config"><span class="status-badge">正在检查 AI 配置</span></div>
+          <div class="assistant-grid">
+            <section class="panel chat-panel"><div class="panel-head"><div><h3 class="panel-title">和小紫一起分析</h3><div class="panel-sub">使用当前账号会话，多轮上下文按用户隔离</div></div><div class="chat-actions"><button class="text-cta" id="regenerate" hidden>重新生成</button><button class="text-cta" id="clear-chat">新建会话</button></div></div><div class="chat-space" id="chat-space" aria-live="polite"><div class="chat-bubble ai">你好！我是小紫。你可以问我销售趋势、商品排名、退款变化或客户分层；回答会附上当前可用的公开依据。</div></div><form class="chat-form" id="chat-form"><input id="chat-input" maxlength="500" placeholder="输入经营问题，例如：为什么退款率变高？" aria-label="经营问题" autocomplete="off"><button class="primary" data-ai-submit type="submit">发送 ↗</button></form></section>
+            <aside class="evidence-column">
+              <section class="panel"><div class="panel-head"><div><h3 class="panel-title">公开执行步骤</h3><div class="panel-sub" id="ai-usage">尚未开始查询</div></div></div><div class="steps-list" id="ai-steps"><div class="empty-compact">提问后显示节点动作与耗时</div></div></section>
+              <section class="panel"><h3 class="panel-title">来源与数据依据</h3><div id="ai-sources" class="source-list"><div class="empty-compact">暂无来源</div></div><div id="ai-sql"></div><div id="ai-analysis"></div></section>
+            </aside>
+          </div>
+          <section class="panel result-panel" id="ai-result-panel" hidden><div class="panel-head"><div><h3 class="panel-title">查询结果</h3><div class="panel-sub" id="ai-result-note"></div></div><button class="outline-button" id="download-ai-result">下载 CSV</button></div><div class="chart-holder ai-chart" id="ai-chart" hidden></div><div class="table-wrap" id="ai-result"></div></section>
+        </section>
+
+        <section class="view subview-wide" id="view-sales" aria-labelledby="sales-title">
+          <div class="lead"><div><div class="eyebrow">SALES ANALYTICS</div><h1 id="sales-title">销售分析</h1><p>核心指标使用全部非取消订单；日期筛选仅作用于销售趋势，平台对比使用整体口径。</p></div><a class="outline-link" href="/BI/">完整交互 BI →</a></div>
+          <form class="filter-bar" id="sales-filter"><label>开始日期<input type="date" id="sales-start"></label><label>结束日期<input type="date" id="sales-end"></label><button class="primary" type="submit">更新趋势</button><span class="filter-note" id="sales-filter-note"></span></form>
+          <div class="kpis"><article class="kpi"><div class="kpi-name">累计销售金额</div><div class="kpi-value" id="sales-sales">—</div><div class="kpi-note">支付金额口径</div></article><article class="kpi"><div class="kpi-name">成交订单</div><div class="kpi-value" id="sales-orders">—</div><div class="kpi-note">非取消订单</div></article><article class="kpi"><div class="kpi-name">平均客单价</div><div class="kpi-value" id="sales-aov">—</div><div class="kpi-note">销售金额 / 成交订单</div></article><article class="kpi"><div class="kpi-name">退款订单占比</div><div class="kpi-value" id="sales-refund">—</div><div class="kpi-note">退款订单 / 非取消订单</div></article></div>
+          <div class="grid"><section class="panel"><div class="panel-head"><div><h3 class="panel-title">销售额趋势</h3><div class="panel-sub" id="sales-trend-sub">按日统计</div></div><span class="legend">销售金额</span></div><div id="sales-trend" class="chart-holder"><div class="state-block">正在加载…</div></div></section><section class="panel"><div class="panel-head"><div><h3 class="panel-title">平台对比</h3><div class="panel-sub">整体销售占比、订单与退款订单占比</div></div></div><div id="sales-platforms"><div class="state-block">正在加载…</div></div></section></div>
+          <section class="panel"><div class="panel-head"><div><h3 class="panel-title">商品销售排行</h3><div class="panel-sub">整体支付金额与订单量</div></div></div><div id="sales-products"><div class="state-block">正在加载…</div></div></section>
+        </section>
+
+        <section class="view subview-wide" id="view-rfm" aria-labelledby="rfm-title">
+          <div class="lead"><div><div class="eyebrow">CUSTOMER SEGMENTATION</div><h1 id="rfm-title">RFM 客户分层</h1><p>R 越近越活跃，F/M 越高价值越高；八类分群与评分语义保持现有实现。</p></div><a class="outline-link" href="/BI/">价值矩阵与群体洞察 →</a></div>
+          <form class="filter-bar" id="rfm-filter"><label>参考日期<input type="date" id="rfm-date"></label><button class="primary" type="submit">重新分层</button><span class="filter-note">留空时使用最新付款订单日期</span></form>
+          <div class="kpis rfm-kpis"><article class="kpi"><div class="kpi-name">参与分层客户</div><div class="kpi-value" id="rfm-total">—</div><div class="kpi-note" id="rfm-reference">参考日读取中</div></article><article class="kpi"><div class="kpi-name">平均最近消费</div><div class="kpi-value" id="rfm-recency">—</div><div class="kpi-note">日历天数</div></article><article class="kpi"><div class="kpi-name">平均消费频次</div><div class="kpi-value" id="rfm-frequency">—</div><div class="kpi-note">有效付款订单</div></article><article class="kpi"><div class="kpi-name">平均消费金额</div><div class="kpi-value" id="rfm-monetary">—</div><div class="kpi-note">客户支付金额</div></article></div>
+          <section class="panel"><div class="panel-head"><div><h3 class="panel-title">八类客户群体</h3><div class="panel-sub">点击分群查看可核验客户明细</div></div></div><div class="rfm-grid" id="rfm-segments"><div class="state-block">正在计算 RFM 分群…</div></div></section>
+          <section class="panel" id="rfm-detail-panel" hidden><div class="panel-head"><div><h3 class="panel-title" id="rfm-detail-title">客户明细</h3><div class="panel-sub" id="rfm-detail-sub"></div></div></div><div class="table-wrap" id="rfm-detail"></div><div class="pagination" id="rfm-pagination"></div></section>
+        </section>
+
+        <section class="view subview-wide" id="view-products" aria-labelledby="products-title">
+          <div class="lead"><div><div class="eyebrow">ORDERS & PRODUCTS</div><h1 id="products-title">订单与商品</h1><p>商品排行使用非取消订单口径；订单查询覆盖订单表全部状态并展示取消状态，便于核对原始记录。</p></div></div>
+          <section class="panel"><div class="panel-head"><div><h3 class="panel-title">商品销售排行</h3><div class="panel-sub">按支付金额排序</div></div></div><div id="product-ranking"><div class="state-block">正在加载商品…</div></div></section>
+          <section class="panel orders-panel"><div class="panel-head"><div><h3 class="panel-title">订单查询</h3><div class="panel-sub" id="orders-summary">正在读取订单</div></div></div><form class="filter-bar order-filters" id="orders-filter"><label>开始日期<input type="date" id="order-start"></label><label>结束日期<input type="date" id="order-end"></label><label>平台类型<input id="order-platform" placeholder="例如 APP"></label><label>商品 ID<input id="order-product" placeholder="精确匹配"></label><label>退款状态<select id="order-refunded"><option value="">全部</option><option value="是">已退款</option><option value="否">未退款</option></select></label><button class="primary" type="submit">查询订单</button></form><div class="table-wrap" id="orders-table"><div class="state-block">正在加载订单…</div></div><div class="pagination" id="orders-pagination"></div></section>
+        </section>
+
+        <section class="view subview-wide" id="view-monitor" aria-labelledby="monitor-title">
+          <div class="lead"><div><div class="eyebrow">SYSTEM STATUS</div><h1 id="monitor-title">运行监控</h1><p>仅向具备管理权限的账号展示；状态来自实时健康接口，不虚构绿色在线。</p></div><button class="outline-link as-button" id="refresh-monitor">立即刷新</button></div>
+          <div class="status-grid" id="monitor-services"><div class="state-block">正在检查服务…</div></div>
+          <div class="grid monitor-grid"><section class="panel"><div class="panel-head"><div><h3 class="panel-title">组件健康</h3><div class="panel-sub" id="monitor-health-time"></div></div></div><div id="monitor-health"><div class="state-block">正在检查…</div></div></section><section class="panel"><div class="panel-head"><div><h3 class="panel-title">请求与缓存</h3><div class="panel-sub">当前后端 worker 的进程内指标</div></div></div><div id="monitor-metrics"><div class="state-block">正在读取…</div></div></section></div>
+          <a class="outline-link monitor-link" href="/monitor">打开完整监控面板 →</a>
+        </section>
+      </main>
+    </div>
+  </div>
+  <nav class="mobile-nav" aria-label="手机导航"><button class="active" data-view="overview"><svg><use href="#ico-grid"/></svg>总览</button><button data-view="assistant"><svg><use href="#ico-spark"/></svg>AI 分析</button><button data-view="sales"><svg><use href="#ico-chart"/></svg>销售</button><button data-view="rfm"><svg><use href="#ico-users"/></svg>客户</button><button data-view="products"><svg><use href="#ico-box"/></svg>订单</button><button data-view="monitor" id="mobile-monitor" hidden><svg><use href="#ico-shield"/></svg>监控</button></nav>
+  <dialog id="order-dialog" class="order-dialog"><div class="dialog-head"><h2>订单详情</h2><button id="close-order-dialog" aria-label="关闭订单详情">×</button></div><div id="order-detail"><div class="state-block">正在读取…</div></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -20,13 +20,15 @@
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 387 项自动化测试（后端 298：296 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 392 项自动化测试（后端 303：301 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
 
 ## 在线演示
 
 | 应用 | 链接 | 说明 |
 |------|------|------|
 | **Docker 统一入口** | `http://localhost/` | 导航页（默认入口） |
+| **统一登录页** | `http://localhost/login` | 四角色交互登录；写入 HttpOnly 会话 Cookie |
+| **经营工作台** | `http://localhost/workspace` | 登录后默认落地页：总览、AI 问答、销售、RFM、订单、监控 |
 | **BI 数据看板** | `http://localhost/BI/` | 交互式数据大屏 |
 | **AI 分析助手** | `http://localhost/ai/` | 自然语言查数 + RAG 知识库 |
 | **API 文档** | `http://localhost/docs` | Swagger UI |
@@ -35,6 +37,18 @@
 | **健康检查** | `http://localhost/health-panel` | 组件健康状态 |
 
 ## 界面预览
+
+### 统一登录页
+
+![统一登录页：四角色与密码隐私态](docs/screenshots/login-roles.png)
+
+### 经营工作台
+
+![经营工作台：总览、AI 提问、KPI 与单日趋势摘要](docs/screenshots/workspace-overview.png)
+
+### 手机端工作台
+
+![经营工作台手机端：KPI 双列与底部导航](docs/screenshots/workspace-mobile.png)
 
 ### AI 分析助手
 
@@ -80,6 +94,7 @@ docker compose up -d
 |------|----------|------|
 | `/` | backend:8000 | 统一导航页（默认入口） |
 | `/login` `/logout` | backend:8000 | 统一登录/退出（公开）；登录后写入 HttpOnly 会话 Cookie |
+| `/workspace` | backend:8000 | 经营工作台（需 `data:read` 会话；未登录 303 跳转登录） |
 | `/BI/` | streamlit:8501 | BI 看板（需会话；baseUrlPath=/BI，`/BI` 会 301 跳到 `/BI/`） |
 | `/ai/` | ai-assistant:8502 | AI 分析助手（需会话；baseUrlPath=/ai；RAG/模型由后端执行） |
 | `/api/*` | backend:8000 | RESTful API |
@@ -184,6 +199,8 @@ Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -Argum
 # 3. AI 助手 (:8505)
 Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run ai-ecommerce-assistant/app.py --server.port 8505"
 ```
+
+浏览器访问 `http://localhost:8000/login`，登录后进入 `http://localhost:8000/workspace`；`/BI/`、`/ai/` 仍走各自 Streamlit 端口（Docker 下由 Nginx 统一为 `/BI/`、`/ai/`）。未登录访问 `/workspace` 会 303 跳转登录页，不依赖前端隐藏菜单。
 
 **初始化数据库（Alembic 为主路径）：**
 
@@ -491,7 +508,7 @@ rag_tool_call_total 0
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 298 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 303 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -592,10 +609,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（387 项，实收 385 passed / 2 skipped）
+### 自动化测试（392 项，实收 390 passed / 2 skipped）
 
 ```bash
-# 后端（298 项，完整运行需要 MySQL）
+# 后端（303 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（89 项）
@@ -604,14 +621,14 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（298 项）：
+后端（303 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis WATCH/MULTI 原子写入与冲突重试、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
 - `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、统一非取消指标口径（退款保留在毛额、取消剔除）、`data_state.data_version` 单调与并发递增、BI 分页版本冲突（分页期间新增/取消订单返回 409）、页面与后端 RFM 客户名单/数值一致性、版本化缓存键、主体限流隔离、导出上限、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
-- `test_auth_ai_gateway.py` / `test_bi_client.py` — Cookie 会话、角色/服务凭据/账号停用后的 BI 读写边界、`data:export` 后端强制校验、BI 分页完整性与版本冲突整次重试、导出权限映射与显式按钮触发、`/api/ai/test` 的额度/并发/审计闭环、AI 页面无业务答案缓存、BI 页面无数据库直连
+- `test_auth_ai_gateway.py` / `test_bi_client.py` — Cookie 会话、角色/服务凭据/账号停用后的 BI 读写边界、`data:export` 后端强制校验、BI 分页完整性与版本冲突整次重试、导出权限映射与显式按钮触发、`/api/ai/test` 的额度/并发/审计闭环、AI 页面无业务答案缓存、BI 页面无数据库直连；另含 `/workspace` 未登录跳转、`data:read` 角色边界、登录页 no-store 与静态资源回归
 - `test_bi_rfm.py` — 页面 RFM 日期口径（参考日当天 recency=0）、非付款/未来订单过滤
 - `test_operations.py` — `/livez` 不触库、`/readyz` 三库检查与 503、生产配置 fail-fast、非 root 镜像、Compose 资源上限与 `/readyz` 健康检查、生产镜像固定层、TLS 鉴权/WebSocket/HSTS、备份恢复脚本安全默认值与 shell 语法
 
@@ -630,14 +647,14 @@ AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEm
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 298 | **296 passed / 2 skipped**（43.67s） |
-| `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.80s） |
-| **合计** | **387** | **385 passed / 2 skipped / 0 failed** |
+| `backend/tests` | 303 | **301 passed / 2 skipped**（45.40s） |
+| `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.78s） |
+| **合计** | **392** | **390 passed / 2 skipped / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
 
-前端：`backend/static/index.html` 拆分为 `css/studio.css` + `js/studio.js`，并经 Impeccable detector（0 critical/0 error）与桌面三视口（1366×768 / 1440×900 / 1920×1080）验收 `badCount=0`。
+前端：`backend/static/index.html` 拆分为 `css/studio.css` + `js/studio.js`，并经 Impeccable detector（0 critical/0 error）与桌面三视口（1366×768 / 1440×900 / 1920×1080）验收 `badCount=0`。登录页拆分为 `css/login.css` + `js/login.js`；经营工作台拆分为 `workspace.html` + `css/workspace.css` + `js/workspace.js`（数据请求封装在 `js/workspace-api.js`，SVG 图表在 `js/workspace-charts.js`），本次已用 Chrome 在 1440 / 1024 / 768 / 390 / 320 宽度截图检查，并完成真实登录、六视图、RFM 明细、订单弹窗与角色隐私态交互验收。
 
 ### 安全边界
 
@@ -758,7 +775,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
-│   ├── tests/                    # 298 项 API/事件集成测试
+│   ├── tests/                    # 303 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）
