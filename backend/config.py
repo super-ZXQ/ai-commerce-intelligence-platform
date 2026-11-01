@@ -2,7 +2,7 @@ import logging
 import os
 import re
 from functools import lru_cache
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -163,6 +163,24 @@ class Settings(BaseSettings):
         if self.redis_session_db == self.redis_db:
             # 逻辑 DB 只是命名隔离，不改变 allkeys-lru 的全局淘汰；但同库会直接键冲突。
             raise ValueError("REDIS_SESSION_DB 必须与 REDIS_DB 不同，避免会话键与业务缓存键冲突")
+        if self.default_page_size < 1:
+            raise ValueError("DEFAULT_PAGE_SIZE 必须大于 0")
+        if self.max_page_size < self.default_page_size:
+            raise ValueError("MAX_PAGE_SIZE 不能小于 DEFAULT_PAGE_SIZE")
+        if self.export_max_rows < 1 or self.export_excel_max_rows < 1:
+            raise ValueError("EXPORT_MAX_ROWS / EXPORT_EXCEL_MAX_ROWS 必须大于 0")
+        if self.export_excel_max_rows > self.export_max_rows:
+            raise ValueError("EXPORT_EXCEL_MAX_ROWS 不能超过 EXPORT_MAX_ROWS")
+        if self.cache_ttl_seconds < 1:
+            raise ValueError("CACHE_TTL_SECONDS 必须大于 0")
+        if self.llm_mode == "managed" and self.llm_api_key:
+            # 托管密钥只允许发往白名单内的 https 主机；配置错误应在启动时暴露，
+            # 而不是等第一次 AI 查询才由出站策略拒绝。
+            if not self.llm_base_url.startswith("https://"):
+                raise ValueError("托管模式下 LLM_BASE_URL 必须使用 https")
+            base_host = (urlparse(self.llm_base_url).hostname or "").lower().rstrip(".")
+            if base_host not in self.llm_allowed_hosts:
+                raise ValueError("LLM_BASE_URL 的主机必须在 LLM_PROVIDER_ALLOWLIST 中")
         if not self.debug:
             if self.jwt_secret in _INSECURE_JWT_SECRETS or len(self.jwt_secret) < 32:
                 raise ValueError("生产环境 JWT_SECRET 至少需要 32 位且不能使用示例值！")
@@ -177,6 +195,12 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 ADMIN_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
             if self.analyst_password and not _BCRYPT_HASH_RE.fullmatch(self.analyst_password):
                 raise ValueError("生产环境 ANALYST_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
+            if self.db_user == "root":
+                logger.warning("⚠️ 生产环境业务账号为 root，请改用最小权限账号（如 ea_app）")
+            if not self.auth_cookie_secure:
+                logger.warning(
+                    "⚠️ AUTH_COOKIE_SECURE=false：仅在 TLS 已由可信反代终止且全站强制 HTTPS 时使用"
+                )
 
     @property
     def database_url(self) -> str:

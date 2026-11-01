@@ -21,6 +21,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "${MYSQL_CPUS:-2.0}"
+          memory: "${MYSQL_MEMORY:-2g}"
     networks:
       - ea-network
 
@@ -92,6 +97,31 @@ services:
     networks:
       - ea-network
 
+  # 最小权限账号验收：显式 profile，不随 docker compose up 自动运行。
+  #   docker compose --profile verify run --rm db-verify
+  db-verify:
+    image: mysql:8.0
+    container_name: ea-db-verify
+    profiles: ["verify"]
+    restart: "no"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: ${DB_NAME:-ai_commerce_intelligence_platform}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?请设置 DB_APP_PASSWORD}
+      DB_AI_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
+      DB_EVENT_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
+      DB_AUTH_PASSWORD: ${DB_AUTH_PASSWORD:?请设置 DB_AUTH_PASSWORD}
+    volumes:
+      - ./deploy/mysql/verify-grants.sh:/verify-grants.sh:ro
+    entrypoint: ["sh", "/verify-grants.sh"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      db-grant:
+        condition: service_completed_successfully
+    networks:
+      - ea-network
+
   redis:
     image: redis:7-alpine
     container_name: ea-redis
@@ -107,6 +137,13 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPUS:-0.5}"
+          memory: "${REDIS_MEMORY:-512m}"
     networks:
       - ea-network
 
@@ -174,11 +211,18 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/readyz').raise_for_status()"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${BACKEND_CPUS:-2.0}"
+          memory: "${BACKEND_MEMORY:-2g}"
     networks:
       - ea-network
 
@@ -246,6 +290,13 @@ services:
         condition: service_healthy
       db-grant:
         condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${STREAMLIT_CPUS:-1.0}"
+          memory: "${STREAMLIT_MEMORY:-1g}"
     networks:
       - ea-network
 
@@ -277,6 +328,13 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${AI_CPUS:-2.0}"
+          memory: "${AI_MEMORY:-4g}"
     networks:
       - ea-network
 
@@ -295,6 +353,13 @@ services:
         condition: service_started
       ai-assistant:
         condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${NGINX_CPUS:-0.5}"
+          memory: "${NGINX_MEMORY:-256m}"
     networks:
       - ea-network
 

@@ -1,0 +1,44 @@
+# 生产覆盖层：禁止浮动标签，所有镜像必须显式固定 tag 或 digest。
+#
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# 变量示例（建议使用发布流水线产出的镜像 digest）：
+#   BACKEND_IMAGE=ghcr.io/super-zxq/ai-commerce-intelligence-platform-backend@sha256:...
+#   STREAMLIT_IMAGE=ghcr.io/super-zxq/ai-commerce-intelligence-platform-streamlit@sha256:...
+#   AI_ASSISTANT_IMAGE=ghcr.io/super-zxq/ai-commerce-intelligence-platform-ai-assistant@sha256:...
+#   MYSQL_IMAGE=mysql:8.0.<patch>@sha256:<digest>
+#   REDIS_IMAGE=redis:7.<patch>-alpine@sha256:<digest>
+#   NGINX_IMAGE=nginx:<version>-alpine@sha256:<digest>
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:?生产部署必须通过 MYSQL_IMAGE 固定镜像 tag 或 digest}
+  redis:
+    image: ${REDIS_IMAGE:?生产部署必须通过 REDIS_IMAGE 固定镜像 tag 或 digest}
+  nginx:
+    image: ${NGINX_IMAGE:?生产部署必须通过 NGINX_IMAGE 固定镜像 tag 或 digest}
+
+  db-bootstrap:
+    image: ${MYSQL_IMAGE:?生产部署必须通过 MYSQL_IMAGE 固定镜像 tag 或 digest}
+  db-grant:
+    image: ${MYSQL_IMAGE:?生产部署必须通过 MYSQL_IMAGE 固定镜像 tag 或 digest}
+  db-verify:
+    image: ${MYSQL_IMAGE:?生产部署必须通过 MYSQL_IMAGE 固定镜像 tag 或 digest}
+  db-migrate:
+    image: ${BACKEND_IMAGE:?生产部署必须通过 BACKEND_IMAGE 固定镜像 tag 或 digest}
+    build: !reset null
+  data-import:
+    image: ${BACKEND_IMAGE:?生产部署必须通过 BACKEND_IMAGE 固定镜像 tag 或 digest}
+    build: !reset null
+
+  backend:
+    image: ${BACKEND_IMAGE:?生产部署必须通过 BACKEND_IMAGE 固定镜像 tag 或 digest}
+    build: !reset null
+  streamlit:
+    image: ${STREAMLIT_IMAGE:?生产部署必须通过 STREAMLIT_IMAGE 固定镜像 tag 或 digest}
+    build: !reset null
+  ai-assistant:
+    image: ${AI_ASSISTANT_IMAGE:?生产部署必须通过 AI_ASSISTANT_IMAGE 固定镜像 tag 或 digest}
+    build: !reset null

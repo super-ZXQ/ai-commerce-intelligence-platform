@@ -108,6 +108,9 @@ jobs:
             echo "ea_auth 不应读取 orders"; exit 1
           fi
 
+          # 最小权限账号验收：正向/负向语句全部按 docs/DB_PERMISSIONS.md 断言。
+          docker compose --profile verify run --rm --no-deps db-verify
+
           # 订单数据只能由显式 data-import 导入；后端启动不得触碰 orders。
           docker compose --profile data-import run --rm data-import --mode bootstrap
 
@@ -192,6 +195,9 @@ jobs:
             "SELECT COUNT(*) FROM ai_commerce_intelligence_platform.order_events WHERE order_id LIKE 'CI-RETENTION-%'")"
           test "$ledger_rows" = "5"
 
+          # 备份 → 恢复临时库 → 关键表行数对比；这是备份可用性的验收证据。
+          bash scripts/backup_restore_drill.sh
+
           # db-migrate / db-grant 应已成功退出
           migrate_status="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' ea-db-migrate)"
           echo "db-migrate: $migrate_status"
@@ -200,8 +206,15 @@ jobs:
           echo "db-grant: $grant_status"
           echo "$grant_status" | grep -q 'exited 0'
 
-          # 公开页面无需登录。
-          for path in / /docs /demo /monitor /health-panel; do
+          # 应用容器以非 root 运行。
+          for service in backend streamlit ai-assistant; do
+            uid="$(docker compose exec -T "$service" id -u)"
+            echo "$service uid=$uid"
+            test "$uid" = "10001"
+          done
+
+          # 公开页面与探针无需登录。
+          for path in / /docs /demo /monitor /health-panel /livez /readyz; do
             status="$(curl --location --silent --output /dev/null \
               --write-out '%{http_code}' --max-time 20 "http://localhost${path}")"
             echo "$path -> $status"

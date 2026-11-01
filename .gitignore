@@ -64,3 +64,9 @@ video-promo/out/
 video-promo/.cache/
 # 含真实凭据的轮换脚本（仅本地执行）
 deploy/sql/rotate_credentials.local.sql
+
+# TLS 私钥与证书（生产由运维挂载，禁止入库）
+deploy/certs/
+
+# 数据库备份产物（含业务数据，禁止入库）
+backups/

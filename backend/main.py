@@ -139,7 +139,7 @@ app.add_middleware(
 )
 
 _SKIP_RATE_LIMIT_PATHS = (
-    "/docs", "/redoc", "/health", "/health/detailed", "/health-panel", "/",
+    "/docs", "/redoc", "/health", "/health/detailed", "/health-panel", "/livez", "/readyz", "/",
     "/demo", "/openapi.json", "/monitor", "/metrics", "/login", "/logout",
     # Nginx auth_request 会为每个静态资源/WebSocket 握手发起子请求，
     # 若计入限流桶会让正常浏览快速触发 429。
@@ -282,6 +282,47 @@ async def favicon_svg() -> FileResponse:
 async def health_check() -> dict:
     db_ok = await check_db_connection()
     return {"status": "healthy" if db_ok else "degraded", "database": "connected" if db_ok else "disconnected"}
+
+
+@app.get("/livez", tags=["系统"])
+async def liveness_check() -> dict:
+    """存活性探针：不访问任何依赖。
+
+    数据库抖动时不应触发容器重启；依赖不可用由 /readyz 表达。
+    """
+    return {"status": "alive"}
+
+
+async def _readiness_checks() -> dict[str, bool]:
+    """三个连接池分别探测，避免只看主库而掩盖认证/事件库故障。"""
+    results = await asyncio.gather(
+        check_db_connection(),
+        check_event_db_connection(),
+        check_auth_db_connection(),
+        return_exceptions=True,
+    )
+    names = ("database", "event_database", "auth_database")
+    return {
+        name: result is True
+        for name, result in zip(names, results, strict=True)
+    }
+
+
+@app.get("/readyz", tags=["系统"])
+async def readiness_check() -> JSONResponse:
+    """就绪性探针：业务库、事件库、认证库全部可用才返回 200。
+
+    只返回布尔值，不回显驱动异常或连接串，可安全暴露给负载均衡器。
+    """
+    checks = await _readiness_checks()
+    ready = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={
+            "status": "ready" if ready else "not_ready",
+            "checks": checks,
+        },
+    )
 
 
 @app.get("/health/detailed", tags=["系统"])

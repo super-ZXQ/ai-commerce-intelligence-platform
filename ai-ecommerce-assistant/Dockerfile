@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HOME=/home/app
+
 WORKDIR /app/ai-ecommerce-assistant
 
 COPY ai-ecommerce-assistant/requirements.txt .
@@ -13,7 +17,11 @@ COPY backend/ /app/backend/
 COPY agent_core/ /app/agent_core/
 COPY ai-ecommerce-assistant/ ./
 
-RUN PYTHONPATH=/app python -c "import agent_core"
+RUN PYTHONPATH=/app python -c "import agent_core" \
+    && mkdir -p /home/app \
+    && chown 10001:10001 /home/app
+
+USER 10001:10001
 
 EXPOSE 8502
 

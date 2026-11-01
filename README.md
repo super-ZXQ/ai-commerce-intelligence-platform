@@ -20,7 +20,7 @@
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 335 项自动化测试（后端 246：244 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 361 项自动化测试（后端 272：270 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
 
 ## 在线演示
 
@@ -85,10 +85,18 @@ docker compose up -d
 | `/api/*` | backend:8000 | RESTful API |
 | `/nav` | backend:8000 | 导航页（备用路由） |
 | `/docs` `/redoc` `/openapi.json` | backend:8000 | Swagger / ReDoc 文档 |
+| `/livez` `/readyz` | backend:8000 | 存活/就绪探针（就绪检查业务库、事件库、认证库） |
 | `/health` `/health/detailed` `/metrics` | backend:8000 | 公开健康检查与 Prometheus 指标 |
 | `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
 
 部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入、认证和数据同步分别创建最小权限账号；`db-migrate` 完成 Alembic 升级后，`db-grant` 再按表授予权限：`ea_app` 只读业务表，`ea_ai` 只能读 `orders`，`ea_events` 只能写 `orders`/`order_events`/`data_state`，`ea_auth` 只能访问认证与审计表。统一会话由 FastAPI 签发 HttpOnly Cookie，Nginx `auth_request` 保护 `/ai/` 与 `/BI/`（含 WebSocket 握手），后端在每次业务操作时重新校验账号状态、角色与权限。AI 助手只通过 `BACKEND_API_URL` 调用后端，不接触数据库、模型密钥或直连 LLM。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。BI 看板在 Compose 中通过只读账号 `ea_app` 读取运行期订单（仅排除取消订单，页面缓存 30 秒，侧边栏可手动刷新），未配置数据库或读取失败时回退 `data/` 快照。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；默认单次最多 200,000 行，Excel 因工作簿格式限制需在内存中生成，默认最多 50,000 行（`EXPORT_MAX_ROWS` / `EXPORT_EXCEL_MAX_ROWS` 可调）。限流同时按 IP 与登录主体执行，AI/导出/事件写入的主体桶不会因同一出口 IP 被他人挤占。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
+
+生产加固与验收：
+
+- 应用容器以 UID/GID `10001` 非 root 运行，启用 `no-new-privileges`，并为 MySQL/Redis/后端/BI/AI/Nginx 设置 CPU/内存上限。
+- `docker-compose.prod.yml` 要求所有镜像使用不可变 tag 或 digest，禁止 `latest`；`docker-compose.tls.yml` 提供 443 终止、HTTP 跳转与 HSTS。
+- `/livez` 只表示进程存活，`/readyz` 检查业务库、事件库、认证库后才允许接流量；Compose 健康检查使用 `/readyz`。
+- 备份、恢复、恢复演练与最小权限账号验收命令见 [运维手册](docs/OPERATIONS.md) 与 [上线检查清单](docs/GO_LIVE_CHECKLIST.md)。RPO 当前为备份间隔（≤ 24 小时），未配置 binlog，不承诺更低值。
 
 ### 本地开发
 
@@ -475,7 +483,7 @@ rag_tool_call_total 0
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 246 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 272 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -529,6 +537,8 @@ python scripts/health_check.py --checks backend,db --fail-on-error
 
 | 名称 | 检查方式 | 期望 |
 |------|----------|------|
+| `backend:/livez` | GET | status 字段存在（不依赖数据库） |
+| `backend:/readyz` | GET | 200，checks 包含三个数据库 |
 | `backend:/health` | GET | status 字段存在 |
 | `backend:/health/detailed` | GET | 200 |
 | `backend:/api/monitor/services-status` | GET | 200 |
@@ -574,10 +584,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（335 项，实收 333 passed / 2 skipped）
+### 自动化测试（361 项，实收 359 passed / 2 skipped）
 
 ```bash
-# 后端（246 项，完整运行需要 MySQL）
+# 后端（272 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（89 项）
@@ -586,13 +596,14 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（246 项）：
+后端（272 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis WATCH/MULTI 原子写入与冲突重试、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
 - `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、统一非取消指标口径（退款保留在毛额、取消剔除）、`data_state.data_version` 单调与并发递增、版本化缓存键、主体限流隔离、导出上限、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
+- `test_operations.py` — `/livez` 不触库、`/readyz` 三库检查与 503、生产配置 fail-fast、非 root 镜像、Compose 资源上限与 `/readyz` 健康检查、生产镜像固定层、TLS 鉴权/WebSocket/HSTS、备份恢复脚本安全默认值与 shell 语法
 
 AI/RAG（89 项）：
 - `test_vector_store.py` — Chroma 增删查改（fake embedder，不依赖真实模型）
@@ -609,9 +620,9 @@ AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEm
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 246 | **244 passed / 2 skipped**（35.56s） |
-| `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.45s） |
-| **合计** | **335** | **333 passed / 2 skipped / 0 failed** |
+| `backend/tests` | 272 | **270 passed / 2 skipped**（35.97s） |
+| `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.64s） |
+| **合计** | **361** | **359 passed / 2 skipped / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -737,7 +748,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
-│   ├── tests/                    # 246 项 API/事件集成测试
+│   ├── tests/                    # 272 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）
@@ -760,19 +771,30 @@ ai-commerce-intelligence-platform/
 │   ├── docker-smoke.yml          # 空卷 Compose 冷启动验收
 │   └── release.yml               # Docker 镜像构建（push main / tag 触发）
 ├── scripts/
-│   └── health_check.py           # 全栈健康检查脚本（本地 + CI）
+│   ├── health_check.py           # 全栈健康检查脚本（本地 + CI）
+│   ├── backup_mysql.sh           # 一致性逻辑备份（mysqldump + sha256）
+│   ├── restore_mysql.sh          # 恢复到新库/临时库（默认拒绝覆盖生产库）
+│   └── backup_restore_drill.sh   # 备份→恢复→行数对比演练
 ├── deploy/                       # 部署配置
-│   ├── nginx.conf                # Nginx 反向代理
+│   ├── nginx.conf                # Nginx 反向代理（HTTP）
+│   ├── nginx.tls.conf            # Nginx TLS 终止（443 + HSTS）
 │   ├── redis.conf                # Redis 持久化配置
 │   ├── mysql/
-│   │   └── bootstrap-users.sh    # 创建最小权限数据库账号
+│   │   ├── bootstrap-users.sh    # 创建最小权限数据库账号
+│   │   ├── apply-grants.sh       # 迁移后按表收紧授权
+│   │   └── verify-grants.sh      # 真实账号正向/负向授权验收
 │   └── .env.example              # 环境变量模板
+├── docs/
+│   ├── OPERATIONS.md             # SLO/RPO/RTO、备份恢复、探针与 503 处置
+│   └── GO_LIVE_CHECKLIST.md      # 上线检查清单与未执行项
 ├── data/                         # 数据文件
 ├── sql/                          # 建表/导入/分析脚本
 ├── notebook/                     # Jupyter 分析笔记本
 ├── docker-compose.yml            # Docker Compose 编排
-├── Dockerfile                    # FastAPI 后端镜像
-├── Dockerfile.streamlit          # Streamlit 镜像
+├── docker-compose.prod.yml       # 生产镜像固定覆盖层
+├── docker-compose.tls.yml        # HTTPS 终止覆盖层
+├── Dockerfile                    # FastAPI 后端镜像（非 root）
+├── Dockerfile.streamlit          # Streamlit 镜像（非 root）
 ├── requirements.streamlit.txt    # BI 镜像精简运行时依赖
 └── requirements.txt              # Notebook / 本地数据分析依赖
 ```

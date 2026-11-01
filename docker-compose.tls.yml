@@ -1,0 +1,25 @@
+# HTTPS 覆盖层：Nginx 在 443 终止 TLS，80 仅保留健康检查并跳转 HTTPS。
+#
+# 前置条件：
+#   deploy/certs/fullchain.pem
+#   deploy/certs/privkey.pem（权限 0600，禁止提交）
+#
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+#
+# 该层会强制 AUTH_COOKIE_SECURE=true；若 TLS 由外部负载均衡终止，
+# 不要叠加本层，改为在 .env 中自行设置 AUTH_COOKIE_SECURE=true。
+
+services:
+  nginx:
+    volumes:
+      - ./deploy/nginx.tls.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+    ports: !override
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+
+  backend:
+    environment:
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}

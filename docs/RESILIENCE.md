@@ -36,6 +36,12 @@
 
 回归测试：`backend/tests/test_order_event_create_pk.py`（3 项，本地 pytest 通过）。
 
+## 503 分类与探针
+
+事件写入超时/不可用、AI 排队超时、RFM 数据未就绪与 `/readyz` 503 的区分与
+处置见 `docs/OPERATIONS.md` 第 5、6 节。`/livez` 不访问数据库，因此数据库故障
+只应让 `/readyz` 失败，不应触发容器重启。
+
 ## 故障注入命令备忘
 
 ```powershell

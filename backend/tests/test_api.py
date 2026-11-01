@@ -122,6 +122,33 @@ class TestSystem:
         assert "database" in data
 
     @pytest.mark.asyncio
+    async def test_livez_does_not_touch_dependencies(self, client: AsyncClient, monkeypatch):
+        """存活探针不能因数据库抖动而失败，否则编排器会误杀进程。"""
+        async def _boom():
+            raise AssertionError("/livez 不应访问数据库")
+
+        monkeypatch.setattr("backend.main.check_db_connection", _boom)
+        r = await client.get("/livez")
+        assert r.status_code == 200
+        assert r.json() == {"status": "alive"}
+
+    @pytest.mark.asyncio
+    async def test_readyz_requires_all_three_databases(self, client: AsyncClient, monkeypatch):
+        r = await client.get("/readyz")
+        assert r.status_code == 200
+        assert r.json()["status"] == "ready"
+        assert set(r.json()["checks"]) == {"database", "event_database", "auth_database"}
+
+        async def _down():
+            return False
+
+        monkeypatch.setattr("backend.main.check_auth_db_connection", _down)
+        r = await client.get("/readyz")
+        assert r.status_code == 503
+        assert r.json()["status"] == "not_ready"
+        assert r.json()["checks"]["auth_database"] is False
+
+    @pytest.mark.asyncio
     async def test_openapi_schema(self, client: AsyncClient):
         r = await client.get("/openapi.json")
         assert r.status_code == 200

@@ -54,7 +54,16 @@
 
 ## 验收方法
 
-1. 使用各账号分别连接，执行允许与禁止的语句：
+1. 一键验收（真实账号，只做只读与 0 行写入探测，不改业务数据）：
+
+```bash
+docker compose --profile verify run --rm --no-deps db-verify
+```
+
+脚本 `deploy/mysql/verify-grants.sh` 会逐项输出 PASS/FAIL；CI 的 Docker smoke
+也执行同一步骤。没有 PASS 输出不能视为授权已生效。
+
+2. 使用各账号分别连接，执行允许与禁止的语句：
 
 ```sql
 -- ea_ai：应成功
@@ -75,5 +84,6 @@ SELECT COUNT(*) FROM auth_users;
 DELETE FROM data_state WHERE id = 1;
 ```
 
-2. 迁移后重新执行 `docker compose run --rm db-grant`，确认脚本幂等且不产生新授权错误。
-3. 真实 MySQL 上的账号验收属于部署验收项；仅阅读脚本或单元测试不足以证明权限已生效。
+3. 迁移后重新执行 `docker compose run --rm db-grant`，确认脚本幂等且不产生新授权错误。
+4. 真实 MySQL 上的账号验收属于部署验收项；仅阅读脚本或单元测试不足以证明权限已生效。
+   验收记录写入 `docs/GO_LIVE_CHECKLIST.md`。

@@ -143,6 +143,10 @@ def _check_http(name: str, url: str, timeout: float = 5.0,
 def check_backend(backend: str, timeout: float) -> list[CheckResult]:
     """后端一组端点检查。"""
     return [
+        _check_http("backend:/livez", f"{backend}/livez", timeout=timeout,
+                    expect_key="status"),
+        _check_http("backend:/readyz", f"{backend}/readyz", timeout=timeout,
+                    expect_key="checks"),
         _check_http("backend:/health", f"{backend}/health", timeout=timeout,
                     expect_key="status"),
         _check_http("backend:/health/detailed", f"{backend}/health/detailed",
