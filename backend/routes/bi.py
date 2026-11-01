@@ -22,11 +22,31 @@ settings = get_settings()
 async def bi_orders(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(5000, ge=1, le=20000, description="每页数量"),
+    data_version: int | None = Query(
+        None,
+        ge=0,
+        description="首屏返回的数据版本；后续页必须携带，版本变化时返回 409",
+    ),
     db: AsyncSession = Depends(get_db),
     _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
-    """与销售总览使用同一非取消口径；超过导出上限时拒绝，避免页面只看到部分数据。"""
-    result = await order_service.get_bi_orders(db, page, page_size)
+    """与销售总览使用同一非取消口径；整次分页读取绑定同一数据版本。"""
+    try:
+        result = await order_service.get_bi_orders(
+            db,
+            page,
+            page_size,
+            expected_version=data_version,
+        )
+    except order_service.BIDataVersionChanged as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "BI_DATA_VERSION_CHANGED",
+                "message": "BI 数据在分页读取期间发生变化，请重新加载",
+                "data_version": exc.actual,
+            },
+        )
     if result.total > settings.export_max_rows:
         raise HTTPException(
             status_code=413,

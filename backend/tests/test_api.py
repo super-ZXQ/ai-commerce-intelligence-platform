@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pandas as pd
 import pymysql
 import pytest
 import pytest_asyncio
@@ -9,11 +10,14 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
 from backend.config import get_settings
-from backend.database import event_session_factory
+from backend.database import async_session_factory, event_session_factory
 from backend.main import app
 from backend.models.schemas import OrderEventInput
 from backend.services import order_event_service
+from backend.services.rfm_service import _build_rfm_snapshot
 from backend.utils.auth import hash_password, role_default_scopes
+from backend.utils.rfm_scoring import assign_segment
+from bi_rfm import score_rfm_frame
 
 TEST_ADMIN_USERNAME = "ci_admin"
 TEST_ADMIN_PASSWORD = "ci-admin-pass-123"
@@ -323,19 +327,124 @@ class TestBIDataAccess:
         # 跨接口一致性：BI 快照订单数必须等于销售总览的非取消订单数。
         assert data["total"] == overview["total_orders"]
         assert data["page"] == 1
+        assert isinstance(data["data_version"], int)
         assert len(data["items"]) <= 3
         assert data["total_pages"] == (data["total"] + 2) // 3
 
         if data["total"] > 3:
             second = (
-                await authed_client.get("/api/bi/orders", params={"page": 2, "page_size": 3})
+                await authed_client.get(
+                    "/api/bi/orders",
+                    params={
+                        "page": 2,
+                        "page_size": 3,
+                        "data_version": data["data_version"],
+                    },
+                )
             ).json()
             assert second["page"] == 2
+            assert second["data_version"] == data["data_version"]
             assert len(second["items"]) <= 3
             # order_no 唯一，翻页结果不能重复。
             assert {item["order_no"] for item in data["items"]}.isdisjoint(
                 {item["order_no"] for item in second["items"]}
             )
+
+    @pytest.mark.asyncio
+    async def test_bi_pagination_rejects_snapshot_before_new_order(
+        self, authed_client: AsyncClient
+    ):
+        """第一页之后新增订单：旧版本的第二页必须 409，重读后版本与总数同步。"""
+        first = (
+            await authed_client.get("/api/bi/orders", params={"page_size": 2})
+        ).json()
+        stale_version = first["data_version"]
+        order_id = f"BI-PAGE-NEW-{uuid4().hex[:16]}"
+        assert (
+            await authed_client.post(
+                "/api/order-events", json=_created_event(order_id)
+            )
+        ).json()["processed"] == 1
+        try:
+            conflict = await authed_client.get(
+                "/api/bi/orders",
+                params={
+                    "page": 2,
+                    "page_size": 2,
+                    "data_version": stale_version,
+                },
+            )
+            assert conflict.status_code == 409
+            detail = conflict.json()["detail"]
+            assert detail["error_code"] == "BI_DATA_VERSION_CHANGED"
+            assert detail["data_version"] == stale_version + 1
+
+            refreshed = (
+                await authed_client.get("/api/bi/orders", params={"page_size": 2})
+            ).json()
+            assert refreshed["data_version"] == stale_version + 1
+            assert refreshed["total"] == first["total"] + 1
+            second = await authed_client.get(
+                "/api/bi/orders",
+                params={
+                    "page": 2,
+                    "page_size": 2,
+                    "data_version": refreshed["data_version"],
+                },
+            )
+            assert second.status_code == 200
+            assert second.json()["data_version"] == refreshed["data_version"]
+        finally:
+            assert (
+                await authed_client.post(
+                    "/api/order-events", json=_cancel_event(order_id)
+                )
+            ).json()["processed"] == 1
+
+    @pytest.mark.asyncio
+    async def test_bi_pagination_rejects_snapshot_before_order_cancelled(
+        self, authed_client: AsyncClient
+    ):
+        """第一页之后取消订单：旧版本的第二页必须 409，不能保留已取消订单。"""
+        order_id = f"BI-PAGE-CANCEL-{uuid4().hex[:16]}"
+        cancelled = False
+        assert (
+            await authed_client.post(
+                "/api/order-events", json=_created_event(order_id)
+            )
+        ).json()["processed"] == 1
+        try:
+            first = (
+                await authed_client.get("/api/bi/orders", params={"page_size": 2})
+            ).json()
+            stale_version = first["data_version"]
+
+            assert (
+                await authed_client.post(
+                    "/api/order-events", json=_cancel_event(order_id)
+                )
+            ).json()["processed"] == 1
+            cancelled = True
+
+            conflict = await authed_client.get(
+                "/api/bi/orders",
+                params={"page": 2, "page_size": 2, "data_version": stale_version},
+            )
+            assert conflict.status_code == 409
+            detail = conflict.json()["detail"]
+            assert detail["error_code"] == "BI_DATA_VERSION_CHANGED"
+            assert detail["data_version"] == stale_version + 1
+
+            refreshed = (
+                await authed_client.get("/api/bi/orders", params={"page_size": 2})
+            ).json()
+            assert refreshed["data_version"] == stale_version + 1
+            assert refreshed["total"] == first["total"] - 1
+        finally:
+            if not cancelled:
+                await authed_client.post(
+                    "/api/order-events", json=_cancel_event(order_id)
+                )
 
     @pytest.mark.asyncio
     async def test_bi_snapshot_rejects_rows_over_page_limit(
@@ -451,6 +560,62 @@ class TestRFMExport:
         assert invalid_threshold.status_code == 400
 
 
+class TestRFMPageBackendConsistency:
+    @pytest.mark.asyncio
+    async def test_page_rfm_values_match_backend_export_snapshot(
+        self, authed_client: AsyncClient
+    ):
+        """页面基于 BI 快照算出的 RFM 必须与后端导出快照同一客户、同一数值。"""
+        rows: list[dict] = []
+        page = 1
+        version: int | None = None
+        while True:
+            params: dict[str, int] = {"page": page, "page_size": 20000}
+            if version is not None:
+                params["data_version"] = version
+            response = await authed_client.get("/api/bi/orders", params=params)
+            assert response.status_code == 200, response.text
+            payload = response.json()
+            version = payload["data_version"]
+            rows.extend(payload["items"])
+            if page >= payload["total_pages"]:
+                break
+            page += 1
+
+        frame = pd.DataFrame(rows)
+        reference_date = pd.to_datetime(frame["order_time"]).max().date()
+        page_rfm = score_rfm_frame(frame, reference_date, n_bins=5)
+
+        async with async_session_factory() as db:
+            backend = await _build_rfm_snapshot(db, str(reference_date), 5)
+
+        backend_users = {user["user_name"]: user for user in backend["users"]}
+        assert set(page_rfm["user_name"]) == set(backend_users)
+        assert len(page_rfm) == backend["total_users"]
+        # 参考日为数据中的最大日期，必须存在当天仍消费的客户（recency=0）。
+        assert (page_rfm["recency_days"] == 0).any()
+
+        threshold = backend["score_threshold"]
+        for row in page_rfm.itertuples(index=False):
+            expected = backend_users[row.user_name]
+            assert row.recency_days == expected["recency_days"]
+            assert row.frequency == expected["frequency"]
+            assert row.monetary == pytest.approx(expected["monetary"], abs=0.01)
+            assert (row.r_score, row.f_score, row.m_score) == (
+                expected["r_score"],
+                expected["f_score"],
+                expected["m_score"],
+            )
+            assert assign_segment(
+                row.r_score,
+                row.f_score,
+                row.m_score,
+                threshold,
+                threshold,
+                threshold,
+            ) == expected["segment"]
+
+
 class TestAI:
     @pytest.mark.asyncio
     async def test_ai_requires_auth(self, client: AsyncClient):
@@ -497,6 +662,18 @@ def _created_event(order_id: str, version: int = 1) -> dict:
             "discount_amount": "20.00",
             "platform_type": "APP",
         },
+    }
+
+
+def _cancel_event(order_id: str, version: int = 2) -> dict:
+    return {
+        "event_id": str(uuid4()),
+        "order_id": order_id,
+        "event_type": "ORDER_CANCELLED",
+        "occurred_at": datetime.now(UTC).isoformat(),
+        "version": version,
+        "source": "pytest",
+        "payload": {},
     }
 
 

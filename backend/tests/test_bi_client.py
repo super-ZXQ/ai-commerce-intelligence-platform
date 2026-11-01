@@ -20,12 +20,17 @@ def test_fetch_orders_paginates_and_forwards_session_cookie():
         page = int(request.url.params["page"])
         assert request.url.params["page_size"] == "2"
         if page == 1:
+            assert "data_version" not in request.url.params
             return _json_response(
                 {"total": 3, "page": 1, "page_size": 2, "total_pages": 2,
+                 "data_version": 7,
                  "items": [{"order_no": "A"}, {"order_no": "B"}]}
             )
+        # 后续页必须携带首屏版本，才能与第一页处于同一快照。
+        assert request.url.params["data_version"] == "7"
         return _json_response(
             {"total": 3, "page": 2, "page_size": 2, "total_pages": 2,
+             "data_version": 7,
              "items": [{"order_no": "C"}]}
         )
 
@@ -45,14 +50,78 @@ def test_fetch_orders_rejects_incomplete_pagination():
     def handler(request: httpx.Request) -> httpx.Response:
         page = int(request.url.params["page"])
         if page == 1:
-            return _json_response({"total": 2, "items": [{"order_no": "A"}]})
-        return _json_response({"total": 2, "items": []})
+            return _json_response(
+                {"total": 2, "data_version": 1, "items": [{"order_no": "A"}]}
+            )
+        return _json_response(
+            {"total": 2, "data_version": 1, "items": []}
+        )
 
     client = BiApiClient(
         "http://backend", "ea_session", "token", transport=httpx.MockTransport(handler)
     )
     with pytest.raises(BiApiError, match="分页不完整"):
         client.fetch_orders(page_size=1)
+
+
+def test_fetch_orders_retries_whole_snapshot_after_version_conflict():
+    """第二页遇到 409 时必须丢弃已拼接结果，从第一页整次重读。"""
+    calls: list[tuple[int, str | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = int(request.url.params["page"])
+        version_param = request.url.params.get("data_version")
+        calls.append((page, version_param))
+        if page == 1 and len([c for c in calls if c[0] == 1]) == 1:
+            return _json_response(
+                {"total": 3, "data_version": 7,
+                 "items": [{"order_no": "A"}, {"order_no": "B"}]}
+            )
+        if page == 2 and version_param == "7":
+            return httpx.Response(
+                409,
+                json={
+                    "detail": {
+                        "error_code": "BI_DATA_VERSION_CHANGED",
+                        "message": "BI 数据在分页读取期间发生变化，请重新加载",
+                        "data_version": 8,
+                    }
+                },
+            )
+        if page == 1:
+            return _json_response(
+                {"total": 3, "data_version": 8,
+                 "items": [{"order_no": "A"}, {"order_no": "B"}]}
+            )
+        return _json_response(
+            {"total": 3, "data_version": 8, "items": [{"order_no": "C"}]}
+        )
+
+    client = BiApiClient(
+        "http://backend", "ea_session", "token", transport=httpx.MockTransport(handler)
+    )
+    rows = client.fetch_orders(page_size=2)
+
+    assert [row["order_no"] for row in rows] == ["A", "B", "C"]
+    assert calls == [(1, None), (2, "7"), (1, None), (2, "8")]
+
+
+def test_fetch_orders_rejects_mixed_versions_across_pages():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if int(request.url.params["page"]) == 1:
+            return _json_response(
+                {"total": 3, "data_version": 7,
+                 "items": [{"order_no": "A"}, {"order_no": "B"}]}
+            )
+        return _json_response(
+            {"total": 3, "data_version": 8, "items": [{"order_no": "C"}]}
+        )
+
+    client = BiApiClient(
+        "http://backend", "ea_session", "token", transport=httpx.MockTransport(handler)
+    )
+    with pytest.raises(BiApiError, match="持续变化"):
+        client.fetch_orders(page_size=2, max_retries=2)
 
 
 def test_verify_session_returns_none_on_expired_cookie():

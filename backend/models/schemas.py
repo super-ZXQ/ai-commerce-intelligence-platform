@@ -55,6 +55,7 @@ class BIOrderPage(BaseModel):
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
     total_pages: int = Field(..., description="总页数")
+    data_version: int = Field(..., description="本次分页读取绑定的数据版本")
     items: list[BIOrderItem] = Field(..., description="订单列表")
 
 

@@ -8,8 +8,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from backend.utils.rfm_scoring import assign_segment, quantile_scores
+from backend.utils.rfm_scoring import assign_segment
 from bi_api import BiApiClient, BiApiError, BiAuthError, BiPermissionError
+from bi_rfm import score_rfm_frame
 from bi_style import BI_DASHBOARD_CSS
 
 # ══════════════════════════════════════════════════════════════
@@ -169,7 +170,6 @@ def load_data(refresh_token: int = 0) -> tuple[pd.DataFrame, str]:
     return frame, '后端 API（非取消订单）'
 
 
-@st.cache_data(ttl=30, show_spinner=False)
 def load_rfm_export(
     segment: str,
     reference_date: str,
@@ -177,9 +177,8 @@ def load_rfm_export(
     r_threshold: int,
     f_threshold: int,
     m_threshold: int,
-    refresh_token: int = 0,
 ) -> bytes:
-    """导出由后端重新分层并生成；页面只负责触发与展示下载。"""
+    """导出由后端重新分层并生成；只在用户显式点击后调用，避免消耗额度。"""
     return _bi_client().fetch_rfm_export(
         segment=segment,
         reference_date=reference_date,
@@ -327,28 +326,17 @@ elif page == "RFM 客户分层":
         """对已过滤的付款订单 DataFrame 计算 R/F/M 评分。
 
         _paid_df 加下划线前缀使 st.cache_data 跳过其哈希；data_version
-        显式参与缓存键，保证订单数据变化后重新计算。
+        显式参与缓存键，保证订单数据变化后重新计算。日期口径由
+        bi_rfm.score_rfm_frame 统一，参考日当天订单 recency 为 0。
         """
-        rfm = _paid_df.groupby('用户名').agg(
-            last_order_date=('下单时间', 'max'),
-            frequency=('订单号', 'nunique'),
-            monetary=('付款金额', 'sum')
-        ).reset_index()
-        rfm['recency_days'] = (pd.Timestamp(ref_date) - rfm['last_order_date']).dt.days
-
-        rfm['r_score'] = quantile_scores(
-            rfm['recency_days'].tolist(),
-            n_bins_val,
-        )
-        rfm['f_score'] = quantile_scores(
-            rfm['frequency'].tolist(),
-            n_bins_val,
-        )
-        rfm['m_score'] = quantile_scores(
-            rfm['monetary'].tolist(),
-            n_bins_val,
-        )
-        return rfm
+        canonical = _paid_df.rename(columns={
+            '用户名': 'user_name',
+            '下单时间': 'order_time',
+            '订单号': 'order_no',
+            '付款金额': 'payment_amount',
+        })
+        rfm = score_rfm_frame(canonical, ref_date, n_bins_val)
+        return rfm.rename(columns={'user_name': '用户名'})
 
     _user_stats = paid_df.groupby('用户名').agg(
         order_count=('订单号', 'nunique'),
@@ -901,29 +889,51 @@ elif page == "RFM 客户分层":
 
             # ── 导出CSV（由后端按 data:export 权限重新分层并生成）──
             if export_allowed:
-                try:
-                    csv_data = load_rfm_export(
-                        sel_segment,
-                        ref_date_input.isoformat(),
-                        n_bins,
-                        r_threshold,
-                        f_threshold,
-                        m_threshold,
-                        st.session_state.get('data_refresh_token', 0),
-                    )
+                export_signature = (
+                    bi_session.get('username', ''),
+                    sel_segment,
+                    ref_date_input.isoformat(),
+                    n_bins,
+                    r_threshold,
+                    f_threshold,
+                    m_threshold,
+                )
+                # 只有显式点击才请求后端：浏览分群、切换日期/阈值不消耗导出额度。
+                if st.button("生成导出文件", key="generate_rfm_export"):
+                    try:
+                        csv_data = load_rfm_export(
+                            sel_segment,
+                            ref_date_input.isoformat(),
+                            n_bins,
+                            r_threshold,
+                            f_threshold,
+                            m_threshold,
+                        )
+                    except BiAuthError:
+                        _render_login_gate()
+                    except BiPermissionError:
+                        st.caption("当前账号无导出权限（data:export）。")
+                    except BiApiError as exc:
+                        st.caption(f"导出暂不可用：{exc.message}")
+                    else:
+                        st.session_state['rfm_export'] = {
+                            "signature": export_signature,
+                            "data": csv_data,
+                        }
+
+                stored_export = st.session_state.get('rfm_export')
+                # 参数变化后旧文件立即失效，避免下载到其他分群/阈值的结果。
+                if stored_export and stored_export.get("signature") != export_signature:
+                    st.session_state.pop('rfm_export', None)
+                    stored_export = None
+                if stored_export:
                     st.download_button(
-                        label="导出 CSV",
-                        data=csv_data,
+                        label="下载 CSV",
+                        data=stored_export["data"],
                         file_name=f"{sel_segment}_客户明细.csv",
                         mime="text/csv",
                     )
-                    st.caption("导出由后端按当前账号权限执行，最多 200 条。")
-                except BiAuthError:
-                    _render_login_gate()
-                except BiPermissionError:
-                    st.caption("当前账号无导出权限（data:export）。")
-                except BiApiError as exc:
-                    st.caption(f"导出暂不可用：{exc.message}")
+                st.caption("点击“生成导出文件”后才会请求后端；每次请求计入导出限流额度，最多 200 条。")
             else:
                 st.caption("当前账号无导出权限（data:export），无法下载客户明细。")
 

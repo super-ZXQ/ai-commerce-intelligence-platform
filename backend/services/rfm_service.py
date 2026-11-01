@@ -53,6 +53,7 @@ async def _fetch_rfm_raw(db: AsyncSession, ref_date) -> list[dict]:
         func.coalesce(func.sum(Order.payment_amount), 0).label("monetary"),
     ).where(
         and_(
+            Order.user_name.is_not(None),
             Order.order_date <= ref_date,
             Order.payment_amount > 0,
             # 与 BI/AI 统一：取消订单不参与 RFM；退款订单保留，M 值为历史付款额。

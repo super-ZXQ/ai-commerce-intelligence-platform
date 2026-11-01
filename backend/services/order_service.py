@@ -1,7 +1,7 @@
 import logging
 import math
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import asc, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database_models import Order
@@ -27,6 +27,28 @@ SORT_COLUMN_MAP = {
 # 与 analytics_service._ORDER_BASE 保持一致：所有经营聚合都排除取消订单；
 # 退款订单仍保留在销售额/订单数中。
 _ORDER_BASE = Order.order_status != "CANCELLED"
+
+
+class BIDataVersionChanged(RuntimeError):
+    """分页读取期间数据版本发生变化，本次快照不再可信。"""
+
+    def __init__(self, expected: int | None, actual: int):
+        super().__init__(f"BI 数据版本已变化（期望 {expected}，实际 {actual}）")
+        self.expected = expected
+        self.actual = actual
+
+
+async def _read_bi_data_version(db: AsyncSession) -> int:
+    """读取与本次查询同一事务快照的数据版本。
+
+    必须是本事务的第一条一致性读：MySQL REPEATABLE READ 会在此时建立快照，
+    后续 count 与分页查询都复用该快照。版本行缺失说明迁移未完成，直接失败，
+    不能用不完整数据继续渲染看板。
+    """
+    value = await db.scalar(text("SELECT data_version FROM data_state WHERE id = 1"))
+    if value is None:
+        raise RuntimeError("data_state 缺少 id=1 的版本行，请先执行数据库迁移")
+    return int(value)
 
 
 async def get_orders(
@@ -127,8 +149,18 @@ async def get_bi_orders(
     db: AsyncSession,
     page: int = 1,
     page_size: int = 5000,
+    expected_version: int | None = None,
 ) -> BIOrderPage:
-    """BI 看板读取运行期订单：按非取消口径分页，权限由路由层校验。"""
+    """BI 看板读取运行期订单：按非取消口径分页，权限由路由层校验。
+
+    整次分页读取绑定同一 data_version：首屏返回版本，后续页必须携带。
+    服务端在查询前后各读一次版本，任一次不一致都拒绝本次结果，避免在
+    两次请求之间新增/取消订单导致漏行或保留已取消订单。
+    """
+    version_before = await _read_bi_data_version(db)
+    if expected_version is not None and version_before != expected_version:
+        raise BIDataVersionChanged(expected_version, version_before)
+
     total = (
         await db.execute(select(func.count(Order.id)).where(_ORDER_BASE))
     ).scalar() or 0
@@ -149,11 +181,19 @@ async def get_bi_orders(
         .limit(page_size)
     )
     rows = (await db.execute(stmt)).all()
+
+    # REPEATABLE READ 下两次读到同一快照版本，数据也来自同一快照；
+    # READ COMMITTED 下再读一次可兜住查询窗口内已提交的写入。
+    version_after = await _read_bi_data_version(db)
+    if version_after != version_before:
+        raise BIDataVersionChanged(version_before, version_after)
+
     return BIOrderPage(
         total=total,
         page=page,
         page_size=page_size,
         total_pages=math.ceil(total / page_size) if page_size > 0 else 0,
+        data_version=version_before,
         items=[
             BIOrderItem(
                 order_no=row.order_no,

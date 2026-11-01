@@ -633,6 +633,13 @@ class TestFrontendBoundaries:
         assert "fetch_orders" in source
         assert "fetch_rfm_export" in source
         assert "data:export" in source
+        # 导出必须由显式按钮触发，浏览分群/切换参数不得调用导出接口。
+        export_block = source.split("# ── 导出CSV", 1)[1]
+        assert 'if st.button("生成导出文件"' in export_block
+        assert export_block.index("load_rfm_export(") > export_block.index(
+            'if st.button("生成导出文件"'
+        )
+        assert "rfm_export" in export_block
 
 
 class TestManageAuthScopes:

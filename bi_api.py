@@ -122,9 +122,28 @@ class BiApiClient:
         except BiAuthError:
             return None
 
-    def fetch_orders(self, page_size: int = 10000) -> list[dict]:
-        """分页拉取完整非取消订单集；结果行数必须等于后端 total。"""
+    def fetch_orders(self, page_size: int = 10000, max_retries: int = 3) -> list[dict]:
+        """分页拉取完整非取消订单集，整次读取绑定同一数据版本。
+
+        首屏返回 data_version，后续页携带该版本；服务端发现期间有新增/取消
+        订单会返回 409，客户端放弃已拼接结果并整次重读，最多 max_retries 次。
+        """
         self._require_token()
+        last_conflict: BiApiError | None = None
+        for _ in range(max(1, max_retries)):
+            try:
+                return self._fetch_orders_snapshot(page_size)
+            except BiApiError as exc:
+                if exc.error_code != "BI_DATA_VERSION_CHANGED":
+                    raise
+                last_conflict = exc
+        raise BiApiError(
+            "BI 数据持续变化，暂时无法取得一致快照，请稍后重试",
+            status_code=last_conflict.status_code if last_conflict else 0,
+            error_code="BI_DATA_VERSION_CHANGED",
+        )
+
+    def _fetch_orders_snapshot(self, page_size: int) -> list[dict]:
         with self._client() as client:
             first = self._request(
                 client,
@@ -132,6 +151,9 @@ class BiApiClient:
                 "/api/bi/orders",
                 params={"page": 1, "page_size": page_size},
             ).json()
+            version = first.get("data_version")
+            if not isinstance(version, int):
+                raise BiApiError("后端未返回 BI 数据版本，无法保证分页一致性")
             total = int(first.get("total") or 0)
             rows = list(first.get("items") or [])
             pages = math.ceil(total / page_size) if total else 0
@@ -140,12 +162,22 @@ class BiApiClient:
                     client,
                     "GET",
                     "/api/bi/orders",
-                    params={"page": page, "page_size": page_size},
+                    params={
+                        "page": page,
+                        "page_size": page_size,
+                        "data_version": version,
+                    },
                 ).json()
-                items = list(payload.get("items") or [])
-                if not items:
-                    break
-                rows.extend(items)
+                # 任何一页的版本或总数漂移都说明快照已失效，不能拼接后交付。
+                if (
+                    payload.get("data_version") != version
+                    or int(payload.get("total") or 0) != total
+                ):
+                    raise BiApiError(
+                        "BI 数据在分页期间发生变化，正在重新读取",
+                        error_code="BI_DATA_VERSION_CHANGED",
+                    )
+                rows.extend(payload.get("items") or [])
         if len(rows) != total:
             raise BiApiError(
                 f"BI 数据分页不完整（{len(rows)}/{total} 行），请刷新重试"
