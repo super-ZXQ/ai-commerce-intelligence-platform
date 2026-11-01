@@ -194,6 +194,8 @@ page = st.sidebar.selectbox("选择看板页面", ["销售总览", "RFM 客户�
 st.sidebar.caption(f"登录账号：{bi_session.get('username', '')}")
 if st.sidebar.button("刷新数据", help="重新经后端读取数据；页面缓存最长 30 秒"):
     st.session_state['data_refresh_token'] = st.session_state.get('data_refresh_token', 0) + 1
+    # 数据刷新后旧导出文件必须失效，避免下载到刷新前的结果。
+    st.session_state.pop('rfm_export', None)
     load_data.clear()
     st.rerun()
 
