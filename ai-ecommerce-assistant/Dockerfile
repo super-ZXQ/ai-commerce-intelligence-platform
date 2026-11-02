@@ -7,7 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/ai-ecommerce-assistant
 
 COPY ai-ecommerce-assistant/requirements.txt .
-RUN --network=host python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
+# BuildKit 在现代 Docker Desktop 中禁止构建期 host 网络；默认 bridge 网络即可访问 PyPI。
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
     && pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu \
         "torch==2.13.0+cpu" \
