@@ -41,7 +41,7 @@ svg { display: block; }
 .brand-mark i:nth-child(2) { height: 11px; background: #f4c62b; margin-top: 6px; }
 .brand-mark i:nth-child(3) { height: 14px; background: #f89353; margin-top: 3px; }
 .brand-mark i:nth-child(4) { height: 12px; background: #f2f4f8; margin-top: 5px; }
-.brand span { display: block; min-width: 0; }
+.brand-copy { display: block; min-width: 0; }
 .brand strong { display: block; font-size: 13px; font-weight: 750; letter-spacing: -.1px; white-space: nowrap; }
 .brand small { display: block; margin-top: 3px; font-size: 8.5px; letter-spacing: .07em; color: #88919f; white-space: nowrap; }
 .side-label { padding: 25px 22px 10px; font-size: 9.5px; letter-spacing: .14em; color: #737e90; }
