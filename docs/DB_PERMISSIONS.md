@@ -12,7 +12,7 @@
 | `ea_app` | FastAPI 业务读路径（含 BI 数据与导出） | `DB_USER` / `DB_PASSWORD` | 表级只读 |
 | `ea_ai` | AI Text-to-SQL 只读执行 | `AI_DB_USER` / `AI_DB_PASSWORD` | 仅 `orders` 表级只读 |
 | `ea_events` | 订单事件摄入写路径 | `EVENT_DB_USER` / `EVENT_DB_PASSWORD` | `orders` / `order_events` / `data_state` 表级读写 |
-| `ea_auth` | 登录、权限、服务凭据、审计 | `AUTH_DB_USER` / `AUTH_DB_PASSWORD` | 仅认证/审计表 |
+| `ea_auth` | 登录、权限、服务凭据、审计、用户长期偏好 | `AUTH_DB_USER` / `AUTH_DB_PASSWORD` | 仅认证/审计/记忆表 |
 | `ea_sync` | 显式订单导入、staging 换表 | `MIGRATION_DB_USER=ea_sync`（data-import） | 库级 DDL（运维例外） |
 | `ea_migrate` | Alembic schema 升级 | `MIGRATION_DB_USER=ea_migrate` | 库级 DDL（迁移例外） |
 | `root` | 仅 bootstrap / apply-grants | MySQL 容器内 | 全部 |
@@ -30,6 +30,8 @@
 | `service_clients` | — | — | — | SELECT/INSERT/UPDATE/DELETE |
 | `auth_audit_log` | — | — | — | SELECT/INSERT |
 | `ai_query_audit` | — | — | — | SELECT/INSERT |
+| `agent_memory_fact` | — | — | — | SELECT/INSERT/UPDATE/DELETE |
+| `agent_memory_episode` | — | — | — | SELECT/INSERT/UPDATE/DELETE |
 | `app_metadata` | — | — | — | — |
 
 说明：
@@ -38,6 +40,8 @@
 - `ea_events` 不能删除订单、不能访问认证表；事件幂等由 `order_events.event_id` 唯一键兜底。
 - `ea_events` 可在事件事务内更新 `data_state.data_version`，用于缓存版本切换；该权限不包含 DELETE，不能重置版本或删除版本行。
 - `ea_auth` 无任何 `orders` 权限；认证库连接池与业务连接池相互独立。
+- `ea_auth` 对 `agent_memory_fact` 的读写必须始终带 `owner` 条件；owner 来自认证主体，不能由客户端传入。
+- `ea_auth` 对 `agent_memory_episode` 同样强制 `owner` 过滤；向量字段只保存摘要的嵌入，不保存完整对话。
 - `ea_app` 不授予 `auth_users` / `service_clients`，避免业务接口意外泄露口令哈希。
 - BI 看板容器不持有 `ea_app` 凭据：页面携带会话 Cookie 调用 `/api/bi/orders` 与
   `/api/export/rfm-segment`，由 FastAPI 使用 `ea_app` 读取并执行 `data:read` /

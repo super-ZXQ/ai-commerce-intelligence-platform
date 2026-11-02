@@ -11,6 +11,12 @@ COPY backend/requirements.txt ./backend/
 RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
     && pip install --no-cache-dir -r ./backend/requirements.txt
 
+# 情节向量模型：构建时通过镜像源预热；失败不阻塞构建，运行时再懒加载。
+ENV HF_ENDPOINT=https://hf-mirror.com \
+    HF_HOME=/home/app/.cache/huggingface
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-zh-v1.5')" || true
+RUN chown -R 10001:10001 /tmp/fastembed_cache 2>/dev/null || true
+
 COPY backend/ ./backend/
 COPY agent_core/ ./agent_core/
 COPY ai-ecommerce-assistant/knowledge_base/ ./ai-ecommerce-assistant/knowledge_base/
@@ -19,7 +25,7 @@ COPY sql/ /app/sql/
 
 RUN python -c "import agent_core" \
     && mkdir -p /home/app \
-    && chown 10001:10001 /home/app
+    && chown -R 10001:10001 /home/app
 
 # 非 root 运行：应用只读代码与数据卷，不需要任何特权。
 USER 10001:10001

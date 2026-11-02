@@ -47,10 +47,11 @@ missing="$(mysql --protocol=TCP -h mysql -uroot -N -B -e "
   WHERE table_schema='${DB_NAME}'
     AND table_name IN ('orders','order_events','data_state','data_import_runs',
                        'order_status_reconciliation','auth_users','service_clients',
-                       'auth_audit_log','ai_query_audit')
+                       'auth_audit_log','ai_query_audit','agent_memory_fact',
+                       'agent_memory_episode')
 ")"
-if [ "${missing}" != "9" ]; then
-  echo "schema 尚未就绪：期望 9 张表，实际 ${missing} 张；请先完成 db-migrate" >&2
+if [ "${missing}" != "11" ]; then
+  echo "schema 尚未就绪：期望 11 张表，实际 ${missing} 张；请先完成 db-migrate" >&2
   exit 1
 fi
 
@@ -86,6 +87,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`auth_users\` TO 'ea_aut
 GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`service_clients\` TO 'ea_auth'@'%';
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.\`auth_audit_log\` TO 'ea_auth'@'%';
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.\`ai_query_audit\` TO 'ea_auth'@'%';
+-- 用户长期偏好：认证账号可读写当前主体的白名单记忆，仍无订单数据权限。
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`agent_memory_fact\` TO 'ea_auth'@'%';
+-- 历史情节：只读写当前主体的压缩摘要与向量。
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`agent_memory_episode\` TO 'ea_auth'@'%';
 
 FLUSH PRIVILEGES;
 SQL

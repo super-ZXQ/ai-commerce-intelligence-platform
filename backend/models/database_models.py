@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, Date, DateTime, Integer, Numeric, String, Text, func
+from sqlalchemy import JSON, Column, Date, DateTime, Integer, Numeric, String, Text, UniqueConstraint, func
 
 from backend.database import Base
 
@@ -94,6 +94,46 @@ class AIQueryAudit(Base):
     total_tokens = Column("total_tokens", Integer, nullable=True)
     latency_ms = Column("latency_ms", Integer, nullable=True)
     error_category = Column("error_category", String(80), nullable=False, default="")
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
+
+
+class AgentMemoryFact(Base):
+    """按认证主体隔离的长期偏好；只允许白名单键值，不存原始对话。"""
+
+    __tablename__ = "agent_memory_fact"
+    __table_args__ = (
+        UniqueConstraint("owner", "memory_key", name="uq_agent_memory_owner_key"),
+    )
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    owner = Column("owner", String(100), nullable=False, index=True)
+    memory_key = Column("memory_key", String(64), nullable=False)
+    memory_value = Column("memory_value", String(255), nullable=False)
+    confidence = Column("confidence", Numeric(3, 2), nullable=False, default=0.95)
+    source_thread_id = Column("source_thread_id", String(128), nullable=False, default="")
+    source_request_id = Column("source_request_id", String(64), nullable=False, default="")
+    expires_at = Column("expires_at", DateTime, nullable=True)
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
+    updated_at = Column("updated_at", DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class AgentMemoryEpisode(Base):
+    """按主体隔离的历史情节摘要；embedding 可为空以支持关键词降级。"""
+
+    __tablename__ = "agent_memory_episode"
+    __table_args__ = (
+        UniqueConstraint("owner", "source_request_id", name="uq_episode_owner_request"),
+    )
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    owner = Column("owner", String(100), nullable=False, index=True)
+    thread_id = Column("thread_id", String(128), nullable=False, default="")
+    source_request_id = Column("source_request_id", String(64), nullable=False)
+    summary = Column("summary", Text, nullable=False)
+    intent = Column("intent", String(32), nullable=False, default="")
+    embedding = Column("embedding", JSON, nullable=True)
+    embedding_model = Column("embedding_model", String(64), nullable=False, default="")
+    expires_at = Column("expires_at", DateTime, nullable=True)
     created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
 
 

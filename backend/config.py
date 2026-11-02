@@ -78,6 +78,27 @@ class Settings(BaseSettings):
     redis_session_db: int = 1
     redis_enabled: bool = False
 
+    # 短期会话记忆：存储按轮数保留，提示词再按字符预算裁剪。
+    agent_session_ttl_seconds: int = 1800
+    agent_session_max_turns: int = 6
+    agent_session_max_sessions: int = 1000
+    agent_history_max_chars: int = 2000
+
+    # 长期偏好：只存白名单键值，按认证主体隔离。
+    agent_memory_enabled: bool = True
+    agent_memory_ttl_days: int = 180
+    agent_memory_max_facts: int = 20
+    agent_memory_max_chars: int = 600
+
+    # 历史情节：单轮摘要 + 本地向量召回；向量不可用时自动降级为关键词。
+    agent_episode_enabled: bool = True
+    agent_episode_vector_enabled: bool = True
+    agent_episode_embedding_model: str = "BAAI/bge-small-zh-v1.5"
+    agent_episode_ttl_days: int = 90
+    agent_episode_max_per_owner: int = 200
+    agent_episode_top_k: int = 3
+    agent_episode_min_score: float = 0.45
+
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
@@ -163,6 +184,27 @@ class Settings(BaseSettings):
         if self.redis_session_db == self.redis_db:
             # 逻辑 DB 只是命名隔离，不改变 allkeys-lru 的全局淘汰；但同库会直接键冲突。
             raise ValueError("REDIS_SESSION_DB 必须与 REDIS_DB 不同，避免会话键与业务缓存键冲突")
+        if (
+            self.agent_session_ttl_seconds < 1
+            or self.agent_session_max_turns < 1
+            or self.agent_session_max_sessions < 1
+            or self.agent_history_max_chars < 1
+        ):
+            raise ValueError("AGENT_SESSION_* / AGENT_HISTORY_MAX_CHARS 必须大于 0")
+        if self.agent_memory_ttl_days < 0:
+            raise ValueError("AGENT_MEMORY_TTL_DAYS 不能小于 0")
+        if not 1 <= self.agent_memory_max_facts <= 100:
+            raise ValueError("AGENT_MEMORY_MAX_FACTS 必须在 1-100 之间")
+        if not 1 <= self.agent_memory_max_chars <= 4000:
+            raise ValueError("AGENT_MEMORY_MAX_CHARS 必须在 1-4000 之间")
+        if self.agent_episode_ttl_days < 0:
+            raise ValueError("AGENT_EPISODE_TTL_DAYS 不能小于 0")
+        if not 1 <= self.agent_episode_max_per_owner <= 1000:
+            raise ValueError("AGENT_EPISODE_MAX_PER_OWNER 必须在 1-1000 之间")
+        if not 1 <= self.agent_episode_top_k <= 10:
+            raise ValueError("AGENT_EPISODE_TOP_K 必须在 1-10 之间")
+        if not 0 <= self.agent_episode_min_score <= 1:
+            raise ValueError("AGENT_EPISODE_MIN_SCORE 必须在 0-1 之间")
         if self.default_page_size < 1:
             raise ValueError("DEFAULT_PAGE_SIZE 必须大于 0")
         if self.max_page_size < self.default_page_size:

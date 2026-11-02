@@ -10,6 +10,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from typing import Literal
 
+from agent_core.context import DEFAULT_HISTORY_MAX_CHARS, build_history_window
 from agent_core.models import AgentIntent, AgentSource, ModelResponse
 from agent_core.provider_policy import (
     build_http_client,
@@ -51,9 +52,11 @@ class OpenAIModelAdapter:
         resolver: Callable[..., list] = socket.getaddrinfo,
         timeout: float = 120.0,
         max_retries: int = 1,
+        history_max_chars: int = DEFAULT_HISTORY_MAX_CHARS,
     ):
         self._api_key = api_key
         self._business_context = business_context
+        self._history_max_chars = history_max_chars
         self._allowed_hosts = tuple(allowed_hosts)
         self._resolver = resolver
         self._timeout = timeout
@@ -125,6 +128,13 @@ class OpenAIModelAdapter:
         result.content = parsed.action
         return result
 
+    def _history_json(self, history: list[Message]) -> str:
+        """按字符预算裁剪历史；SQL 与回答两条提示词共用同一窗口。"""
+        return json.dumps(
+            build_history_window(history, max_chars=self._history_max_chars),
+            ensure_ascii=False,
+        )
+
     async def generate_sql(
         self,
         query: str,
@@ -143,7 +153,7 @@ class OpenAIModelAdapter:
 知识来源：
 {source_context or '无'}
 
-最近会话：{json.dumps(history[-6:], ensure_ascii=False)}
+会话上下文：{self._history_json(history)}
 用户问题：{query}
 上次脱敏错误：{previous_error or '无'}
 
@@ -178,7 +188,7 @@ class OpenAIModelAdapter:
         return f"""你是电商数据分析助手。根据已验证的工具结果用中文简洁回答，不得编造。
 问题：{query}
 意图：{intent}
-最近会话：{json.dumps(history[-6:], ensure_ascii=False)}
+会话上下文：{self._history_json(history)}
 引用知识：{source_context or '无'}
 SQL：{sql or '未执行'}
 结果：{json.dumps(rows[:50], ensure_ascii=False, default=str)}

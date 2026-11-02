@@ -14,6 +14,7 @@ from sqlalchemy.engine import Engine
 
 from agent_core import AgentRuntime
 from agent_core.db_schema import describe_table
+from agent_core.memory import EpisodeSummary, EpisodeTurn, MemoryFact, MemoryTurn
 from agent_core.model_adapter import OpenAIModelAdapter
 from agent_core.provider_policy import (
     ModelConfig,
@@ -26,6 +27,7 @@ from agent_core.session import FallbackConversationStore, MemoryConversationStor
 from agent_core.sql_safety import dialect_from_url
 from backend.config import get_settings
 from backend.models.schemas import AIQueryResponse, AgentUsage
+from backend.services import episode_memory_service, memory_service
 from backend.utils.sql_guard import guard_read_only_engine, is_read_only_sql
 from backend.utils.text_cleaner import sanitize_error
 
@@ -171,6 +173,22 @@ async def _runtime_schema() -> str:
     return await asyncio.to_thread(describe_table, _get_sync_engine(), "orders")
 
 
+async def _runtime_recall_memories(owner: str) -> list[MemoryFact]:
+    return await memory_service.recall_memories(owner)
+
+
+async def _runtime_write_memory(turn: MemoryTurn) -> int:
+    return await memory_service.remember_turn(turn)
+
+
+async def _runtime_recall_episodes(owner: str, query: str) -> list[EpisodeSummary]:
+    return await episode_memory_service.recall_episodes(owner, query)
+
+
+async def _runtime_write_episode(turn: EpisodeTurn) -> bool:
+    return await episode_memory_service.save_episode(turn)
+
+
 async def _runtime_execute(sql: str) -> list[dict]:
     # AST 层之后仍保留执行器黑名单与数据库只读账户两层防护。
     return await asyncio.to_thread(_execute_query_with_columns, sql)
@@ -182,14 +200,23 @@ _model_adapter = OpenAIModelAdapter(
     model=settings.llm_model,
     business_context=BUSINESS_CONTEXT,
     allowed_hosts=settings.llm_allowed_hosts,
+    history_max_chars=settings.agent_history_max_chars,
 )
 
 
 def _conversation_store():
-    memory = MemoryConversationStore(ttl_seconds=1800, max_sessions=1000, max_turns=6)
+    memory = MemoryConversationStore(
+        ttl_seconds=settings.agent_session_ttl_seconds,
+        max_sessions=settings.agent_session_max_sessions,
+        max_turns=settings.agent_session_max_turns,
+    )
     # 会话使用独立逻辑 DB 仅作命名隔离；同一实例的 allkeys-lru 仍可能淘汰会话。
     primary = (
-        RedisConversationStore(settings.redis_session_url)
+        RedisConversationStore(
+            settings.redis_session_url,
+            ttl_seconds=settings.agent_session_ttl_seconds,
+            max_turns=settings.agent_session_max_turns,
+        )
         if settings.redis_enabled
         else None
     )
@@ -208,6 +235,11 @@ def _build_runtime(adapter: OpenAIModelAdapter) -> AgentRuntime:
         answer_generator=adapter.astream_answer,
         analysis_planner=adapter.choose_refund_analysis,
         conversations=_conversations,
+        memory_recall=_runtime_recall_memories if settings.agent_memory_enabled else None,
+        memory_writer=_runtime_write_memory if settings.agent_memory_enabled else None,
+        episode_recall=_runtime_recall_episodes if settings.agent_episode_enabled else None,
+        episode_writer=_runtime_write_episode if settings.agent_episode_enabled else None,
+        memory_max_chars=settings.agent_memory_max_chars,
         sql_timeout_seconds=10,
         # 方言决定能否把执行时限下推到数据库（MySQL 用 MAX_EXECUTION_TIME）。
         sql_dialect=dialect_from_url(settings.ai_database_url),
@@ -288,6 +320,7 @@ def _runtime_for(config: ModelConfig | None) -> AgentRuntime:
         model=config.model,
         business_context=BUSINESS_CONTEXT,
         allowed_hosts=settings.llm_allowed_hosts,
+        history_max_chars=settings.agent_history_max_chars,
     )
     runtime = _build_runtime(adapter)
     _runtime_cache[fingerprint] = (runtime, adapter)

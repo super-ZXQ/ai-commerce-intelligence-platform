@@ -86,6 +86,8 @@ def main() -> int:
                 "service_clients",
                 "auth_audit_log",
                 "ai_query_audit",
+                "agent_memory_fact",
+                "agent_memory_episode",
             }
             missing = need - tables
             if missing:

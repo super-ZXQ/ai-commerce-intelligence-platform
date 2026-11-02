@@ -19,7 +19,7 @@ _SEED = _BACKEND / "scripts" / "seed_ci_data.py"
 _BOOTSTRAP_SH = _ROOT / "deploy" / "mysql" / "bootstrap-users.sh"
 _GRANT_SH = _ROOT / "deploy" / "mysql" / "apply-grants.sh"
 # Alembic head 由迁移树决定；测试不再写死单一 revision，避免新增迁移后漏改。
-_HEAD = "0004_auth_identity"
+_HEAD = "0006_episode_memory"
 # alembic CLI must run from repo root: backend/alembic/ can shadow the package
 _ALEMBIC_CWD = _ROOT
 
@@ -135,6 +135,32 @@ def test_auth_identity_migration_declares_identity_tables():
         assert marker in source, f"0004 missing: {marker}"
 
 
+def test_agent_memory_migration_declares_table():
+    source = (_VERSIONS / "0005_agent_memory.py").read_text(encoding="utf-8")
+    for marker in (
+        "CREATE TABLE IF NOT EXISTS agent_memory_fact",
+        "uq_agent_memory_owner_key",
+        "idx_agent_memory_owner_expires",
+        "expires_at",
+        "source_request_id",
+    ):
+        assert marker in source, f"0005 missing: {marker}"
+    assert "DROP TABLE IF EXISTS agent_memory_fact" in source
+
+
+def test_episode_memory_migration_declares_table():
+    source = (_VERSIONS / "0006_episode_memory.py").read_text(encoding="utf-8")
+    for marker in (
+        "CREATE TABLE IF NOT EXISTS agent_memory_episode",
+        "uq_episode_owner_request",
+        "idx_episode_owner_created",
+        "embedding JSON NULL",
+        "embedding_model",
+    ):
+        assert marker in source, f"0006 missing: {marker}"
+    assert "DROP TABLE IF EXISTS agent_memory_episode" in source
+
+
 def test_reference_sql_and_baseline_stay_consistent():
     """Reference DDL in sql/01 must not drift from Alembic baseline."""
     ref = _REF_SQL.read_text(encoding="utf-8")
@@ -185,6 +211,8 @@ def test_table_level_grants_are_least_privilege():
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`service_clients\\`" in sh
     assert "GRANT SELECT, INSERT ON \\`${DB_NAME}\\`.\\`auth_audit_log\\`" in sh
     assert "GRANT SELECT, INSERT ON \\`${DB_NAME}\\`.\\`ai_query_audit\\`" in sh
+    assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`agent_memory_fact\\`" in sh
+    assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`agent_memory_episode\\`" in sh
     assert "GRANT SELECT, UPDATE ON \\`${DB_NAME}\\`.\\`data_state\\` TO 'ea_events'@'%'" in sh
     assert "DELETE ON \\`${DB_NAME}\\`.\\`data_state\\`" not in sh
     assert "auth_users" not in sh.split("GRANT SELECT ON")[1].split("ea_ai")[0]
@@ -262,6 +290,8 @@ def test_alembic_upgrade_head_on_mysql_if_available():
             "service_clients",
             "auth_audit_log",
             "ai_query_audit",
+            "agent_memory_fact",
+            "agent_memory_episode",
         } <= tables
         cols = {row[0] for row in c.execute(text("SHOW COLUMNS FROM orders")).fetchall()}
         assert {"order_seq_id", "order_id", "order_status", "event_version"} <= cols
@@ -402,6 +432,8 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
                 "service_clients",
                 "auth_audit_log",
                 "ai_query_audit",
+                "agent_memory_fact",
+                "agent_memory_episode",
             } <= tables
             assert c.execute(text("SELECT COUNT(*) FROM data_state")).scalar() == 1
             assert (

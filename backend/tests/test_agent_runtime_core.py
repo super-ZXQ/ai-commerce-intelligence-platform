@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent_core.context import build_history_window
 from agent_core.session import (
     FallbackConversationStore,
     MemoryConversationStore,
@@ -219,6 +220,61 @@ async def test_conversation_store_falls_back_when_redis_is_unavailable() -> None
         {"role": "user", "content": "question"},
         {"role": "assistant", "content": "answer"},
     ]
+
+
+def _turn(index: int, size: int = 40) -> list[dict[str, str]]:
+    return [
+        {"role": "user", "content": "q" * size + str(index)},
+        {"role": "assistant", "content": "a" * size + str(index)},
+    ]
+
+
+def test_history_window_drops_old_turns_without_splitting_a_turn() -> None:
+    """预算不足时整轮丢弃，不能留下孤立的 user 或 assistant 消息。"""
+    history = [message for index in range(3) for message in _turn(index)]
+    window = build_history_window(history, max_chars=260)
+
+    assert len(window) == 4
+    assert window[0]["content"] == "q" * 40 + "1"
+    assert window[-1]["content"] == "a" * 40 + "2"
+
+
+def test_history_window_keeps_latest_turn_even_when_budget_is_small() -> None:
+    """最新一轮必须保留：优先保问题，剩余预算再装回答。"""
+    history = _turn(0, size=10)
+    history[1]["content"] = "a" * 300
+    window = build_history_window(history, max_chars=60)
+
+    assert window[0] == {"role": "user", "content": "q" * 10 + "0"}
+    assert window[1]["role"] == "assistant"
+    assert len(window[1]["content"]) == 12
+    assert window[1]["content"].endswith("…")
+
+
+def test_history_window_clips_single_long_message_and_ignores_orphans() -> None:
+    history = [
+        {"role": "assistant", "content": "不应进入窗口"},
+        {"role": "user", "content": "问题" * 100},
+        {"role": "assistant", "content": "回答" * 100},
+    ]
+    window = build_history_window(history, max_chars=500, max_message_chars=30)
+
+    assert [message["role"] for message in window] == ["user", "assistant"]
+    assert all(len(message["content"]) <= 30 for message in window)
+    assert all(message["content"].endswith("…") for message in window)
+
+
+def test_history_window_preserves_system_memory_message() -> None:
+    """长期偏好作为 system 消息始终保留，不参与轮次配对。"""
+    history = [{"role": "system", "content": "默认指标：订单量"}, *_turn(0, size=10)]
+    window = build_history_window(history, max_chars=60)
+
+    assert window[0] == {"role": "system", "content": "默认指标：订单量"}
+    assert window[1]["content"] == "q" * 10 + "0"
+
+
+def test_history_window_returns_empty_for_zero_budget() -> None:
+    assert build_history_window(_turn(0), max_chars=0) == []
 
 
 def _runtime(calls: list[str], *, fail_sql_once: bool = False) -> AgentRuntime:

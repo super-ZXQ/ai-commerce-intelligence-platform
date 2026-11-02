@@ -53,6 +53,8 @@ expect_ok     "ea_app 读取 orders"            ea_app "$DB_APP_PASSWORD" "SELEC
 expect_ok     "ea_app 读取 data_state"        ea_app "$DB_APP_PASSWORD" "SELECT COUNT(*) FROM data_state"
 expect_denied "ea_app 不能更新 orders"        ea_app "$DB_APP_PASSWORD" "UPDATE orders SET updated_at = updated_at WHERE 1 = 0"
 expect_denied "ea_app 不能读取 auth_users"    ea_app "$DB_APP_PASSWORD" "SELECT COUNT(*) FROM auth_users"
+expect_denied "ea_app 不能读取长期偏好"       ea_app "$DB_APP_PASSWORD" "SELECT COUNT(*) FROM agent_memory_fact"
+expect_denied "ea_app 不能读取历史情节"       ea_app "$DB_APP_PASSWORD" "SELECT COUNT(*) FROM agent_memory_episode"
 
 # ── ea_ai：Text-to-SQL 只读，仅 orders ──
 expect_ok     "ea_ai 读取 orders"             ea_ai "$DB_AI_PASSWORD" "SELECT COUNT(*) FROM orders"
@@ -70,6 +72,8 @@ expect_denied "ea_events 不能读取 auth_users" ea_events "$DB_EVENT_PASSWORD"
 
 # ── ea_auth：认证/审计表，无业务数据权限 ──
 expect_ok     "ea_auth 读取 auth_users"       ea_auth "$DB_AUTH_PASSWORD" "SELECT COUNT(*) FROM auth_users"
+expect_ok     "ea_auth 读取长期偏好"          ea_auth "$DB_AUTH_PASSWORD" "SELECT COUNT(*) FROM agent_memory_fact"
+expect_ok     "ea_auth 读取历史情节"          ea_auth "$DB_AUTH_PASSWORD" "SELECT COUNT(*) FROM agent_memory_episode"
 expect_denied "ea_auth 不能读取 orders"       ea_auth "$DB_AUTH_PASSWORD" "SELECT COUNT(*) FROM orders"
 expect_denied "ea_auth 不能删除审计日志"      ea_auth "$DB_AUTH_PASSWORD" "DELETE FROM auth_audit_log WHERE 1 = 0"
 

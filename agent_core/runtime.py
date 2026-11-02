@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import time
 from collections.abc import Awaitable, Callable
@@ -12,6 +13,7 @@ from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
+from agent_core.memory import EpisodeSummary, EpisodeTurn, MemoryFact, MemoryTurn, format_memory_context
 from agent_core.models import AgentIntent, AgentResult, AgentSource, AgentStep, AgentUsage, ModelResponse
 from agent_core.operational_metrics import record_llm_failure, record_rag_failure
 from agent_core.session import ConversationStore, MemoryConversationStore, Message
@@ -33,6 +35,12 @@ AnswerGenerator = Callable[
     Awaitable[ModelResponse],
 ]
 AnalysisPlanner = Callable[[str, list[dict[str, Any]]], Awaitable[ModelResponse]]
+MemoryRecall = Callable[[str], Awaitable[list[MemoryFact]]]
+MemoryWriter = Callable[[MemoryTurn], Awaitable[int]]
+EpisodeRecall = Callable[[str, str], Awaitable[list[EpisodeSummary]]]
+EpisodeWriter = Callable[[EpisodeTurn], Awaitable[bool]]
+
+logger = logging.getLogger(__name__)
 
 _INJECTION_PATTERNS = (
     r"忽略(?:以上|之前|系统).*(?:指令|提示词)",
@@ -51,6 +59,9 @@ class RuntimeState(TypedDict, total=False):
     thread_id: str
     intent: AgentIntent
     history: list[Message]
+    prompt_history: list[Message]
+    memories: list[MemoryFact]
+    episodes: list[EpisodeSummary]
     sources: list[AgentSource]
     schema: str
     generated_sql: str
@@ -94,6 +105,11 @@ class AgentRuntime:
         answer_generator: AnswerGenerator,
         analysis_planner: AnalysisPlanner | None = None,
         conversations: ConversationStore | None = None,
+        memory_recall: MemoryRecall | None = None,
+        memory_writer: MemoryWriter | None = None,
+        episode_recall: EpisodeRecall | None = None,
+        episode_writer: EpisodeWriter | None = None,
+        memory_max_chars: int = 600,
         sql_timeout_seconds: float = 10,
         sql_dialect: str = "mysql",
     ):
@@ -104,12 +120,18 @@ class AgentRuntime:
         self._answer_generator = answer_generator
         self._analysis_planner = analysis_planner
         self._conversations = conversations or MemoryConversationStore()
+        self._memory_recall = memory_recall
+        self._memory_writer = memory_writer
+        self._episode_recall = episode_recall
+        self._episode_writer = episode_writer
+        self._memory_max_chars = memory_max_chars
         self._sql_timeout_seconds = sql_timeout_seconds
         self._sql_dialect = sql_dialect
 
         graph = StateGraph(RuntimeState)
         graph.add_node("input_safety", self._input_safety)
         graph.add_node("load_history", self._load_history)
+        graph.add_node("load_memory", self._load_memory)
         graph.add_node("route", self._route)
         graph.add_node("safe_response", self._safe_response)
         graph.add_node("retrieve", self._retrieve)
@@ -121,11 +143,14 @@ class AgentRuntime:
         graph.add_node("analysis_execute", self._analysis_execute)
         graph.add_node("synthesize", self._synthesize)
         graph.add_node("save_session", self._save_session)
+        graph.add_node("save_memory", self._save_memory)
+        graph.add_node("save_episode", self._save_episode)
         graph.add_node("finalize", self._finalize)
 
         graph.add_edge(START, "input_safety")
         graph.add_edge("input_safety", "load_history")
-        graph.add_edge("load_history", "route")
+        graph.add_edge("load_history", "load_memory")
+        graph.add_edge("load_memory", "route")
         graph.add_conditional_edges(
             "route",
             lambda state: state["intent"],
@@ -176,7 +201,9 @@ class AgentRuntime:
         )
         graph.add_edge("safe_response", "save_session")
         graph.add_edge("synthesize", "save_session")
-        graph.add_edge("save_session", "finalize")
+        graph.add_edge("save_session", "save_memory")
+        graph.add_edge("save_memory", "save_episode")
+        graph.add_edge("save_episode", "finalize")
         graph.add_edge("finalize", END)
         self._graph = graph.compile()
 
@@ -226,6 +253,61 @@ class AgentRuntime:
             "history": history,
             "steps": self._append(state, self._event("load_history", started, f"加载最近 {len(history) // 2} 轮会话")),
         }
+
+    async def _load_memory(self, state: RuntimeState) -> dict[str, Any]:
+        """读取主体长期偏好与相关历史情节；失败时保持原会话上下文不变。"""
+        history = state.get("history", [])
+        if self._memory_recall is None and self._episode_recall is None:
+            return {"memories": [], "episodes": [], "prompt_history": history}
+
+        started = time.perf_counter()
+        memories: list[MemoryFact] = []
+        episodes: list[EpisodeSummary] = []
+        errors: list[str] = []
+        if self._memory_recall is not None:
+            try:
+                memories = await self._memory_recall(state["owner"])
+            except Exception as exc:  # noqa: BLE001 - 记忆不可用不能中断问答
+                logger.warning("长期偏好读取失败: %s", type(exc).__name__)
+                errors.append("偏好")
+        if self._episode_recall is not None:
+            try:
+                episodes = await self._episode_recall(state["owner"], state["query"])
+            except Exception as exc:  # noqa: BLE001 - 向量/数据库故障同样降级
+                logger.warning("历史情节召回失败: %s", type(exc).__name__)
+                errors.append("情节")
+
+        memory_text = format_memory_context(
+            memories, episodes=episodes, max_chars=self._memory_max_chars
+        )
+        prompt_history = (
+            [{"role": "system", "content": memory_text}, *history] if memory_text else history
+        )
+        update: dict[str, Any] = {
+            "memories": memories,
+            "episodes": episodes,
+            "prompt_history": prompt_history,
+        }
+        if errors:
+            update["steps"] = self._append(
+                state,
+                self._event(
+                    "load_memory",
+                    started,
+                    f"长期{'/'.join(errors)}不可用，已忽略",
+                    "error",
+                ),
+            )
+        elif memories or episodes:
+            update["steps"] = self._append(
+                state,
+                self._event(
+                    "load_memory",
+                    started,
+                    f"加载 {len(memories)} 条长期偏好、{len(episodes)} 条历史情节",
+                ),
+            )
+        return update
 
     async def _route(self, state: RuntimeState) -> dict[str, Any]:
         started = time.perf_counter()
@@ -282,7 +364,7 @@ class AgentRuntime:
         previous_error = state.get("sql_error")
         try:
             response = await self._sql_generator(
-                state["query"], state["schema"], state.get("history", []), state.get("sources", []), previous_error
+                state["query"], state["schema"], state.get("prompt_history", state.get("history", [])), state.get("sources", []), previous_error
             )
         except Exception as exc:  # noqa: BLE001 - 模型边界需可控降级
             record_llm_failure(type(exc).__name__)
@@ -447,7 +529,7 @@ class AgentRuntime:
             }
         try:
             response = await self._answer_generator(
-                state["query"], state["intent"], state.get("history", []), state.get("sources", []),
+                state["query"], state["intent"], state.get("prompt_history", state.get("history", [])), state.get("sources", []),
                 state.get("sql"), state.get("analysis_evidence") or state.get("rows", []),
             )
         except Exception as exc:  # noqa: BLE001 - 模型边界需可控降级
@@ -469,6 +551,55 @@ class AgentRuntime:
         started = time.perf_counter()
         await self._conversations.save_turn(state["owner"], state["thread_id"], state["query"], state["answer"])
         return {"steps": self._append(state, self._event("save_session", started, "保存本轮会话"))}
+
+    async def _save_memory(self, state: RuntimeState) -> dict[str, Any]:
+        """从显式偏好语句写入长期记忆；失败只记录轨迹，不影响本轮答案。"""
+        if self._memory_writer is None or state.get("intent") == "blocked":
+            return {}
+        started = time.perf_counter()
+        try:
+            written = await self._memory_writer(
+                MemoryTurn(
+                    owner=state["owner"],
+                    thread_id=state["thread_id"],
+                    request_id=state["request_id"],
+                    question=state["query"],
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - 记忆写入失败不能改变回答结果
+            logger.warning("长期记忆写入失败: %s", type(exc).__name__)
+            return {
+                "steps": self._append(state, self._event("save_memory", started, "长期偏好写入失败，已忽略", "error"))
+            }
+        if not written:
+            return {}
+        return {"steps": self._append(state, self._event("save_memory", started, f"更新 {written} 条长期偏好"))}
+
+    async def _save_episode(self, state: RuntimeState) -> dict[str, Any]:
+        """保存压缩后的单轮情节；失败不影响回答，也不进入对话历史。"""
+        if self._episode_writer is None or state.get("intent") in {"blocked", "clarification"}:
+            return {}
+        started = time.perf_counter()
+        try:
+            saved = await self._episode_writer(
+                EpisodeTurn(
+                    owner=state["owner"],
+                    thread_id=state["thread_id"],
+                    request_id=state["request_id"],
+                    question=state["query"],
+                    answer=state["answer"],
+                    intent=state["intent"],
+                    sql=state.get("sql"),
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - 情节写入失败不能改变回答结果
+            logger.warning("历史情节写入失败: %s", type(exc).__name__)
+            return {
+                "steps": self._append(state, self._event("save_episode", started, "历史情节写入失败，已忽略", "error"))
+            }
+        if not saved:
+            return {}
+        return {"steps": self._append(state, self._event("save_episode", started, "保存 1 条历史情节"))}
 
     async def _finalize(self, state: RuntimeState) -> dict[str, Any]:
         latency_ms = max(0, round((time.perf_counter() - state["started_at"]) * 1000))

@@ -144,6 +144,31 @@ class AIConversationPopRequest(BaseModel):
     question: str | None = Field(None, max_length=500, description="待撤销轮次的问题，用于防止误删")
 
 
+class AgentMemoryItem(BaseModel):
+    key: str = Field(..., description="白名单记忆键")
+    value: str = Field(..., description="记忆值")
+    confidence: float = Field(..., ge=0, le=1, description="提取置信度")
+    source_thread_id: str = Field("", description="来源会话标识")
+    expires_at: datetime | None = Field(None, description="过期时间；为空表示长期有效")
+    updated_at: datetime = Field(..., description="最后更新时间")
+
+
+class AgentMemoryListResponse(BaseModel):
+    items: list[AgentMemoryItem] = Field(default_factory=list, description="当前用户的有效偏好")
+
+
+class AgentEpisodeItem(BaseModel):
+    id: int = Field(..., description="情节编号")
+    summary: str = Field(..., description="压缩后的单轮情节摘要")
+    created_at: datetime = Field(..., description="创建时间")
+    expires_at: datetime | None = Field(None, description="过期时间")
+    has_vector: bool = Field(False, description="是否已生成向量")
+
+
+class AgentEpisodeListResponse(BaseModel):
+    items: list[AgentEpisodeItem] = Field(default_factory=list, description="当前用户的历史情节")
+
+
 # ─────────────────── 订单事件摄入契约 ───────────────────
 
 class _StrictPayload(BaseModel):

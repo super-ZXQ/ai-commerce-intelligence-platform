@@ -381,6 +381,113 @@ class TestAIStreamGateway:
         assert response.status_code == 200
         assert response.json() == {"removed": True}
 
+    @pytest.mark.asyncio
+    async def test_list_memories_is_scoped_to_the_authenticated_user(
+        self, admin_client: AsyncClient, temp_admin: dict, monkeypatch
+    ):
+        from datetime import datetime
+
+        from backend.services import memory_service
+
+        async def fake_list(owner):
+            assert owner == temp_admin["username"]
+            return [
+                memory_service.MemoryRecord(
+                    key="default_metric",
+                    value="订单量",
+                    confidence=0.95,
+                    source_thread_id="thread-1",
+                    expires_at=None,
+                    updated_at=datetime(2026, 11, 2, 10, 0),
+                )
+            ]
+
+        monkeypatch.setattr(memory_service, "list_memories", fake_list)
+        response = await admin_client.get("/api/ai/memories")
+        assert response.status_code == 200
+        assert response.json()["items"] == [
+            {
+                "key": "default_metric",
+                "value": "订单量",
+                "confidence": 0.95,
+                "source_thread_id": "thread-1",
+                "expires_at": None,
+                "updated_at": "2026-11-02T10:00:00",
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_delete_memory_uses_authenticated_owner_and_validates_key(
+        self, admin_client: AsyncClient, temp_admin: dict, monkeypatch
+    ):
+        from backend.services import memory_service
+
+        calls: list[tuple[str, str]] = []
+
+        async def fake_delete(owner, key):
+            memory_service.normalize_memory_key(key)
+            calls.append((owner, key))
+            return key == "default_metric"
+
+        monkeypatch.setattr(memory_service, "delete_memory", fake_delete)
+
+        missing = await admin_client.delete("/api/ai/memories/default_platform")
+        assert missing.status_code == 404
+        assert missing.json()["detail"]["error_code"] == "MEMORY_NOT_FOUND"
+
+        invalid = await admin_client.delete("/api/ai/memories/password")
+        assert invalid.status_code == 400
+        assert invalid.json()["detail"]["error_code"] == "MEMORY_KEY_INVALID"
+
+        deleted = await admin_client.delete("/api/ai/memories/default_metric")
+        assert deleted.status_code == 200
+        assert deleted.json() == {"deleted": True, "key": "default_metric"}
+        assert all(owner == temp_admin["username"] for owner, _ in calls)
+        assert (temp_admin["username"], "default_metric") in calls
+
+    @pytest.mark.asyncio
+    async def test_list_and_delete_episodes_are_scoped_to_the_authenticated_user(
+        self, admin_client: AsyncClient, temp_admin: dict, monkeypatch
+    ):
+        from datetime import datetime
+
+        from backend.services import episode_memory_service
+
+        async def fake_list(owner):
+            assert owner == temp_admin["username"]
+            return [
+                episode_memory_service.EpisodeRecord(
+                    id=7,
+                    summary="问题：退款分析\n结论：13.6%",
+                    created_at=datetime(2026, 10, 1, 10, 0),
+                    expires_at=None,
+                    has_vector=True,
+                )
+            ]
+
+        calls: list[tuple[str, int]] = []
+
+        async def fake_delete(owner, episode_id):
+            calls.append((owner, episode_id))
+            return episode_id == 7
+
+        monkeypatch.setattr(episode_memory_service, "list_episodes", fake_list)
+        monkeypatch.setattr(episode_memory_service, "delete_episode", fake_delete)
+
+        response = await admin_client.get("/api/ai/episodes")
+        assert response.status_code == 200
+        assert response.json()["items"][0]["id"] == 7
+        assert response.json()["items"][0]["summary"] == "问题：退款分析\n结论：13.6%"
+
+        missing = await admin_client.delete("/api/ai/episodes/8")
+        assert missing.status_code == 404
+        assert missing.json()["detail"]["error_code"] == "EPISODE_NOT_FOUND"
+
+        deleted = await admin_client.delete("/api/ai/episodes/7")
+        assert deleted.status_code == 200
+        assert deleted.json() == {"deleted": True, "id": 7}
+        assert calls[-1] == (temp_admin["username"], 7)
+
 
 class TestAIModelConnectionTest:
     """连接测试入口必须与 AI 查询共用额度、并发和审计。"""

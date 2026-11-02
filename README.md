@@ -14,13 +14,21 @@
 | 模块 | 技术栈 | 功能 |
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
-| **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot + Chroma | 分节点路由、结构化 Text-to-SQL、一次纠错、多轮会话、引用与公开轨迹 |
-| **FastAPI 后端** | FastAPI + SQLAlchemy | 44 个 API 操作，含认证/限流/缓存/监控/RFM、BI 数据/导出与订单事件摄入 |
+| **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot + Chroma | 分节点路由、结构化 Text-to-SQL、一次纠错、多轮会话、长期偏好、历史情节、引用与公开轨迹 |
+| **FastAPI 后端** | FastAPI + SQLAlchemy | 48 个 API 操作，含认证/限流/缓存/监控/RFM、BI 数据/导出、订单事件摄入与长期记忆管理 |
 | **订单事件摄入** | MySQL 事务 + 幂等账本 | 创建/退款/取消事件、版本水位乱序保护、精准缓存失效与新鲜度查询 |
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
 | **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 392 项自动化测试（后端 303：301 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 411 项自动化测试（后端 322：320 passed + 2 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+
+### AI 长期记忆（P1/P2）
+
+- **长期偏好（P1）**：只识别显式语句中的白名单偏好：`记住 / 以后 / 默认`，例如“记住，我默认看订单量”。支持四类键：默认平台、默认指标、默认拆解维度、用户角色；值必须是枚举，不存自由文本或原始对话。
+- **历史情节（P2）**：每次实质问答压缩成“问题 + 结论 + SQL”情节卡片，默认保留 90 天；用户说“上次那个分析”时触发召回。
+- 情节向量使用 FastEmbed + `BAAI/bge-small-zh-v1.5` 在本地推理，向量存 MySQL；模型不可用时自动降级为中文 bigram 关键词打分，不阻塞问答。
+- 偏好与情节都按登录主体隔离；用户可通过 `GET/DELETE /api/ai/memories` 与 `GET/DELETE /api/ai/episodes` 查看、删除自己的数据。
+- 可用 `AGENT_MEMORY_*`、`AGENT_EPISODE_*` 调整 TTL、召回条数与阈值。
 
 ## 在线演示
 
@@ -225,7 +233,7 @@ docker compose up -d backend streamlit ai-assistant nginx
 
 **Alembic 是 schema evolution source of truth**（`backend/alembic/`）。
 `sql/01_create_table.sql` 仅保留为参考 DDL，**不再**挂载到 MySQL `initdb.d`；一致性由 `test_alembic_migrations.py` 校验。
-历史数据库需先升级到 Alembic head（当前 `0004_auth_identity`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表，`0004_auth_identity` 增加数据库用户目录、服务凭据与认证/AI 审计表。权限矩阵见 `docs/DB_PERMISSIONS.md`。
+历史数据库需先升级到 Alembic head（当前 `0006_episode_memory`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表，`0004_auth_identity` 增加数据库用户目录、服务凭据与认证/AI 审计表，`0005_agent_memory` 增加按用户隔离的长期偏好表，`0006_episode_memory` 增加压缩情节与向量表。权限矩阵见 `docs/DB_PERMISSIONS.md`。
 订单 CSV 只能由 `backend/scripts/import_orders.py` 显式导入（应用侧批量 INSERT，不依赖 `LOAD DATA`/`FILE` 权限）；后端启动不再同步或覆盖订单。
 已有运行期订单或事件账本时禁止全量替换；历史退款状态通过 `backend/scripts/reconcile_orders.py` 独立对账（默认 dry-run）。
 
@@ -508,7 +516,7 @@ rag_tool_call_total 0
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 303 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 322 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -609,10 +617,10 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（392 项，实收 390 passed / 2 skipped）
+### 自动化测试（411 项，实收 409 passed / 2 skipped）
 
 ```bash
-# 后端（303 项，完整运行需要 MySQL）
+# 后端（322 项，完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
 # AI/RAG（89 项）
@@ -621,8 +629,9 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 
 **测试覆盖：**
 
-后端（303 项）：
+后端（322 项）：
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis WATCH/MULTI 原子写入与冲突重试、Redis 降级、Token `null` 语义和 API 兼容
+- `test_agent_memory.py` — 长期偏好白名单提取、歧义拒绝、情节摘要压缩、历史指代触发、提示词注入、向量/写入失败降级与主体隔离
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
@@ -643,13 +652,13 @@ AI/RAG（89 项）：
 
 AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEmbeddings` 生成确定性归一化向量。
 
-**测试规模（实收，非估填）** — 2026-11-01 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
+**测试规模（实收，非估填）** — 2026-11-02 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
 
 | 套件 | pytest 收集 | 结果 |
 |------|------------|------|
-| `backend/tests` | 303 | **301 passed / 2 skipped**（45.40s） |
+| `backend/tests` | 322 | **320 passed / 2 skipped**（41.44s） |
 | `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.78s） |
-| **合计** | **392** | **390 passed / 2 skipped / 0 failed** |
+| **合计** | **411** | **409 passed / 2 skipped / 0 failed** |
 
 数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
@@ -775,7 +784,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
-│   ├── tests/                    # 303 项 API/事件集成测试
+│   ├── tests/                    # 322 项 API/事件集成测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）

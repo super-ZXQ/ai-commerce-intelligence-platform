@@ -12,8 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.database import auth_session_factory, get_auth_db
-from backend.models.schemas import AIConversationPopRequest, AIQueryRequest, AIQueryResponse
-from backend.services import ai_service
+from backend.models.schemas import (
+    AIConversationPopRequest,
+    AIQueryRequest,
+    AIQueryResponse,
+    AgentEpisodeListResponse,
+    AgentMemoryListResponse,
+)
+from backend.services import ai_service, episode_memory_service, memory_service
 from backend.services.ai_limits import (
     AILimitError,
     acquire_ai_slot,
@@ -123,6 +129,134 @@ async def ai_config(
         "database": await ai_service.database_status(),
         "principal": {"name": principal.name, "role": principal.role},
     }
+
+
+@router.get("/memories", response_model=AgentMemoryListResponse, summary="列出当前用户的长期偏好")
+async def list_memories(
+    request: Request,
+    principal: Principal = Depends(require_scope(SCOPE_AI_QUERY)),
+    auth_db: AsyncSession = Depends(get_auth_db),
+) -> AgentMemoryListResponse:
+    """只返回当前认证主体自己的有效偏好；owner 不来自客户端参数。"""
+    records = await memory_service.list_memories(principal.name)
+    await record_auth_audit(
+        auth_db,
+        principal_type=principal.principal_type,
+        principal_name=principal.name,
+        action="ai.memory.list",
+        outcome="success",
+        resource="/api/ai/memories",
+        client=client_ip(request),
+    )
+    return AgentMemoryListResponse(
+        items=[
+            {
+                "key": record.key,
+                "value": record.value,
+                "confidence": record.confidence,
+                "source_thread_id": record.source_thread_id,
+                "expires_at": record.expires_at,
+                "updated_at": record.updated_at,
+            }
+            for record in records
+        ]
+    )
+
+
+@router.delete("/memories/{memory_key}", summary="删除一条长期偏好")
+async def delete_memory(
+    memory_key: str,
+    request: Request,
+    principal: Principal = Depends(require_scope(SCOPE_AI_QUERY)),
+    auth_db: AsyncSession = Depends(get_auth_db),
+) -> dict:
+    """按白名单键硬删除；owner 过滤保证不会删除其他主体的记录。"""
+    try:
+        removed = await memory_service.delete_memory(principal.name, memory_key)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": "MEMORY_KEY_INVALID", "message": str(exc)},
+        ) from exc
+    if not removed:
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "MEMORY_NOT_FOUND", "message": "未找到该长期偏好"},
+        )
+    await record_auth_audit(
+        auth_db,
+        principal_type=principal.principal_type,
+        principal_name=principal.name,
+        action="ai.memory.delete",
+        outcome="success",
+        resource=f"/api/ai/memories/{memory_key}",
+        client=client_ip(request),
+        detail=memory_key,
+    )
+    return {"deleted": True, "key": memory_key}
+
+
+@router.get("/episodes", response_model=AgentEpisodeListResponse, summary="列出当前用户的历史情节")
+async def list_episodes(
+    request: Request,
+    principal: Principal = Depends(require_scope(SCOPE_AI_QUERY)),
+    auth_db: AsyncSession = Depends(get_auth_db),
+) -> AgentEpisodeListResponse:
+    """只返回当前认证主体的情节摘要，不暴露其他用户的分析历史。"""
+    records = await episode_memory_service.list_episodes(principal.name)
+    await record_auth_audit(
+        auth_db,
+        principal_type=principal.principal_type,
+        principal_name=principal.name,
+        action="ai.episode.list",
+        outcome="success",
+        resource="/api/ai/episodes",
+        client=client_ip(request),
+    )
+    return AgentEpisodeListResponse(
+        items=[
+            {
+                "id": record.id,
+                "summary": record.summary,
+                "created_at": record.created_at,
+                "expires_at": record.expires_at,
+                "has_vector": record.has_vector,
+            }
+            for record in records
+        ]
+    )
+
+
+@router.delete("/episodes/{episode_id}", summary="删除一条历史情节")
+async def delete_episode(
+    episode_id: int,
+    request: Request,
+    principal: Principal = Depends(require_scope(SCOPE_AI_QUERY)),
+    auth_db: AsyncSession = Depends(get_auth_db),
+) -> dict:
+    """按主体过滤硬删除；越权删除他人情节不会命中。"""
+    if episode_id < 1:
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": "EPISODE_ID_INVALID", "message": "情节编号必须为正整数"},
+        )
+    removed = await episode_memory_service.delete_episode(principal.name, episode_id)
+    if not removed:
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "EPISODE_NOT_FOUND", "message": "未找到该历史情节"},
+        )
+    await record_auth_audit(
+        auth_db,
+        principal_type=principal.principal_type,
+        principal_name=principal.name,
+        action="ai.episode.delete",
+        outcome="success",
+        resource=f"/api/ai/episodes/{episode_id}",
+        client=client_ip(request),
+        detail=str(episode_id),
+    )
+    return {"deleted": True, "id": episode_id}
 
 
 @router.post("/pop-last-turn", summary="撤销会话末轮")
