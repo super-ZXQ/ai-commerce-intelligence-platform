@@ -1,11 +1,12 @@
 import asyncio
 import logging
 import os
+import sys
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -29,8 +30,20 @@ from backend.routes.monitor import (
     render_rag_prometheus,
 )
 from backend.services.rfm_service import RfmDataUnavailableError
-from backend.utils.auth import SCOPE_DATA_READ, ensure_bootstrap_users, load_principal_from_token
-from backend.utils.cache import cleanup_memory_cache, close_redis, init_redis
+from backend.utils.auth import (
+    SCOPE_ADMIN_MANAGE,
+    SCOPE_DATA_READ,
+    Principal,
+    ensure_bootstrap_users,
+    load_principal_from_token,
+    require_scope,
+)
+from backend.utils.cache import (
+    check_redis_health,
+    cleanup_memory_cache,
+    close_redis,
+    init_redis,
+)
 from backend.utils.cache import clear as clear_cache
 from backend.utils.rate_limiter import check_rate_limit
 from backend.utils.event_metrics import render_prometheus
@@ -46,6 +59,57 @@ settings = get_settings()
 
 _CACHE_CLEANUP_INTERVAL = 300
 
+# 常见进程管理器暴露 worker 数量的环境变量；uvicorn 还可能直接出现在 argv。
+_WORKER_ENV_VARS = ("WEB_CONCURRENCY", "GUNICORN_WORKERS", "UVICORN_WORKERS")
+
+
+def _positive_int(raw: str | None) -> int | None:
+    if raw is None:
+        return None
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _detect_worker_count() -> int:
+    """尽力检测多 worker 启动；不同进程管理器的暴露方式并不统一。"""
+    counts: list[int] = []
+    for name in _WORKER_ENV_VARS:
+        value = _positive_int(os.environ.get(name))
+        if value is not None:
+            counts.append(value)
+    for index, arg in enumerate(sys.argv):
+        if arg == "--workers" and index + 1 < len(sys.argv):
+            value = _positive_int(sys.argv[index + 1])
+        elif arg.startswith("--workers="):
+            value = _positive_int(arg.partition("=")[2])
+        else:
+            continue
+        if value is not None:
+            counts.append(value)
+    return max(counts, default=1)
+
+
+def _enforce_single_worker() -> None:
+    """多 worker 会让进程内限流/AI 并发按倍数放大，默认拒绝启动。"""
+    workers = _detect_worker_count()
+    if workers <= 1:
+        logger.info("✅ 单 worker 模式：限流与 AI 并发为进程内计数")
+        return
+    if not settings.allow_multi_worker:
+        raise RuntimeError(
+            f"检测到 {workers} 个 worker：限流、AI 并发与每日额度均为进程内计数，"
+            "多 worker 会按 worker 数量放大配额。"
+            "如确认要这样部署，请设置 ALLOW_MULTI_WORKER=true 并自行承担配额放大。"
+        )
+    logger.warning(
+        "⚠️ 多 worker 模式（%d workers）：进程内限流/并发会按 worker 放大，"
+        "已通过 ALLOW_MULTI_WORKER=true 显式放行",
+        workers,
+    )
+
 
 async def _cache_cleanup_task():
     while True:
@@ -60,6 +124,7 @@ async def _cache_cleanup_task():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _enforce_single_worker()
     logger.info("🚀 AI Commerce Intelligence Platform v%s 启动中...", settings.app_version)
     if not await check_db_connection():
         # 生产 API 不应以“表面存活、业务接口全部失败”的状态继续运行。
@@ -139,7 +204,7 @@ app.add_middleware(
 )
 
 _SKIP_RATE_LIMIT_PATHS = (
-    "/docs", "/redoc", "/health", "/health/detailed", "/health-panel", "/livez", "/readyz", "/",
+    "/docs", "/redoc", "/health", "/health-panel", "/livez", "/readyz", "/",
     "/demo", "/openapi.json", "/monitor", "/metrics", "/login", "/logout",
     # Nginx auth_request 会为每个静态资源/WebSocket 握手发起子请求，
     # 若计入限流桶会让正常浏览快速触发 429。
@@ -261,21 +326,37 @@ async def login_page() -> FileResponse:
     return response
 
 
-@app.get("/workspace", include_in_schema=False, response_model=None)
-async def workspace_page(request: Request) -> FileResponse | RedirectResponse:
-    """经营工作台在服务端校验浏览器会话，未登录时返回安全登录回跳。"""
+async def _scoped_page(
+    request: Request,
+    *,
+    next_path: str,
+    scope: str,
+    filename: str,
+) -> FileResponse | RedirectResponse:
+    """服务端校验页面会话与权限，避免只靠前端按钮隐藏入口。"""
     token = request.cookies.get(settings.auth_cookie_name, "").strip()
     principal = None
     if token:
         async with auth_session_factory() as auth_db:
             principal = await load_principal_from_token(auth_db, token)
     if principal is None:
-        return RedirectResponse("/login?next=/workspace", status_code=303)
-    if not principal.has_scope(SCOPE_DATA_READ):
-        raise HTTPException(status_code=403, detail="缺少权限：data:read")
-    response = FileResponse(os.path.join(_STATIC_DIR, "workspace.html"))
+        return RedirectResponse(f"/login?next={next_path}", status_code=303)
+    if not principal.has_scope(scope):
+        raise HTTPException(status_code=403, detail=f"缺少权限：{scope}")
+    response = FileResponse(os.path.join(_STATIC_DIR, filename))
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.get("/workspace", include_in_schema=False, response_model=None)
+async def workspace_page(request: Request) -> FileResponse | RedirectResponse:
+    """经营工作台在服务端校验浏览器会话，未登录时返回安全登录回跳。"""
+    return await _scoped_page(
+        request,
+        next_path="/workspace",
+        scope=SCOPE_DATA_READ,
+        filename="workspace.html",
+    )
 
 
 @app.get("/logout", include_in_schema=False)
@@ -316,15 +397,26 @@ async def liveness_check() -> dict:
     return {"status": "alive"}
 
 
+async def _redis_ready() -> bool:
+    """Redis 是会话与缓存的强依赖；启用状态下 ping 失败即视为未就绪。"""
+    if not settings.redis_enabled:
+        return True
+    try:
+        return (await check_redis_health()).get("status") == "ok"
+    except Exception:
+        return False
+
+
 async def _readiness_checks() -> dict[str, bool]:
-    """三个连接池分别探测，避免只看主库而掩盖认证/事件库故障。"""
+    """四个依赖分别探测，避免只看主库而掩盖认证/事件库/Redis 故障。"""
     results = await asyncio.gather(
         check_db_connection(),
         check_event_db_connection(),
         check_auth_db_connection(),
+        _redis_ready(),
         return_exceptions=True,
     )
-    names = ("database", "event_database", "auth_database")
+    names = ("database", "event_database", "auth_database", "redis")
     return {
         name: result is True
         for name, result in zip(names, results, strict=True)
@@ -333,7 +425,7 @@ async def _readiness_checks() -> dict[str, bool]:
 
 @app.get("/readyz", tags=["系统"])
 async def readiness_check() -> JSONResponse:
-    """就绪性探针：业务库、事件库、认证库全部可用才返回 200。
+    """就绪性探针：业务库、事件库、认证库、Redis 全部可用才返回 200。
 
     只返回布尔值，不回显驱动异常或连接串，可安全暴露给负载均衡器。
     """
@@ -349,8 +441,10 @@ async def readiness_check() -> JSONResponse:
 
 
 @app.get("/health/detailed", tags=["系统"])
-async def detailed_health_alias() -> dict:
-    """兼容运维工具的公开详细健康检查路径。"""
+async def detailed_health_alias(
+    _principal: Principal = Depends(require_scope(SCOPE_ADMIN_MANAGE)),
+) -> dict:
+    """详细健康检查包含内部依赖信息，仅管理员可读。"""
     return await detailed_health()
 
 
@@ -372,11 +466,22 @@ async def demo_page() -> FileResponse:
     return FileResponse(os.path.join(_DEMO_DIR, "demo.html"))
 
 
-@app.get("/monitor", tags=["监控"])
-async def monitor_page() -> FileResponse:
-    return FileResponse(os.path.join(_STATIC_DIR, "monitor.html"))
+@app.get("/monitor", tags=["监控"], response_model=None)
+async def monitor_page(request: Request) -> FileResponse | RedirectResponse:
+    """监控页与 API 使用同一权限点，避免出现匿名可读的页面壳。"""
+    return await _scoped_page(
+        request,
+        next_path="/monitor",
+        scope=SCOPE_ADMIN_MANAGE,
+        filename="monitor.html",
+    )
 
 
-@app.get("/health-panel", tags=["监控"])
-async def health_panel_page() -> FileResponse:
-    return FileResponse(os.path.join(_STATIC_DIR, "health.html"))
+@app.get("/health-panel", tags=["监控"], response_model=None)
+async def health_panel_page(request: Request) -> FileResponse | RedirectResponse:
+    return await _scoped_page(
+        request,
+        next_path="/health-panel",
+        scope=SCOPE_ADMIN_MANAGE,
+        filename="health.html",
+    )

@@ -16,6 +16,7 @@ from backend.services.rfm_service import (
 from backend.utils import cache
 from fastapi import HTTPException
 
+from backend.utils import rate_limiter
 from backend.utils.rate_limiter import (
     PRINCIPAL_RATE_LIMITS,
     _get_client_id,
@@ -23,6 +24,8 @@ from backend.utils.rate_limiter import (
 )
 from backend.utils.rfm_scoring import assign_segment, quantile_scores
 from backend.utils.sql_guard import is_read_only_sql
+from agent_core.sql_safety import SQLValidationError, validate_and_limit_sql
+from backend.routes.monitor import render_rag_prometheus
 
 
 @pytest.mark.parametrize("sql", [
@@ -37,6 +40,7 @@ from backend.utils.sql_guard import is_read_only_sql
     "SHOW CREATE TABLE orders",
     "SHOW CREATE TABLE `orders`",
     "SHOW CREATE VIEW order_summary",
+    "(SELECT 1) UNION (SELECT 2)",
 ])
 def test_read_only_sql_accepts_queries(sql):
     assert is_read_only_sql(sql)
@@ -58,6 +62,56 @@ def test_read_only_sql_accepts_queries(sql):
 ])
 def test_read_only_sql_blocks_mutation_and_side_effects(sql):
     assert not is_read_only_sql(sql)
+
+
+@pytest.mark.parametrize("sql", [
+    # 这些写法曾绕过"仅整数字面量才收敛"的 LIMIT 检查。
+    "SELECT * FROM orders LIMIT (1000000)",
+    "SELECT * FROM orders LIMIT 100000+900000",
+    "SELECT * FROM orders LIMIT NULL",
+    "SELECT * FROM orders LIMIT 1e5",
+    "SELECT * FROM orders LIMIT 1000.5",
+])
+def test_limit_is_rewritten_to_hard_cap(sql):
+    result = validate_and_limit_sql(sql, max_rows=500)
+    assert "LIMIT 500" in result.upper()
+
+
+def test_qualified_table_is_rejected():
+    with pytest.raises(SQLValidationError, match="库名"):
+        validate_and_limit_sql("SELECT * FROM otherdb.orders LIMIT 500")
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT REPLACE(platform_type, 'APP', '应用') FROM orders LIMIT 100",
+    "SELECT TRUNCATE(payment_amount, 0) FROM orders LIMIT 100",
+])
+def test_string_functions_are_not_mistaken_for_writes(sql):
+    assert is_read_only_sql(sql)
+
+
+@pytest.mark.parametrize("sql", [
+    "SHOW GRANTS",
+    "SHOW VARIABLES",
+    "SHOW FULL PROCESSLIST",
+])
+def test_sensitive_show_statements_are_blocked(sql):
+    assert not is_read_only_sql(sql)
+
+
+def test_prometheus_label_injection_is_escaped():
+    stats = {
+        "retriever": {
+            "score_buckets": {
+                "[0.4,0.6)": 5,
+                'x"\nmetrics_hacked 1': 1,
+            }
+        }
+    }
+    text = render_rag_prometheus(stats)
+    # 正常分桶标签必须保留；带换行的标签必须整行丢弃，不能注入新指标。
+    assert 'rag_score_bucket{range="[0.4,0.6)"} 5' in text
+    assert "metrics_hacked" not in text
 
 
 def test_rfm_recent_user_gets_lower_r_score():
@@ -109,11 +163,18 @@ def test_rfm_redis_summary_excludes_full_user_lists():
 def test_ai_query_uses_database_column_aliases(monkeypatch):
     class FakeMappings:
         @staticmethod
-        def all():
+        def _rows():
             return [{
                 "refund_rate": Decimal("13.18"),
                 "avg_order_value": Decimal("994.81"),
             }]
+
+        def __iter__(self):
+            return iter(self._rows())
+
+        @classmethod
+        def all(cls):
+            return cls._rows()
 
     class FakeResult:
         @staticmethod
@@ -126,6 +187,10 @@ def test_ai_query_uses_database_column_aliases(monkeypatch):
 
         def __exit__(self, *_args):
             return None
+
+        @staticmethod
+        def execution_options(**_kwargs):
+            return FakeConnection()
 
         @staticmethod
         def execute(_statement):
@@ -362,6 +427,26 @@ def test_principal_rate_limit_covers_stream_and_non_stream_bucket():
     # 非 AI 查询路由不受主体桶影响。
     other = SimpleNamespace(url=SimpleNamespace(path="/api/orders"))
     assert check_principal_rate_limit(other, "carol") is None
+
+
+def test_login_lockout_is_scoped_to_account_and_ip(monkeypatch):
+    """锁定不能按账号全局生效，否则攻击者可锁死 admin；必须带客户端 IP。"""
+    monkeypatch.setattr(rate_limiter, "LOGIN_FAILURE_LIMIT", 3)
+
+    for _ in range(3):
+        rate_limiter.record_login_failure("alice", "10.0.0.1")
+
+    with pytest.raises(HTTPException) as exc:
+        rate_limiter.check_login_lock("alice", "10.0.0.1")
+    assert exc.value.status_code == 429
+    assert exc.value.headers["X-RateLimit-Scope"] == "login"
+
+    # 同账号其他 IP、同 IP 其他账号都不受影响。
+    rate_limiter.check_login_lock("alice", "10.0.0.2")
+    rate_limiter.check_login_lock("bob", "10.0.0.1")
+
+    rate_limiter.clear_login_failures("alice", "10.0.0.1")
+    rate_limiter.check_login_lock("alice", "10.0.0.1")
 
 
 def test_proxy_headers_are_ignored_by_default():

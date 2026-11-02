@@ -51,12 +51,12 @@ async def ingest_order_events(
         try:
             async with asyncio.timeout(settings.order_event_timeout_seconds):
                 result = await apply_order_event(db, event)
-        except TimeoutError:
+        except TimeoutError as exc:
             record_db_timeout()
             raise HTTPException(
                 status_code=503,
                 detail={"error_code": "EVENT_WRITE_TIMEOUT", "message": "订单事件处理超时，请稍后重试"},
-            )
+            ) from exc
         except Exception as exc:
             # 服务端保留可诊断日志；API 响应不回显驱动异常、SQL 或连接串。
             logger.exception("订单事件处理失败 event_type=%s order_id=%s", event.event_type, event.order_id)

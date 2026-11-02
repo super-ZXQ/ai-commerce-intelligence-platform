@@ -59,5 +59,5 @@ python -m backend.scripts.manage_auth create-service bi-exporter --scopes data:r
 ## 已知限制
 
 - 当前是单客户私有部署：角色为全局角色，没有租户隔离。
-- 限流与并发计数在单 uvicorn worker 内准确；多 worker 会按 worker 放大。限流分两层：IP 桶（匿名滥用防护）与登录主体桶（AI 查询 10 次/分钟、导出 3 次/120 秒、事件写入 120 次/分钟）。主体桶按账号共享同一类操作额度，流式/非流式 AI 端点合计计数，切换端点不能绕过配额。
+- 限流与并发计数在单 uvicorn worker 内准确；多 worker 会按 worker 放大，启动守卫默认拒绝多 worker（`ALLOW_MULTI_WORKER=true` 可显式放行）。限流分两层：IP 桶（匿名滥用防护）与登录主体桶（AI 查询 10 次/分钟、导出 3 次/120 秒、事件写入 120 次/分钟）。主体桶按账号共享同一类操作额度，流式/非流式 AI 端点合计计数，切换端点不能绕过配额。登录失败按「账号+客户端 IP」计数，5 次/5 分钟触发 5 分钟锁定，成功登录清零；不做全局账号锁定，避免攻击者锁死管理员账号。
 - 密码重置没有自助找回流程，由运维通过 `manage_auth set-password` 完成。

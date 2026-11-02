@@ -15,7 +15,7 @@ from backend.main import app
 from backend.models.schemas import OrderEventInput
 from backend.services import order_event_service
 from backend.services.rfm_service import _build_rfm_snapshot
-from backend.utils.auth import hash_password, role_default_scopes
+from backend.utils.auth import hash_password
 from backend.utils.rfm_scoring import assign_segment
 from bi_rfm import score_rfm_frame
 
@@ -47,7 +47,7 @@ def test_admin():
                 "INSERT INTO auth_users "
                 "(username, password_hash, role, scopes, is_active, token_version) "
                 "VALUES (%s, %s, 'admin', %s, 1, 1)",
-                (TEST_ADMIN_USERNAME, hash_password(TEST_ADMIN_PASSWORD), role_default_scopes("admin")),
+                (TEST_ADMIN_USERNAME, hash_password(TEST_ADMIN_PASSWORD), ""),
             )
     finally:
         conn.close()
@@ -137,11 +137,13 @@ class TestSystem:
         assert r.json() == {"status": "alive"}
 
     @pytest.mark.asyncio
-    async def test_readyz_requires_all_three_databases(self, client: AsyncClient, monkeypatch):
+    async def test_readyz_requires_all_dependencies(self, client: AsyncClient, monkeypatch):
         r = await client.get("/readyz")
         assert r.status_code == 200
         assert r.json()["status"] == "ready"
-        assert set(r.json()["checks"]) == {"database", "event_database", "auth_database"}
+        assert set(r.json()["checks"]) == {
+            "database", "event_database", "auth_database", "redis"
+        }
 
         async def _down():
             return False
@@ -164,15 +166,18 @@ class TestSystem:
         assert "/api/export/rfm-segment" in schema["paths"]
 
     @pytest.mark.asyncio
-    async def test_public_monitor_aliases(self, client: AsyncClient):
+    async def test_public_monitor_aliases(self, client: AsyncClient, authed_client: AsyncClient):
+        # /metrics 只暴露聚合计数，保持公开供 Prometheus 抓取；
+        # 详细健康检查与监控端点含内部依赖信息，必须管理员鉴权。
         health = await client.get("/health/detailed")
         metrics = await client.get("/metrics")
-        services = await client.get("/api/monitor/services-status")
+        services_anon = await client.get("/api/monitor/services-status")
+        services = await authed_client.get("/api/monitor/services-status")
 
-        assert health.status_code == 200
-        assert "checks" in health.json()
+        assert health.status_code in {401, 403}
         assert metrics.status_code == 200
         assert metrics.headers["content-type"].startswith("text/plain")
+        assert services_anon.status_code in {401, 403}
         assert services.status_code == 200
 
 
@@ -257,6 +262,13 @@ class TestOrders:
     async def test_invalid_sort_field(self, authed_client: AsyncClient):
         r = await authed_client.get("/api/orders?sort_by=nonexistent")
         assert r.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_impossible_date_returns_422(self, authed_client: AsyncClient):
+        # 2025-02-30 格式合法但日期不存在；必须走 FastAPI 校验得到 422，
+        # 而不是 date.fromisoformat 抛出 ValueError 变成 500。
+        r = await authed_client.get("/api/orders/filter?start_date=2025-02-30")
+        assert r.status_code == 422
 
 
 class TestAnalytics:

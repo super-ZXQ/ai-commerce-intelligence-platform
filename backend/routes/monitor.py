@@ -9,19 +9,27 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from backend.database import check_db_connection
+from backend.utils.auth import SCOPE_ADMIN_MANAGE, require_scope
 from backend.utils.cache import check_redis_health
 from backend.utils.cache import stats as cache_stats
 from backend.utils.cache import operational_snapshot
 from backend.utils.event_metrics import snapshot as event_metrics_snapshot
+from backend.utils.text_cleaner import sanitize_error
 from agent_core.operational_metrics import snapshot as agent_metrics_snapshot
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/monitor", tags=["监控"])
+# 监控端点返回进程内部状态（PID、端点计数、Redis 信息与内部服务地址），
+# 必须与业务数据同等级鉴权；仅 /livez、/readyz、/metrics 保持公开。
+router = APIRouter(
+    prefix="/api/monitor",
+    tags=["监控"],
+    dependencies=[Depends(require_scope(SCOPE_ADMIN_MANAGE))],
+)
 
 # 注意：以下统计变量为进程级状态，在多 worker 部署时每个 worker 进程各自独立计数，
 # 不会跨进程聚合。如需全局统计，请使用 Redis 或外部存储进行汇总。
@@ -111,18 +119,22 @@ async def detailed_health():
     checks = {}
     try:
         checks["database"] = {"status": "ok" if await check_db_connection() else "error"}
-    except Exception as e:
-        checks["database"] = {"status": "error", "detail": str(e)}
+    except Exception as exc:  # noqa: BLE001 - 健康检查必须覆盖所有驱动异常
+        # 驱动异常可能包含主机名、用户名与端口，只入服务端日志，不回显给调用方。
+        logger.warning("详细健康检查数据库探测失败: %s", sanitize_error(exc))
+        checks["database"] = {"status": "error"}
 
     try:
         checks["cache"] = await cache_stats()
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("详细健康检查缓存探测失败: %s", sanitize_error(exc))
         checks["cache"] = {"status": "error"}
 
     try:
         checks["redis"] = await check_redis_health()
-    except Exception as e:
-        checks["redis"] = {"status": "error", "detail": str(e)}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("详细健康检查 Redis 探测失败: %s", sanitize_error(exc))
+        checks["redis"] = {"status": "error"}
 
     all_ok = all(c.get("status") in {"ok", "disabled"} for c in checks.values())
     return {
@@ -147,8 +159,10 @@ async def get_services_status():
                 "status": "ok" if r.status_code == 200 else "error",
                 "code": r.status_code,
             }
-        except Exception as e:
-            return name, {"status": "error", "detail": str(e)}
+        except Exception as exc:  # noqa: BLE001 - 单个服务失败不能拖垮整体检查
+            # httpx 异常会带上内部主机名/端口，只写日志，响应只给静态状态。
+            logger.warning("外部服务 %s 健康检查失败: %s", name, sanitize_error(exc))
+            return name, {"status": "error"}
 
     async with httpx.AsyncClient(timeout=5.0) as client:
         pairs = await asyncio.gather(*(
@@ -178,6 +192,17 @@ def _load_rag_stats() -> dict | None:
         return None
 
 
+def _prom_label_value(value: object) -> str | None:
+    """转义 Prometheus 标签值，阻止外部 JSON 通过换行注入任意指标行。
+
+    不能只允许字母数字：RAG 分桶标签形如 "[0.4,0.6)"，直接拒绝会丢失指标。
+    """
+    text = str(value)
+    if "\n" in text or "\r" in text:
+        return None
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def render_rag_prometheus(stats: dict) -> str:
     """将共享的 RAG 快照转换为 Prometheus exposition 文本。"""
     if not stats:
@@ -195,7 +220,9 @@ def render_rag_prometheus(stats: dict) -> str:
     }
     lines = [f"{name} {value}" for name, value in metrics.items()]
     for bucket, count in (retriever.get("score_buckets") or {}).items():
-        lines.append(f'rag_score_bucket{{range="{bucket}"}} {count}')
+        label = _prom_label_value(bucket)
+        if label is not None:
+            lines.append(f'rag_score_bucket{{range="{label}"}} {count}')
     return "\n".join(lines) + "\n"
 
 
@@ -219,11 +246,13 @@ def render_backend_prometheus() -> str:
         "# TYPE cache_rebuild_inflight gauge",
         f"cache_rebuild_inflight {cache['rebuild_inflight']}",
     ] + [
-        f'llm_failures_total{{category="{category}"}} {count}'
+        f'llm_failures_total{{category="{label}"}} {count}'
         for category, count in sorted(agent["llm_failures"].items())
+        if (label := _prom_label_value(category)) is not None
     ] + [
-        f'rag_failures_total{{category="{category}"}} {count}'
+        f'rag_failures_total{{category="{label}"}} {count}'
         for category, count in sorted(agent["rag_failures"].items())
+        if (label := _prom_label_value(category)) is not None
     ] + [""])
 
 

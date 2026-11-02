@@ -1,24 +1,38 @@
 target-version = "py312"
 line-length = 120
 
+# 分析笔记本是探索性产物，不被任何运行时代码导入；未使用的 import 与
+# 无占位符 f-string 在里面是正常写法，纳入 lint 只会制造噪音。
+extend-exclude = ["notebook"]
+
 [lint]
-ignore = [
-    "G004", # 项目现有日志同时使用 f-string 与参数化格式，暂不做无关重写
-]
+# 真实启用的规则集：语法/未定义名 + bugbear + bandit（S）。
+# 之前没有 select，只跑默认 E4/E7/E9/F，下面的 per-file-ignores 形同装饰。
+select = ["E4", "E7", "E9", "F", "B", "S"]
 
 [lint.per-file-ignores]
+# FastAPI 依赖注入惯用 Depends(...) 作为默认值，不属于可变默认参数 bug。
 "backend/routes/**/*.py" = ["B008"]
-"backend/tests/**/*.py" = ["B008", "S110", "BLE001", "DTZ005"]
-"ai-ecommerce-assistant/tests/**/*.py" = ["B008", "S110", "BLE001", "DTZ005", "PERF"]
-"ai-ecommerce-assistant/rag/**/*.py" = ["BLE001", "S110"]
-"backend/utils/cache.py" = ["BLE001", "S110"]
-"backend/routes/monitor.py" = ["BLE001"]
-"backend/database.py" = ["BLE001"]
-"streamlit_app.py" = ["BLE001"]
+"backend/main.py" = ["B008"]
+"backend/utils/auth.py" = ["B008", "S105"] # token_type="bearer" 被 bandit 误判为硬编码密码
+# 调试模式默认密钥/密码仅用于本地，生产环境由 model_post_init 强制拒绝。
+"backend/config.py" = ["S105"]
+# 测试中的断言、固定测试口令与假密钥不是生产凭据。
+"backend/tests/**/*.py" = ["B008", "S101", "S105", "S106", "S603", "S608"]
+"ai-ecommerce-assistant/tests/**/*.py" = ["B008", "S101", "S105", "S106", "S603", "S608"]
+
+# 明确吞掉异常且已有降级路径的 best-effort 代码。
+"agent_core/session.py" = ["S110"]
+"ai-ecommerce-assistant/assistant_charts.py" = ["S110"]
+"ai-ecommerce-assistant/rag/**/*.py" = ["S110", "S324"]
+"backend/alembic/versions/**/*.py" = ["S110"]
+"backend/utils/cache.py" = ["S110", "S324"] # md5 仅用于非安全的缓存键
+"backend/scripts/**/*.py" = ["E402", "S603", "S608"] # 固定命令/静态 SQL 模板
 
 # 这些可执行入口必须先把仓库根目录加入 sys.path，之后才能导入共享包。
-"ai-ecommerce-assistant/app.py" = ["E402"]
-"ai-ecommerce-assistant/build_knowledge_base.py" = ["BLE001", "S110", "E402"]
+"ai-ecommerce-assistant/app.py" = ["E402", "S324"]
+"ai-ecommerce-assistant/build_knowledge_base.py" = ["E402", "S324"]
 "ai-ecommerce-assistant/eval/run_eval.py" = ["E402"]
-"backend/scripts/**/*.py" = ["BLE001", "E402"]
-"scripts/**/*.py" = ["BLE001"]
+
+# 固定 SQL 模板 / 静态分析误报：参数由内部白名单生成，不接收用户输入。
+"agent_core/refund_analysis.py" = ["S608"]

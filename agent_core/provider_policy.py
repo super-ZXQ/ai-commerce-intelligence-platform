@@ -22,6 +22,8 @@ class ProviderPolicyError(ValueError):
 
 _MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,99}$")
 _RESERVED_HOSTS = {"localhost", "localhost.localdomain"}
+# 运营商级 NAT / 共享地址空间；ipaddress 的 is_private 对 100.64.0.0/10 返回 False。
+_SHARED_ADDRESS_SPACE = ipaddress.ip_network("100.64.0.0/10")
 
 
 def _normalize_host(host: str) -> str:
@@ -37,6 +39,7 @@ def _is_forbidden_ip(value: str) -> bool:
         or ip.is_multicast
         or ip.is_reserved
         or ip.is_unspecified
+        or (ip.version == 4 and ip in _SHARED_ADDRESS_SPACE)
     )
 
 
@@ -87,7 +90,7 @@ def validate_provider_url(
             except OSError as exc:
                 raise ProviderPolicyError(f"模型提供方域名无法解析: {host}") from exc
             if not infos:
-                raise ProviderPolicyError(f"模型提供方域名无解析结果: {host}")
+                raise ProviderPolicyError(f"模型提供方域名无解析结果: {host}") from None
             for info in infos:
                 address = info[4][0]
                 try:

@@ -55,7 +55,7 @@ async def bi_orders(
                 "message": "BI 数据在分页读取期间发生变化，请重新加载",
                 "data_version": exc.actual,
             },
-        )
+        ) from exc
     if result.total > settings.export_max_rows:
         raise HTTPException(
             status_code=413,

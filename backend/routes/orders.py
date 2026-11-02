@@ -48,8 +48,10 @@ async def list_orders(
 
 @router.get("/filter", response_model=PaginatedResponse, summary="条件筛选订单")
 async def filter_orders(
-    start_date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="开始日期 YYYY-MM-DD"),
-    end_date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="结束日期 YYYY-MM-DD"),
+    # 使用 FastAPI 的 date 类型而不是手写正则：2025-02-30 这类“格式合法、
+    # 日期不存在”的输入会得到标准 422，而不是 ValueError → 500。
+    start_date: date_type | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: date_type | None = Query(None, description="结束日期 YYYY-MM-DD"),
     platform_type: str | None = Query(None, description="平台类型"),
     user_name: str | None = Query(None, description="用户名(模糊匹配)"),
     product_id: str | None = Query(None, description="商品编号"),
@@ -69,9 +71,7 @@ async def filter_orders(
     - 支持时间范围、平台类型、用户名、商品编号、退款状态、金额范围筛选
     - 用户名支持模糊匹配
     """
-    parsed_start = date_type.fromisoformat(start_date) if start_date else None
-    parsed_end = date_type.fromisoformat(end_date) if end_date else None
-    if parsed_start and parsed_end and parsed_start > parsed_end:
+    if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
     if min_amount is not None and max_amount is not None and min_amount > max_amount:
         raise HTTPException(status_code=400, detail="最小金额不能大于最大金额")
@@ -82,8 +82,8 @@ async def filter_orders(
         )
 
     filters = OrderFilterParams(
-        start_date=parsed_start,
-        end_date=parsed_end,
+        start_date=start_date,
+        end_date=end_date,
         platform_type=platform_type,
         user_name=user_name,
         product_id=product_id,

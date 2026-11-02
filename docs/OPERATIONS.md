@@ -7,7 +7,8 @@
 
 - 单节点 Docker Compose，Nginx 统一入口；不包含多副本、跨可用区或 Kubernetes。
 - 后端单 uvicorn worker：AI 并发、每日额度与主体限流计数在进程内准确；多 worker
-  会按 worker 放大，不作为当前支持范围。
+  会按 worker 放大，不作为当前支持范围。启动时会检测 worker 数量并默认拒绝；
+  确需多 worker 必须显式设置 `ALLOW_MULTI_WORKER=true`。
 - MySQL 单实例；Redis 单实例（`allkeys-lru`），会话逻辑 DB 只做命名隔离，
   不解决淘汰隔离。
 - 不在本文档范围内：多租户、在线支付、计费、PITR、自动故障转移。
@@ -155,5 +156,6 @@ curl --fail http://localhost/readyz
   备份恢复演练均未在本机执行**；相关脚本与 CI 步骤已就绪。
 - 未配置 binlog/PITR，RPO 只能承诺 ≤ 24 小时。
 - 单机单实例，无自动故障转移；MySQL/Redis 故障期间服务不可用或降级。
-- 限流、AI 并发与每日额度为进程内计数，多 worker 部署会放大配额。
+- 限流、AI 并发与每日额度为进程内计数，多 worker 部署会放大配额；默认启动守卫会
+  拒绝多 worker，仅在设置 `ALLOW_MULTI_WORKER=true` 后才放行。
 - `docs/LOAD_TEST_REPORT.md` 的负载数据来自既有环境，不能替代本次验收。

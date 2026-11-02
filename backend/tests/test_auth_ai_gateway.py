@@ -29,7 +29,7 @@ from backend.models.database_models import AIQueryAudit, AuthAuditLog, AuthUser,
 from backend.models.schemas import AgentUsage, AIQueryResponse
 from backend.scripts.manage_auth import _parse_scopes
 from backend.services import ai_limits, ai_service
-from backend.utils.auth import decode_token, hash_password, hash_service_key
+from backend.utils.auth import decode_token, effective_scopes, hash_password, hash_service_key
 
 
 @pytest.fixture
@@ -173,6 +173,59 @@ class TestSessionCookie:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
+    async def test_verify_enforces_page_scope(
+        self, client: AsyncClient, temp_identity: dict
+    ):
+        """Nginx 通过 X-Required-Scope 声明页面权限，viewer 不能打开 AI 页面壳。"""
+        token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Required-Scope": "ai:query",
+        }
+        assert (await client.get("/api/auth/verify", headers=headers)).status_code == 403
+        allowed = {
+            "Authorization": f"Bearer {token}",
+            "X-Required-Scope": "data:read",
+        }
+        assert (await client.get("/api/auth/verify", headers=allowed)).status_code == 200
+
+        # Nginx 实际传的是原始 URI；/ai/ 页面需要 ai:query，viewer 应被 403。
+        ai_page = {
+            "Authorization": f"Bearer {token}",
+            "X-Original-URI": "/ai/",
+        }
+        assert (await client.get("/api/auth/verify", headers=ai_page)).status_code == 403
+        bi_page = {
+            "Authorization": f"Bearer {token}",
+            "X-Original-URI": "/BI/",
+        }
+        assert (await client.get("/api/auth/verify", headers=bi_page)).status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_login_lockout_after_repeated_failures(
+        self, client: AsyncClient, temp_admin: dict, monkeypatch
+    ):
+        """连续失败后同账号+同 IP 进入锁定，正确密码也不能立即绕过。"""
+        from backend.utils.rate_limiter import RATE_LIMITS
+
+        # 放宽 IP 桶，确保第 6 次请求能到达路由层，验证的是账号+IP 锁定。
+        monkeypatch.setitem(RATE_LIMITS["/api/auth/login"], "requests", 100)
+        wrong = {"username": temp_admin["username"], "password": "wrong-password"}
+        for _ in range(5):
+            response = await client.post("/api/auth/login", json=wrong)
+            assert response.status_code == 401
+
+        locked = await client.post("/api/auth/login", json=wrong)
+        assert locked.status_code == 429
+        assert "登录失败次数过多" in locked.text
+
+        correct = {
+            "username": temp_admin["username"],
+            "password": temp_admin["password"],
+        }
+        assert (await client.post("/api/auth/login", json=correct)).status_code == 429
+
+    @pytest.mark.asyncio
     async def test_logout_clears_cookie(self, client: AsyncClient, temp_admin: dict):
         await client.post(
             "/api/auth/login",
@@ -181,6 +234,20 @@ class TestSessionCookie:
         logout = await client.post("/api/auth/logout")
         assert logout.status_code == 200
         assert (await client.get("/api/auth/verify")).status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_logout_revokes_bearer_token(self, client: AsyncClient, temp_identity: dict):
+        """只删 Cookie 不足以吊销无状态 JWT；登出必须递增 token_version。"""
+        token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (await client.get("/api/orders", headers=headers)).status_code == 200
+
+        assert (
+            await client.post("/api/auth/logout", headers=headers)
+        ).status_code == 200
+
+        # 同一个 Bearer Token 在登出后必须立即失效。
+        assert (await client.get("/api/orders", headers=headers)).status_code == 401
 
 
 class TestRoleAndAccountState:
@@ -750,14 +817,21 @@ class TestFrontendBoundaries:
 
 
 class TestManageAuthScopes:
-    def test_default_role_scopes_are_not_split_into_characters(self):
-        # 回归：role_default_scopes 返回逗号字符串，直接 sorted/join 会把权限拆成字符。
-        scopes = _parse_scopes(None, "analyst")
-        assert scopes == {"data:read", "ai:query"}
+    def test_role_defaults_are_not_persisted_into_user_scopes(self):
+        # 回归：把角色默认权限写进 scopes 列会让「收紧角色」对已有账号失效——
+        # effective_scopes 取角色默认与显式权限的并集，旧值会被重新加回来。
+        assert _parse_scopes(None) == set()
+        assert _parse_scopes("") == set()
+
+    def test_explicit_scopes_are_additive_only(self):
+        assert _parse_scopes("ai:query") == {"ai:query"}
+        # viewer 默认只有 data:read；显式追加后在鉴权时生效
+        assert effective_scopes("viewer", "ai:query") == {"data:read", "ai:query"}
+        assert effective_scopes("viewer", "") == {"data:read"}
 
     def test_unknown_explicit_scope_is_rejected(self):
         with pytest.raises(SystemExit, match="未知权限"):
-            _parse_scopes("data:read,root:everything", "analyst")
+            _parse_scopes("data:read,root:everything")
 
 
 class TestAuthConfigValidation:

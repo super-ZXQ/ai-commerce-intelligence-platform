@@ -36,6 +36,13 @@ class _FakeStreamClient:
         return _FakeChunk("".join(c.content for c in self._chunks), self._chunks[-1].usage_metadata)
 
 
+def test_content_blocks_are_flattened_to_text():
+    """部分 OpenAI 兼容提供方返回 content blocks，不能直接 str() 成 Python repr。"""
+    from agent_core.model_adapter import _content_text
+
+    assert _content_text([{"type": "text", "text": "退款率"}, {"text": " 13.6%"}]) == "退款率 13.6%"
+
+
 def _runtime(calls: list[str], *, answer_tokens: list[str] | None = None) -> AgentRuntime:
     async def retrieve(_query: str) -> list[AgentSource]:
         calls.append("retrieve")

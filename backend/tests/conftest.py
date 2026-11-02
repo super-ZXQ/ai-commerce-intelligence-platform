@@ -30,5 +30,9 @@ def _reset_rate_limiter():
     """
     from backend.utils import rate_limiter
     rate_limiter._rate_store.clear()
+    rate_limiter._login_failures.clear()
+    rate_limiter._login_locks.clear()
     yield
     rate_limiter._rate_store.clear()
+    rate_limiter._login_failures.clear()
+    rate_limiter._login_locks.clear()

@@ -28,6 +28,9 @@
   python scripts/health_check.py --db "mysql+pymysql://root:123456@localhost/ai_commerce" \\
       --redis redis://localhost:6379/0
 
+  # 也可只提供 REDIS_PASSWORD（配合 REDIS_HOST/PORT/DB），脚本会自动 URL 编码并拼装
+  REDIS_PASSWORD='p@ss+w/rd=1#' REDIS_HOST=localhost python scripts/health_check.py
+
 退出码：
   0 - 全部健康
   1 - 有 check 失败（--fail-on-error 开启时）
@@ -44,7 +47,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +229,24 @@ def check_redis(redis_url: str) -> list[CheckResult]:
         return [res]
 
 
+def _default_redis_url() -> str | None:
+    """构造默认 Redis URL：显式 REDIS_URL 优先，否则用组件变量拼装。
+
+    密码必须 quote_plus：`openssl rand -base64 32` 会产出 + / =，
+    直接拼接会让 redis-py 解析出错误的主机或截断密码。
+    """
+    explicit = os.environ.get("REDIS_URL")
+    if explicit:
+        return explicit
+    password = os.environ.get("REDIS_PASSWORD")
+    if not password:
+        return None
+    host = os.environ.get("REDIS_HOST", "localhost")
+    port = os.environ.get("REDIS_PORT", "6379")
+    db = os.environ.get("REDIS_DB", "0")
+    return f"redis://:{quote_plus(password)}@{host}:{port}/{db}"
+
+
 def _redact_url(url: str) -> str:
     """URL 脱敏，避免密码泄露到日志。"""
     try:
@@ -256,8 +277,8 @@ def main() -> int:
                    help="通过 Docker Compose 的 Nginx 统一入口检查")
     p.add_argument("--db", default=os.environ.get("DATABASE_URL"),
                    help="MySQL URL（默认读环境变量 DATABASE_URL）")
-    p.add_argument("--redis", dest="redis_url", default=os.environ.get("REDIS_URL"),
-                   help="Redis URL（默认读环境变量 REDIS_URL）")
+    p.add_argument("--redis", dest="redis_url", default=_default_redis_url(),
+                   help="Redis URL（默认读 REDIS_URL；否则用 REDIS_HOST/PORT/DB/PASSWORD 拼装）")
     p.add_argument("--checks", default="backend,bi,ai,db,redis",
                    help="要跑的检查（逗号分隔：backend,bi,ai,db,redis）")
     p.add_argument("--output", help="把 JSON 报告写到指定文件")

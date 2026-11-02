@@ -32,6 +32,11 @@ _SEGMENT_PRIORITY = {
     "一般价值客户": 5, "一般发展客户": 6, "一般保持客户": 7, "一般挽留客户": 8,
 }
 
+# 高价值必须按明确分群名判定，不能用子串"重要"：否则"重要挽留客户"
+# 会同时被算作高价值与流失预警，"一般价值客户"反而被排除。
+_HIGH_VALUE_SEGMENTS = frozenset({"重要价值客户", "重要发展客户", "重要保持客户"})
+_AT_RISK_SEGMENTS = frozenset({"重要挽留客户"})
+
 # 完整用户明细只缓存在当前进程，避免把 7 万+ 用户序列化为超大 Redis Key。
 # Docker 当前使用单 Worker；若未来扩容为多 Worker，各进程会各自维护一份有界快照。
 _SNAPSHOT_TTL_SECONDS = 600
@@ -98,6 +103,7 @@ def _score_users(users: list[dict], n_bins: int = 5) -> list[dict]:
         recency_scores,
         frequency_scores,
         monetary_scores,
+        strict=True,
     ):
         u["r_score"] = r_score
         u["f_score"] = f_score
@@ -282,6 +288,9 @@ async def get_rfm_segment_detail(
     page_size: int = 20,
     reference_date: str | None = None,
     n_bins: int = 5,
+    r_threshold: int | None = None,
+    f_threshold: int | None = None,
+    m_threshold: int | None = None,
 ) -> dict:
     snapshot = await _get_rfm_snapshot(
         db,
@@ -290,7 +299,19 @@ async def get_rfm_segment_detail(
     )
     users = snapshot.get("users", [])
 
-    filtered = [u for u in users if u["segment"] == segment]
+    # 明细与导出使用同一套阈值重算逻辑，避免"同名分群"在不同入口指向不同人群。
+    default_threshold = max(2, math.ceil(n_bins * 0.6))
+    thresholds = (
+        r_threshold or default_threshold,
+        f_threshold or default_threshold,
+        m_threshold or default_threshold,
+    )
+    filtered = [
+        u for u in users
+        if assign_segment(
+            u["r_score"], u["f_score"], u["m_score"], *thresholds
+        ) == segment
+    ]
 
     total = len(filtered)
     start = (page - 1) * page_size
@@ -377,32 +398,39 @@ async def get_rfm_top_users(
 
 
 @cached(ttl=600, tags=("rfm",), versioned=True)
-async def get_rfm_overview(db: AsyncSession) -> dict:
-    rfm_data = await compute_rfm(db)
+async def get_rfm_overview(
+    db: AsyncSession,
+    reference_date: str | None = None,
+    n_bins: int = 5,
+) -> dict:
+    rfm_data = await compute_rfm(db, reference_date=reference_date, n_bins=n_bins)
 
     segments = rfm_data["segments"]
     segment_distribution = [{"segment": s["segment"], "count": s["count"], "percentage": s["percentage"]} for s in segments]
     monetary_distribution = [{"segment": s["segment"], "total_monetary": s["total_monetary"], "avg_monetary": s["avg_monetary"]} for s in segments]
 
-    high_value = [s for s in segments if "重要" in s["segment"]]
+    high_value = [s for s in segments if s["segment"] in _HIGH_VALUE_SEGMENTS]
     high_value_count = sum(s["count"] for s in high_value)
     high_value_monetary = sum(s["total_monetary"] for s in high_value)
 
-    at_risk = [s for s in segments if "挽留" in s["segment"]]
+    at_risk = [s for s in segments if s["segment"] in _AT_RISK_SEGMENTS]
     at_risk_count = sum(s["count"] for s in at_risk)
+
+    total_users = rfm_data["total_users"] or 1
 
     return {
         "reference_date": rfm_data["reference_date"],
         "total_users": rfm_data["total_users"],
+        "n_bins": rfm_data["n_bins"],
         "averages": rfm_data["averages"],
         "high_value_users": {
             "count": high_value_count,
-            "percentage": round(high_value_count / rfm_data["total_users"] * 100, 2),
+            "percentage": round(high_value_count / total_users * 100, 2),
             "total_monetary": round(high_value_monetary, 2),
         },
         "at_risk_users": {
             "count": at_risk_count,
-            "percentage": round(at_risk_count / rfm_data["total_users"] * 100, 2),
+            "percentage": round(at_risk_count / total_users * 100, 2),
         },
         "segment_distribution": segment_distribution,
         "monetary_distribution": monetary_distribution,

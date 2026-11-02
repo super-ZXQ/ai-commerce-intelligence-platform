@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.config import get_settings
 from backend.models.database_models import AuthUser, Order
-from backend.utils.auth import hash_password, role_default_scopes
+from backend.utils.auth import hash_password
 
 
 def seed_ci_users(engine) -> int:
@@ -39,7 +39,9 @@ def seed_ci_users(engine) -> int:
             user = session.execute(
                 select(AuthUser).where(AuthUser.username == username)
             ).scalar_one_or_none()
-            scopes = role_default_scopes(role)
+            # scopes 列只存「角色默认之外的追加权限」，留空即完全由角色决定：
+            # 与生产语义一致，CI 才能真正验证角色权限的收紧/放宽。
+            scopes = ""
             if user is None:
                 session.add(
                     AuthUser(

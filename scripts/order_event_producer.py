@@ -48,7 +48,8 @@ def _catalog() -> list[dict[str, str]]:
                 "platform_type": row.get("平台类型") or row.get("platform_type") or "APP",
                 "channel_id": row.get("渠道编号") or row.get("channel_id") or "synthetic",
             }
-            for _, row in zip(range(2000), rows)
+            # strict=False 是有意的：只取商品目录前 2000 行作为压测样本。
+            for _, row in zip(range(2000), rows, strict=False)
         ]
     return values or [{"product_id": "PRODUCT-001", "platform_type": "APP", "channel_id": "synthetic"}]
 
@@ -58,7 +59,8 @@ def build_events(
     out_of_order_rate: float, invalid_rate: float,
 ) -> list[dict]:
     """生成确定性事件序列；相同参数下 event_id、payload 与发送顺序完全一致。"""
-    rng = random.Random(seed)
+    # 压测数据要求可复现，刻意使用带种子的伪随机；不参与任何安全决策。
+    rng = random.Random(seed)  # noqa: S311
     catalog = _catalog()
     events: list[dict] = []
     # 事件发生时间也固定，确保请求体可重放；不依赖运行机器当前时钟。

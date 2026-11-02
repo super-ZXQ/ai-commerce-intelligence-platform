@@ -64,7 +64,11 @@ def build_history_window(
     turns = _turns([message for message in normalized if message["role"] != "system"])
 
     selected: list[list[Message]] = []
-    remaining = max_chars
+    # system 消息始终保留，但必须占用同一份预算；否则长期偏好会无条件
+    # 叠加在 max_chars 之上，调用方按预算估算的提示词长度会失效。
+    remaining = max_chars - sum(_cost(message) for message in system_messages)
+    if remaining <= 0:
+        return system_messages
     for turn in reversed(turns):
         cost = sum(_cost(message) for message in turn)
         if cost <= remaining:

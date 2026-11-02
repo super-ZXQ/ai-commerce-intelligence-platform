@@ -89,4 +89,4 @@
 - [ ] 真实最小权限账号验收（CI 已配置 `db-verify`，尚未在目标环境执行）
 - [ ] 备份/恢复演练（脚本与 CI 步骤已就绪，本机未执行）
 - [ ] TLS 握手与证书链验证（无证书与运行中的 Nginx）
-- [ ] 多 worker / 高可用 / binlog PITR（当前不在实施范围）
+- [ ] 多 worker / 高可用 / binlog PITR（默认启动守卫拒绝多 worker；确需时显式 `ALLOW_MULTI_WORKER=true`，并自行承担配额放大）

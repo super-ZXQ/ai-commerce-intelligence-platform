@@ -1,13 +1,15 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.database import get_auth_db
 from backend.models.database_models import AuthUser
 from backend.utils.auth import (
+    SCOPE_AI_QUERY,
+    SCOPE_DATA_READ,
     Principal,
     TokenResponse,
     UserCredentials,
@@ -17,6 +19,11 @@ from backend.utils.auth import (
     effective_scopes,
     get_principal,
     record_auth_audit,
+)
+from backend.utils.rate_limiter import (
+    check_login_lock,
+    clear_login_failures,
+    record_login_failure,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,9 +56,12 @@ async def login(
     浏览器统一使用 Cookie（Nginx auth_request 保护 /ai/、/BI/ 与 WebSocket）；
     API 客户端仍可使用返回的 Bearer Token。两者身份来源相同。
     """
-    user = await authenticate_user(auth_db, credentials.username, credentials.password)
+    # 同账号+同 IP 连续失败会进入 5 分钟锁定，成功登录后清零。
     ip = client_ip(request)
+    check_login_lock(credentials.username, ip)
+    user = await authenticate_user(auth_db, credentials.username, credentials.password)
     if user is None:
+        record_login_failure(credentials.username, ip)
         await record_auth_audit(
             auth_db,
             principal_type="user",
@@ -64,6 +74,7 @@ async def login(
         logger.warning("登录失败: 用户 %s", credentials.username)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 
+    clear_login_failures(credentials.username, ip)
     access_token = create_access_token(
         user.username,
         role=user.role,
@@ -94,13 +105,32 @@ async def logout(
     response: Response,
     auth_db: AsyncSession = Depends(get_auth_db),
 ) -> dict:
-    """清除浏览器会话 Cookie；Bearer Token 客户端自行丢弃令牌。"""
+    """清除浏览器会话 Cookie，并吊销该用户已签发的全部 Token。
+
+    JWT 是无状态凭据，只删 Cookie 无法阻止已泄露的 Bearer Token 继续使用；
+    递增 token_version 后，load_principal_from_token 会在下一次请求时立即拒绝。
+    """
     principal: Principal | None = None
     try:
         principal = await get_principal(request, auth_db)
     except HTTPException:
         principal = None
-    response.delete_cookie(settings.auth_cookie_name, path="/")
+
+    if principal is not None and principal.principal_type == "user":
+        await auth_db.execute(
+            update(AuthUser)
+            .where(AuthUser.username == principal.name)
+            .values(token_version=AuthUser.token_version + 1)
+        )
+        await auth_db.commit()
+
+    response.delete_cookie(
+        settings.auth_cookie_name,
+        path="/",
+        secure=settings.auth_cookie_secure,
+        httponly=True,
+        samesite=settings.auth_cookie_samesite,
+    )
     if principal is not None:
         await record_auth_audit(
             auth_db,
@@ -114,8 +144,24 @@ async def logout(
 
 
 @router.get("/verify", summary="Nginx auth_request 会话校验")
-async def verify(response: Response, principal: Principal = Depends(get_principal)) -> dict:
-    """供 Nginx 子请求与前端状态检查使用；不返回任何凭据。"""
+async def verify(
+    response: Response,
+    principal: Principal = Depends(get_principal),
+    required_scope: str | None = Header(None, alias="X-Required-Scope"),
+    original_uri: str | None = Header(None, alias="X-Original-URI"),
+) -> dict:
+    """供 Nginx auth_request 与前端状态检查使用；不返回任何凭据。
+
+    页面壳按原始 URI 推导所需权限：/BI/ 只需要只读，/ai/ 需要 AI 查询权限，
+    避免 ingest 或 viewer 虽然"已登录"却能打开实际无权使用的页面。
+    """
+    if required_scope is None and original_uri:
+        if original_uri.startswith("/ai/"):
+            required_scope = SCOPE_AI_QUERY
+        elif original_uri.startswith("/BI/"):
+            required_scope = SCOPE_DATA_READ
+    if required_scope and not principal.has_scope(required_scope):
+        raise HTTPException(status_code=403, detail=f"缺少权限：{required_scope}")
     response.headers["X-Auth-User"] = principal.name
     response.headers["X-Auth-Role"] = principal.role or principal.principal_type
     response.headers["X-Auth-Scopes"] = ",".join(sorted(principal.scopes))

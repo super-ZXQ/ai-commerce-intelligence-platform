@@ -49,7 +49,7 @@ def _active_clause():
 def _cosine(left: list[float], right: list[float]) -> float:
     if not left or len(left) != len(right):
         return 0.0
-    dot = sum(a * b for a, b in zip(left, right))
+    dot = sum(a * b for a, b in zip(left, right, strict=True))
     left_norm = sum(a * a for a in left) ** 0.5
     right_norm = sum(b * b for b in right) ** 0.5
     if left_norm == 0 or right_norm == 0:

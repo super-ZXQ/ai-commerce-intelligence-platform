@@ -108,9 +108,9 @@ docker compose up -d
 | `/api/*` | backend:8000 | RESTful API |
 | `/nav` | backend:8000 | 导航页（备用路由） |
 | `/docs` `/redoc` `/openapi.json` | backend:8000 | Swagger / ReDoc 文档 |
-| `/livez` `/readyz` | backend:8000 | 存活/就绪探针（就绪检查业务库、事件库、认证库） |
-| `/health` `/health/detailed` `/metrics` | backend:8000 | 公开健康检查与 Prometheus 指标 |
-| `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
+| `/livez` `/readyz` | backend:8000 | 存活/就绪探针（就绪检查业务库、事件库、认证库、Redis） |
+| `/health` `/metrics` | backend:8000 | 公开健康检查与聚合 Prometheus 指标 |
+| `/health/detailed` `/monitor` `/health-panel` | backend:8000 | 详细健康与监控页面（需 `admin:manage`） |
 
 部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入、认证和数据同步分别创建最小权限账号；`db-migrate` 完成 Alembic 升级后，`db-grant` 再按表授予权限：`ea_app` 只读业务表，`ea_ai` 只能读 `orders`，`ea_events` 只能写 `orders`/`order_events`/`data_state`，`ea_auth` 只能访问认证与审计表。统一会话由 FastAPI 签发 HttpOnly Cookie，Nginx `auth_request` 保护 `/ai/` 与 `/BI/`（含 WebSocket 握手），后端在每次业务操作时重新校验账号状态、角色与权限。AI 助手只通过 `BACKEND_API_URL` 调用后端，不接触数据库、模型密钥或直连 LLM，页面也不缓存业务答案，每次提问都按当前数据版本实时生成。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。BI 看板同样不持有数据库凭据：页面携带当前账号的 HttpOnly Cookie 调用 `/api/bi/orders` 读取非取消订单，RFM 客户明细导出调用 `/api/export/rfm-segment`；后端每次请求都重新校验账号状态与 `data:read` / `data:export`，会话失效或无权限时直接拒绝，不回退本地快照。销售总览、商品/用户排行与 BI 快照统一排除取消订单，退款订单仍保留在销售额与订单数中。BI 分页读取绑定 `data_state.data_version`：首屏返回版本，后续页必须携带；读取期间新增或取消订单导致版本变化时后端返回 409，页面丢弃已拼接结果并整次重读（最多 3 次），不会交付漏单或仍含已取消订单的快照。RFM 页面的“最近消费(天)”按日历日期计算，与后端 `DATEDIFF` 一致（参考日当天订单为 0 天）；客户明细只在点击“生成导出文件”后调用后端，浏览分群或调整日期/阈值不会消耗导出额度。页面缓存 30 秒，侧边栏可手动刷新。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；默认单次最多 200,000 行，Excel 因工作簿格式限制需在内存中生成，默认最多 50,000 行（`EXPORT_MAX_ROWS` / `EXPORT_EXCEL_MAX_ROWS` 可调）。限流同时按 IP 与登录主体执行，AI/导出/事件写入的主体桶不会因同一出口 IP 被他人挤占。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
 
@@ -118,7 +118,7 @@ docker compose up -d
 
 - 应用容器以 UID/GID `10001` 非 root 运行，启用 `no-new-privileges`，并为 MySQL/Redis/后端/BI/AI/Nginx 设置 CPU/内存上限。
 - `docker-compose.prod.yml` 要求所有镜像使用不可变 tag 或 digest，禁止 `latest`；`docker-compose.tls.yml` 提供 443 终止、HTTP 跳转与 HSTS。
-- `/livez` 只表示进程存活，`/readyz` 检查业务库、事件库、认证库后才允许接流量；Compose 健康检查使用 `/readyz`。
+- `/livez` 只表示进程存活，`/readyz` 检查业务库、事件库、认证库与 Redis 后才允许接流量；Compose 健康检查使用 `/readyz`。
 - 备份、恢复、恢复演练与最小权限账号验收命令见 [运维手册](docs/OPERATIONS.md) 与 [上线检查清单](docs/GO_LIVE_CHECKLIST.md)。RPO 当前为备份间隔（≤ 24 小时），未配置 binlog，不承诺更低值。
 
 ### 本地开发
@@ -458,25 +458,25 @@ RAG 模块内置轻量级监控层，把"检索质量 + 性能 + 用户反馈"�
 | 工具调用（tool） | `metrics.record_tool_call()` | `tool_call_count` / `tool_no_hit_count` / `tool_error_count`（v1 ReAct 由模型触发；v2 工作流下无生产调用方，保留为监控 API，恒为 0） |
 | 结构化事件 | `metrics.log_event()` | `ts` / `event` / `query` / `top1_score` / `hits` / `ms` / `cache_hit` / `source` |
 
-### 2. 端点（无需鉴权）
+### 2. 端点
 
-| 路径 | 格式 | 说明 |
-|------|------|------|
-| `GET /api/monitor/rag-stats` | JSON | RAG 综合快照；未启动 AI 助手时返回 503 |
-| `GET /api/monitor/rag-stats.prom` | Prometheus text | 11 个指标（counter + gauge） |
-| `GET /metrics` | Prometheus text | 后端 / 业务指标（与 RAG 并列） |
+| 路径 | 格式 | 鉴权 | 说明 |
+|------|------|------|------|
+| `GET /api/monitor/rag-stats` | JSON | `admin:manage` | RAG 综合快照；未启动 AI 助手时返回 503 |
+| `GET /api/monitor/rag-stats.prom` | Prometheus text | `admin:manage` | 11 个指标（counter + gauge） |
+| `GET /metrics` | Prometheus text | 公开 | 后端 / 业务指标（与 RAG 并列） |
 
 示例：
 
 ```bash
-# JSON 快照
-curl http://localhost:8000/api/monitor/rag-stats
+# JSON 快照（需 admin:manage 权限）
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/monitor/rag-stats
 
-# Prometheus 抓取（后端请求指标 + RAG 指标）
+# Prometheus 抓取（后端请求指标 + RAG 指标，公开聚合口径）
 curl http://localhost:8000/metrics
 
-# 仅抓取 RAG 指标
-curl http://localhost:8000/api/monitor/rag-stats.prom
+# 仅抓取 RAG 指标（需 admin:manage 权限）
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/monitor/rag-stats.prom
 ```
 
 返回示例（节选）：
@@ -490,16 +490,11 @@ rag_query_total 42
 # TYPE rag_score_bucket counter
 rag_score_bucket{range="[0.4,0.6)"} 5
 rag_score_bucket{range="[0.8,1.0]"} 12
-
-# HELP rag_tool_call_total Agent invoked the knowledge tool
-# TYPE rag_tool_call_total counter
-# v2 收敛为确定性工作流后，工具调用不再由模型发起，该计数恒为 0
-rag_tool_call_total 0
 ```
 
 ### 3. 落盘策略
 
-- **综合 stats（JSON）**：`retriever` 在每次检索后节流（5s）调用 `dump_stats()`，把 retriever stats + tool stats 合并后**原子写入**（tmp + `os.replace`）`ai-ecommerce-assistant/data/rag_stats.json`。Docker 中该目录由 AI 助手读写、后端只读共享。
+- **综合 stats（JSON）**：`retriever` 在每次检索后节流（5s）调用 `dump_stats()`，把 retriever stats **原子写入**（tmp + `os.replace`）`ai-ecommerce-assistant/data/rag_stats.json`。Docker 中该目录由 AI 助手读写、后端只读共享。
 - **事件流（JSONL，可选）**：默认关闭，避免拖慢。设置环境变量 `RAG_EVENTS_LOG=1` 即开启 `data/rag_events.jsonl` 追加写入；每行一条结构化 JSON 事件，可直接被 Vector / Filebeat / Promtail 采集。
 - **用户反馈（JSONL，append-only）**：聊天界面的 👍/👎 按钮触发 `record_feedback()`，追加写入 `ai-ecommerce-assistant/eval/feedback.jsonl`；用于线下分析"检索误召回率"。
 

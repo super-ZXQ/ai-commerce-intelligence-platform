@@ -44,9 +44,9 @@ def load_cases(path: Path) -> list[dict]:
 
 
 def prf(gold: list[str], pred: list[str], label: str):
-    tp = sum(1 for g, p in zip(gold, pred) if g == label and p == label)
-    fp = sum(1 for g, p in zip(gold, pred) if g != label and p == label)
-    fn = sum(1 for g, p in zip(gold, pred) if g == label and p != label)
+    tp = sum(1 for g, p in zip(gold, pred, strict=True) if g == label and p == label)
+    fp = sum(1 for g, p in zip(gold, pred, strict=True) if g != label and p == label)
+    fn = sum(1 for g, p in zip(gold, pred, strict=True) if g == label and p != label)
     p = tp / (tp + fp) if (tp + fp) else 0.0
     r = tp / (tp + fn) if (tp + fn) else 0.0
     f = 2 * p * r / (p + r) if (p + r) else 0.0
@@ -54,7 +54,7 @@ def prf(gold: list[str], pred: list[str], label: str):
 
 
 def metrics(gold: list[str], pred: list[str]) -> dict:
-    correct = sum(1 for g, p in zip(gold, pred) if g == p)
+    correct = sum(1 for g, p in zip(gold, pred, strict=True) if g == p)
     acc = correct / len(gold) if gold else 0.0
     per = {lab: prf(gold, pred, lab) for lab in LABELS}
     macro_f1 = sum(f for _, _, f in per.values()) / len(LABELS)
@@ -68,7 +68,7 @@ def metrics(gold: list[str], pred: list[str]) -> dict:
         },
         "misclassified": [
             {"query": c["query"], "expected": g, "predicted": p}
-            for c, g, p in zip(_GOLD_CASES, gold, pred)
+            for c, g, p in zip(_GOLD_CASES, gold, pred, strict=True)
             if g != p
         ],
     }

@@ -32,7 +32,6 @@ from backend.config import get_settings
 from backend.models.database_models import AuthUser, ServiceClient
 from backend.utils.auth import (
     KNOWN_SCOPES,
-    ROLE_SCOPES,
     effective_scopes,
     hash_password,
     hash_service_key,
@@ -52,28 +51,33 @@ def _password(value: str | None) -> str:
     return first
 
 
-def _parse_scopes(raw: str | None, role: str | None) -> set[str]:
-    """用户显式权限在鉴权时与角色默认权限取并集；服务凭据只使用显式权限。"""
-    if raw:
-        scopes = normalize_scopes(raw)
-        unknown = scopes - KNOWN_SCOPES
-        if unknown:
-            raise SystemExit(f"未知权限: {sorted(unknown)}")
-        return scopes
-    return set(ROLE_SCOPES.get(role or "viewer", frozenset()))
+def _parse_scopes(raw: str | None) -> set[str]:
+    """解析显式权限；服务凭据必须提供，用户可留空表示只使用角色默认权限。
+
+    用户的 scopes 列只存“角色默认之外的追加权限”。把角色默认值也写进去会让
+    之后收紧角色失效：鉴权时 effective_scopes 取角色默认与显式权限的并集，
+    旧值会被重新加回来（例如 viewer 去掉 ai:query 后老账号仍能调用 AI）。
+    """
+    if not raw:
+        return set()
+    scopes = normalize_scopes(raw)
+    unknown = scopes - KNOWN_SCOPES
+    if unknown:
+        raise SystemExit(f"未知权限: {sorted(unknown)}")
+    return scopes
 
 
 async def _create_user(session, args) -> None:
     username = args.username.strip()
     if not username:
         raise SystemExit("用户名不能为空")
-    scopes = _parse_scopes(args.scopes, args.role)
+    extra_scopes = _parse_scopes(args.scopes)
     session.add(
         AuthUser(
             username=username,
             password_hash=hash_password(_password(args.password)),
             role=args.role,
-            scopes=",".join(sorted(scopes)),
+            scopes=",".join(sorted(extra_scopes)),
             is_active=True,
             token_version=1,
         )
@@ -83,7 +87,8 @@ async def _create_user(session, args) -> None:
     except IntegrityError as exc:
         await session.rollback()
         raise SystemExit(f"用户已存在: {username}") from exc
-    print(f"已创建用户 {username}（角色 {args.role}，权限 {','.join(sorted(scopes))}）")
+    effective = effective_scopes(args.role, ",".join(sorted(extra_scopes)))
+    print(f"已创建用户 {username}（角色 {args.role}，生效权限 {','.join(sorted(effective))}）")
 
 
 async def _set_password(session, args) -> None:
@@ -114,7 +119,7 @@ async def _require_user(session, username: str) -> AuthUser:
 
 
 async def _create_service(session, args) -> None:
-    scopes = _parse_scopes(args.scopes, None)
+    scopes = _parse_scopes(args.scopes)
     if not scopes:
         raise SystemExit("服务凭据至少需要一个权限")
     raw_key = secrets.token_urlsafe(32)

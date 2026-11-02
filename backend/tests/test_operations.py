@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -124,6 +126,84 @@ class TestTlsLayer:
         text = (_ROOT / "docker-compose.tls.yml").read_text(encoding="utf-8")
         assert 'AUTH_COOKIE_SECURE: "true"' in text
         assert "deploy/certs:/etc/nginx/certs:ro" in text
+
+
+class TestWorkerGuard:
+    """多 worker 会让进程内限流/AI 并发按倍数放大，默认必须拒绝启动。"""
+
+    @staticmethod
+    def _clear_env(monkeypatch):
+        for name in ("WEB_CONCURRENCY", "GUNICORN_WORKERS", "UVICORN_WORKERS"):
+            monkeypatch.delenv(name, raising=False)
+
+    def test_detects_worker_count_from_env_and_argv(self, monkeypatch):
+        from backend import main
+
+        self._clear_env(monkeypatch)
+        monkeypatch.setattr(sys, "argv", ["uvicorn", "backend.main:app"])
+        assert main._detect_worker_count() == 1
+
+        monkeypatch.setenv("WEB_CONCURRENCY", "2")
+        assert main._detect_worker_count() == 2
+
+        monkeypatch.delenv("WEB_CONCURRENCY")
+        monkeypatch.setattr(
+            sys, "argv", ["uvicorn", "backend.main:app", "--workers", "3"]
+        )
+        assert main._detect_worker_count() == 3
+
+        monkeypatch.setattr(
+            sys, "argv", ["uvicorn", "backend.main:app", "--workers=4"]
+        )
+        assert main._detect_worker_count() == 4
+
+    def test_multi_worker_is_rejected_without_override(self, monkeypatch):
+        from backend import main
+
+        self._clear_env(monkeypatch)
+        monkeypatch.setenv("WEB_CONCURRENCY", "2")
+        monkeypatch.setattr(main, "settings", SimpleNamespace(allow_multi_worker=False))
+        with pytest.raises(RuntimeError, match="ALLOW_MULTI_WORKER"):
+            main._enforce_single_worker()
+
+    def test_multi_worker_can_be_explicitly_allowed(self, monkeypatch):
+        from backend import main
+
+        self._clear_env(monkeypatch)
+        monkeypatch.setenv("WEB_CONCURRENCY", "2")
+        monkeypatch.setattr(main, "settings", SimpleNamespace(allow_multi_worker=True))
+        # 显式放行时只记录警告，不应再次抛出。
+        main._enforce_single_worker()
+
+
+class TestHealthCheckRedisUrl:
+    def test_builds_url_with_encoded_password(self, monkeypatch):
+        from scripts.health_check import _default_redis_url
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        monkeypatch.setenv("REDIS_PASSWORD", "p@ss+w/rd=1#")
+        monkeypatch.setenv("REDIS_HOST", "redis")
+        monkeypatch.setenv("REDIS_PORT", "6380")
+        monkeypatch.setenv("REDIS_DB", "3")
+
+        assert (
+            _default_redis_url()
+            == "redis://:p%40ss%2Bw%2Frd%3D1%23@redis:6380/3"
+        )
+
+    def test_explicit_redis_url_wins(self, monkeypatch):
+        from scripts.health_check import _default_redis_url
+
+        monkeypatch.setenv("REDIS_URL", "redis://:explicit@localhost:6379/0")
+        monkeypatch.setenv("REDIS_PASSWORD", "ignored")
+        assert _default_redis_url() == "redis://:explicit@localhost:6379/0"
+
+    def test_no_password_means_redis_check_is_skipped(self, monkeypatch):
+        from scripts.health_check import _default_redis_url
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        monkeypatch.delenv("REDIS_PASSWORD", raising=False)
+        assert _default_redis_url() is None
 
 
 class TestBackupAndGrantScripts:

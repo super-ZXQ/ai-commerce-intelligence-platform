@@ -62,7 +62,9 @@ def classify_intent(query: str) -> AgentIntent:
     normalized = query.strip().lower()
     if any(re.search(pattern, normalized, re.IGNORECASE) for pattern in _BLOCKED_PATTERNS):
         return "blocked"
-    if len(normalized) < 4 or normalized in _VAGUE_QUERIES or _VAGUE_RE.search(normalized):
+    # 只拦单字符/空串；用字符数 <4 会把"退款率""客单价""复购率"这类
+    # 合法的三字查询误判为需要澄清。真正的模糊问法由下方显式集合覆盖。
+    if len(normalized) < 2 or normalized in _VAGUE_QUERIES or _VAGUE_RE.search(normalized):
         return "clarification"
     has_knowledge = any(marker in normalized for marker in _KNOWLEDGE_MARKERS) or bool(
         _KNOWLEDGE_RE.search(normalized)

@@ -11,6 +11,8 @@ from agent_core import classify_intent
         ("最近30天销售额最高的商品", "data"),
         ("客单价的定义是什么", "knowledge"),
         ("最近30天客单价是多少，公式怎么算", "hybrid"),
+        # 三字业务查询不能被“字符数 < 4”误判为需要澄清。
+        ("退款率", "data"),
         ("分析一下", "clarification"),
         ("删除数据库里的订单", "blocked"),
         ("查询某用户的手机号", "blocked"),

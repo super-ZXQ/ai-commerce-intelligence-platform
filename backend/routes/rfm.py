@@ -21,10 +21,20 @@ router = APIRouter(prefix="/api/rfm", tags=["RFM用户画像"])
 
 @router.get("/overview", summary="RFM 用户画像总览")
 async def rfm_overview(
+    reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
+    n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
     _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
-    result = await get_rfm_overview(db)
+    """总览必须接受与 /segments、/top-users 相同的口径参数。
+
+    否则总览永久锚定默认参考日与 n_bins=5，无法与同参数的分群结果对账。
+    """
+    result = await get_rfm_overview(
+        db,
+        reference_date=reference_date.isoformat() if reference_date else None,
+        n_bins=n_bins,
+    )
     return result
 
 
@@ -57,6 +67,9 @@ async def rfm_segment_users(
     page_size: int = Query(20, ge=1, le=100),
     reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
+    r_threshold: int | None = Query(None, ge=1, le=10, description="R 评分阈值，不传则用默认值"),
+    f_threshold: int | None = Query(None, ge=1, le=10, description="F 评分阈值，不传则用默认值"),
+    m_threshold: int | None = Query(None, ge=1, le=10, description="M 评分阈值，不传则用默认值"),
     db: AsyncSession = Depends(get_db),
     _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
@@ -70,6 +83,9 @@ async def rfm_segment_users(
         db, segment=segment, page=page, page_size=page_size,
         reference_date=reference_date.isoformat() if reference_date else None,
         n_bins=n_bins,
+        r_threshold=r_threshold,
+        f_threshold=f_threshold,
+        m_threshold=m_threshold,
     )
     return result
 

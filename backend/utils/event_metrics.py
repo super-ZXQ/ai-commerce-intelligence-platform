@@ -25,7 +25,9 @@ def record_event(event_type: str, result: str, duration_seconds: float, lag_seco
         _processed[result] += 1
         _processing_seconds_sum += max(duration_seconds, 0.0)
         _processing_seconds_count += 1
-        _lag_seconds = max(lag_seconds, 0.0)
+        # 记录观测到的最大积压，而不是被最后一条事件覆盖：
+        # 后者会让 gauge 在突发结束后立刻归零，失去告警意义。
+        _lag_seconds = max(_lag_seconds, lag_seconds, 0.0)
 
 
 def record_db_timeout() -> None:

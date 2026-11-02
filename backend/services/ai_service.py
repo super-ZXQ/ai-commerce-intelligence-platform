@@ -24,7 +24,7 @@ from agent_core.provider_policy import (
 )
 from agent_core.rag import MarkdownKnowledgeRetriever
 from agent_core.session import FallbackConversationStore, MemoryConversationStore, RedisConversationStore
-from agent_core.sql_safety import dialect_from_url
+from agent_core.sql_safety import DEFAULT_MAX_ROWS, dialect_from_url
 from backend.config import get_settings
 from backend.models.schemas import AIQueryResponse, AgentUsage
 from backend.services import episode_memory_service, memory_service
@@ -83,7 +83,7 @@ def _build_visualization(columns: list[str], rows: list) -> dict | None:
         "chart_type": chart_type,
         "x_field": columns[0],
         "y_field": columns[1] if len(columns) > 1 else None,
-        "data": [dict(zip(columns, row)) for row in rows] if rows else [],
+        "data": [dict(zip(columns, row, strict=True)) for row in rows] if rows else [],
     }
 
 
@@ -108,11 +108,22 @@ def _execute_query_with_columns(sql: str) -> list[dict]:
         raise ValueError("仅允许执行只读 SQL")
 
     with _get_sync_engine().connect() as connection:
-        rows = connection.execute(text(sql)).mappings().all()
-    return [
-        {str(key): _json_safe_value(value) for key, value in row.items()}
-        for row in rows
-    ]
+        # yield_per 会启用服务端游标，避免 LIMIT 失效时把全表拉进内存；
+        # 同时仍设置硬上限，AST 改写与执行层形成双保险。
+        result = connection.execution_options(
+            yield_per=DEFAULT_MAX_ROWS + 1
+        ).execute(text(sql))
+        rows = []
+        for row in result.mappings():
+            if len(rows) >= DEFAULT_MAX_ROWS:
+                break
+            rows.append({str(key): _json_safe_value(value) for key, value in row.items()})
+    return rows
+
+
+# SQL 执行时限与 Runtime 共用同一常量；驱动层 read_timeout 必须略大于它，
+# 否则 asyncio.wait_for 取消协程后，pymysql 仍会占着连接与线程。
+_SQL_TIMEOUT_SECONDS = 10
 
 
 @lru_cache(maxsize=1)
@@ -125,6 +136,13 @@ def _get_sync_engine() -> Engine:
         pool_size=3,
         max_overflow=2,
         pool_recycle=3600,
+        # 驱动级超时是最后一道兜底：数据库/网络卡死时主动断开 socket，
+        # 避免慢查询永久占用默认线程池与连接池。
+        connect_args={
+            "connect_timeout": 5,
+            "read_timeout": _SQL_TIMEOUT_SECONDS + 2,
+            "write_timeout": _SQL_TIMEOUT_SECONDS + 2,
+        },
     )
     guard_read_only_engine(engine)
     return engine
@@ -194,14 +212,22 @@ async def _runtime_execute(sql: str) -> list[dict]:
     return await asyncio.to_thread(_execute_query_with_columns, sql)
 
 
-_model_adapter = OpenAIModelAdapter(
-    api_key=settings.llm_api_key,
-    base_url=settings.llm_base_url,
-    model=settings.llm_model,
-    business_context=BUSINESS_CONTEXT,
-    allowed_hosts=settings.llm_allowed_hosts,
-    history_max_chars=settings.agent_history_max_chars,
-)
+@lru_cache(maxsize=1)
+def _get_default_adapter() -> OpenAIModelAdapter:
+    """延迟构造托管模型适配器。
+
+    在模块导入期构造会在 LLM_BASE_URL 配置错误时直接杀死整个 FastAPI
+    进程（即使当前使用 BYOK 或根本不调用 AI）。改为首次使用时构造，
+    配置错误只在 AI 请求内以可控错误返回。
+    """
+    return OpenAIModelAdapter(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+        business_context=BUSINESS_CONTEXT,
+        allowed_hosts=settings.llm_allowed_hosts,
+        history_max_chars=settings.agent_history_max_chars,
+    )
 
 
 def _conversation_store():
@@ -240,17 +266,22 @@ def _build_runtime(adapter: OpenAIModelAdapter) -> AgentRuntime:
         episode_recall=_runtime_recall_episodes if settings.agent_episode_enabled else None,
         episode_writer=_runtime_write_episode if settings.agent_episode_enabled else None,
         memory_max_chars=settings.agent_memory_max_chars,
-        sql_timeout_seconds=10,
+        sql_timeout_seconds=_SQL_TIMEOUT_SECONDS,
         # 方言决定能否把执行时限下推到数据库（MySQL 用 MAX_EXECUTION_TIME）。
         sql_dialect=dialect_from_url(settings.ai_database_url),
     )
 
 
-_runtime = _build_runtime(_model_adapter)
+@lru_cache(maxsize=1)
+def _get_default_runtime() -> AgentRuntime:
+    return _build_runtime(_get_default_adapter())
+
 
 # BYOK 运行时按“模式+密钥哈希+地址+模型”隔离；只缓存少量指纹，避免密钥常驻内存。
 _MAX_CACHED_RUNTIMES = 8
 _runtime_cache: OrderedDict[str, tuple[AgentRuntime, OpenAIModelAdapter]] = OrderedDict()
+# 事件循环可能只保留弱引用；显式持有后台关闭任务，避免 aclose 被提前回收。
+_adapter_close_tasks: set[asyncio.Task] = set()
 
 
 class AIModelConfigError(ValueError):
@@ -296,7 +327,9 @@ def resolve_model_config(
             base_url=base_url.strip(),
             model=model.strip(),
             allowed_hosts=settings.llm_allowed_hosts,
-            resolve_dns=False,
+            # 用户可控地址必须解析 DNS 并拒绝内网/链路本地结果；
+            # 适配器每次建连前还会再校验一次，降低 DNS 重绑定风险。
+            resolve_dns=True,
         )
     except ProviderPolicyError as exc:
         raise AIModelConfigError(str(exc)) from exc
@@ -304,7 +337,7 @@ def resolve_model_config(
 
 def _runtime_for(config: ModelConfig | None) -> AgentRuntime:
     if config is None:
-        return _runtime
+        return _get_default_runtime()
     fingerprint = hashlib.sha256(
         f"{config.mode}|{hashlib.sha256(config.api_key.encode()).hexdigest()}|"
         f"{config.base_url}|{config.model}".encode()
@@ -327,9 +360,12 @@ def _runtime_for(config: ModelConfig | None) -> AgentRuntime:
     while len(_runtime_cache) > _MAX_CACHED_RUNTIMES:
         _, (_, evicted_adapter) = _runtime_cache.popitem(last=False)
         try:
-            asyncio.get_running_loop().create_task(evicted_adapter.aclose())
+            task = asyncio.get_running_loop().create_task(evicted_adapter.aclose())
         except RuntimeError:
             pass
+        else:
+            _adapter_close_tasks.add(task)
+            task.add_done_callback(_adapter_close_tasks.discard)
     return runtime
 
 

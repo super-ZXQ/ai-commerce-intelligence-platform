@@ -6,31 +6,33 @@ AI 商业智能分析平台，基于 10 万+ 公开电商订单样本，提供 B
 
 **技术栈**：Python 3.12, FastAPI, SQLAlchemy (async), Streamlit, Plotly, LangChain, MySQL 8, Redis 7, Docker Compose, Nginx
 
-**虚拟环境**：`.venv\Scripts\`
+**虚拟环境**：`.venv/bin/`（Windows 为 `.venv\Scripts\`）
 
 ## 启动服务
 
-### 本地开发（直连模式，三端口）
+### 本地开发（直连模式，三端口，macOS/Linux）
 
-```powershell
+```bash
 # 1. FastAPI 后端 (:8000)
-Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\python.exe" -ArgumentList "-m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 # 2. BI 看板 (:8501)
-Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run streamlit_app.py --server.port 8501"
+.venv/bin/streamlit run streamlit_app.py --server.port 8501 &
 # 3. AI 助手 (:8505)
-Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\streamlit.exe" -ArgumentList "run ai-ecommerce-assistant/app.py --server.port 8505"
+.venv/bin/streamlit run ai-ecommerce-assistant/app.py --server.port 8505 &
 ```
+
+Windows 对应命令：`Start-Process -WindowStyle Hidden -FilePath ".venv\Scripts\python.exe" ...`。
 
 ### Docker 部署（Nginx 统一入口 :80）
 
-```powershell
+```bash
 # 启动全部服务
-docker-compose up -d
+docker compose up -d
 # 停止
-docker-compose down
+docker compose down
 # 重建某服务（代码改动后）
-docker-compose up -d --build backend
-docker-compose up -d --build streamlit
+docker compose up -d --build backend
+docker compose up -d --build streamlit
 # 重载 Nginx 配置
 docker exec ea-nginx nginx -s reload
 ```
@@ -45,7 +47,8 @@ docker exec ea-nginx nginx -s reload
 | `/api/*` | backend:8000 | RESTful API |
 | `/nav` | backend:8000 | 导航页（备用路由） |
 | `/docs` `/redoc` `/openapi.json` | backend:8000 | Swagger / ReDoc 文档 |
-| `/health` `/demo` `/monitor` `/health-panel` | backend:8000 | 系统页面 |
+| `/health` `/livez` `/readyz` `/metrics` | backend:8000 | 公开健康与聚合指标（`/readyz` 含 Redis 检查） |
+| `/demo` `/monitor` `/health-panel` | backend:8000 | 页面；`/monitor`、`/health-panel` 需 `admin:manage` |
 
 主数据文件：`data/cleaned_orders.csv`
 
@@ -77,18 +80,24 @@ ENTERPRISE_COLORS_FULL = {
 - **禁止使用 `st.metric(delta_delta_color=...)`** — 当前 Streamlit 版本不支持此参数
 - **禁止 `reindex(..., fill_value=0)` 对含字符串列的 DataFrame** — 字符串列与 `fill_value=0` 类型冲突，必须分列处理：数值列 `fillna(0)`，字符串列 `fillna('其他')`
 - **`go.Pie` 使用 `labels=` 而非 `names=`** — `names` 可能被 Plotly 解析为属性路径
-- **`Start-Process` 必须用 `-WindowStyle Hidden`** — Windows 后台运行
+- **Windows 后台运行 `Start-Process` 必须用 `-WindowStyle Hidden`**；macOS/Linux 用 `&` 或 `nohup`
 - **RFM 评分语义**：R 评分 ≤ 阈值 = 高价值（近期活跃），F/M 评分 ≥ 阈值 = 高价值
 - **`aggregate(lambda x: x.mode().iloc[0])`** — 分组取众数前需检查 `len(x.mode()) > 0`
-- **LLM SQL 必须只读** — `ai_service._is_read_only_sql()` 拦截 DROP/DELETE/UPDATE/INSERT/ALTER/TRUNCATE/CREATE
+- **LLM SQL 必须只读** — AST 层 `agent_core/sql_safety.py` + 字符串层 `backend/utils/sql_guard.is_read_only_sql()` + 只读数据库账号三层拦截；LIMIT 一律强制收敛到 500 行，执行层再用 `yield_per` 流式读取
 - **`@cached` 防击穿** — 基于 `asyncio.Lock` 的 double-check lock，过期时异步重建
 - **内存缓存上限 1000 条** — 满时先清理过期条目再驱逐最旧条目；`cleanup_memory_cache()` 同步清理 `_cache_locks`
-- **公开监控端点** — `/api/monitor/services-status`、`/health/detailed`、`/metrics` 无需 JWT（导航页/监控面板/健康面板调用）
+- **监控端点权限** — 仅 `/livez`、`/readyz`、`/health`、`/metrics` 公开；`/api/monitor/*` 与 `/health/detailed` 需要 `admin:manage`，异常详情只写服务端日志、不回显给调用方
+- **登出必须吊销 Token** — `/api/auth/logout` 会递增 `token_version`，只删 Cookie 不足以让已签发的 Bearer Token 失效
+- **生产环境 AI 只读账号** — `DEBUG=false` 时必须配置 `AI_DB_USER`/`AI_DB_PASSWORD`，禁止回落主库 root/admin 账号
+- **默认单 worker** — `backend/main.py` 启动守卫检测 `WEB_CONCURRENCY` / `GUNICORN_WORKERS` / `UVICORN_WORKERS` / `--workers`；大于 1 且未设置 `ALLOW_MULTI_WORKER=true` 时拒绝启动（进程内限流与 AI 并发会按 worker 放大）
+- **登录失败锁定** — 按「账号+客户端 IP」计数，5 次/5 分钟触发 5 分钟锁定，成功登录清零；禁止改成全局账号锁定（可被用来锁死 admin）
+- **角色默认权限不写入 `scopes` 列** — 鉴权时 `effective_scopes()` 取「角色默认 ∪ 显式权限」，把角色默认值持久化会让后续收紧角色对已有账号失效（旧值被并集加回来）。`manage_auth create-user` 只在 `--scopes` 时存追加权限
+- **公开探针必须边缘限流** — `/readyz` 每次占用业务库、事件库、认证库三个连接并 ping Redis；应用内限流把这些路径排除在桶外，因此必须由 Nginx `probe_edge` zone 兜底
 
 ## 排查路径
 
 - Streamlit 报错 → 看终端输出 / 检查 `columns()` 和 `reindex` 参数
-- FastAPI 端口占用 → `netstat -ano | Select-String ":8000"` 找 PID 后 `Stop-Process`
+- FastAPI 端口占用 → macOS/Linux: `lsof -i :8000`；Windows: `netstat -ano | Select-String ":8000"` 找 PID 后 `Stop-Process`
 - 数据文件 → `data/cleaned_orders.csv`
 - Docker 启动卡住 → 重启 Docker Desktop / `wsl --shutdown`
 - Docker 拉取失败 → 检查 `~/.docker/daemon.json` 镜像加速配置
@@ -104,10 +113,15 @@ ENTERPRISE_COLORS_FULL = {
 - **结构清晰** — 路由/服务/工具分层明确，保持项目可维护性
 - **说明用途** — 生成代码时解释每段代码的用途
 
-## 测试
+## 测试与静态检查
 
-```powershell
-.venv\Scripts\python.exe -m pytest backend/tests/ -v
+```bash
+# 后端（需要本地 MySQL）
+.venv/bin/python -m pytest backend/tests/ -v
+# AI 助手
+.venv/bin/python -m pytest ai-ecommerce-assistant/tests -q
+# 静态检查（与 CI 完全一致；ruff.toml 已启用 E/F/B/S，notebook 由 extend-exclude 排除）
+.venv/bin/ruff check .
 ```
 
 ## 深入文档

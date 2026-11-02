@@ -109,7 +109,13 @@ async def filter_orders(
     if filters.platform_type:
         conditions.append(Order.platform_type == filters.platform_type)
     if filters.user_name:
-        escaped = filters.user_name.replace("%", r"\%").replace("_", r"\_")
+        # 必须先转义转义符本身；否则用户输入的反斜杠会与后续 %/_ 组合成
+        # 错误的转义序列，导致模糊匹配结果与预期不符。
+        escaped = (
+            filters.user_name.replace("\\", r"\\")
+            .replace("%", r"\%")
+            .replace("_", r"\_")
+        )
         conditions.append(Order.user_name.like(f"%{escaped}%", escape="\\"))
     if filters.product_id:
         conditions.append(Order.product_id == filters.product_id)

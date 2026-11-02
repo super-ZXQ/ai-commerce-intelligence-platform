@@ -29,7 +29,15 @@
 
   function safeNext() {
     const value = new URLSearchParams(window.location.search).get('next') || '/workspace';
-    return value.startsWith('/') && !value.startsWith('//') ? value : '/workspace';
+    // 仅用 startsWith('/') 会放过 '/\evil.com'：WHATWG URL 把反斜杠当斜杠，
+    // 登录成功后会被导航到外部域。统一用同源解析校验。
+    try {
+      const url = new URL(value, window.location.origin);
+      if (url.origin !== window.location.origin) return '/workspace';
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return '/workspace';
+    }
   }
 
   function toast(message) {

@@ -12,6 +12,14 @@ _rate_lock = threading.Lock()
 # 守护清理线程一次性启动，避免多线程并发首次调用时启动多个 daemon
 _init_lock = threading.Lock()
 
+# 登录失败锁定：按「账号 + 客户端 IP」组合计数，避免攻击者用少量请求
+# 从任意 IP 锁死 admin 账号（全局账号锁定是可用性 DoS 风险）。
+LOGIN_FAILURE_LIMIT = 5
+LOGIN_FAILURE_WINDOW = 300
+LOGIN_LOCK_SECONDS = 300
+_login_failures: dict[str, list[float]] = defaultdict(list)
+_login_locks: dict[str, float] = {}
+
 RATE_LIMITS = {
     "/api/auth/login": {"requests": 5, "window": 60},
     "/api/ai/query": {"requests": 10, "window": 60},
@@ -63,6 +71,24 @@ def _cleanup_expired_keys() -> None:
     for key in expired_keys:
         del _rate_store[key]
 
+    # 登录失败计数与锁定记录同样需要回收，否则随机用户名会持续堆积。
+    for key in list(_login_failures):
+        remaining = [t for t in _login_failures[key] if now - t < LOGIN_FAILURE_WINDOW]
+        if remaining:
+            _login_failures[key] = remaining
+        else:
+            del _login_failures[key]
+    for key, until in list(_login_locks.items()):
+        if until <= now:
+            del _login_locks[key]
+    if len(_login_failures) > _MAX_STORE_SIZE:
+        oldest = sorted(
+            _login_failures,
+            key=lambda key: max(_login_failures[key], default=0.0),
+        )
+        for key in oldest[: len(_login_failures) - _MAX_STORE_SIZE]:
+            del _login_failures[key]
+
 
 def _periodic_cleanup() -> None:
     while True:
@@ -104,6 +130,60 @@ def _get_client_id(request: Request, trust_proxy_headers: bool = False) -> str:
             if ips:
                 return ips[-1]
     return request.client.host if request.client else "unknown"
+
+
+def _login_key(username: str, client_id: str) -> str:
+    """账号大小写不敏感，但 IP 参与 key，避免全局账号锁定被利用。"""
+    return f"{username.strip().lower()}:{client_id}"
+
+
+def check_login_lock(username: str, client_id: str) -> None:
+    """登录前检查该账号+IP 是否处于失败锁定中。"""
+    key = _login_key(username, client_id)
+    now = time.time()
+    with _rate_lock:
+        until = _login_locks.get(key, 0.0)
+        if until > now:
+            retry_after = int(until - now) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"登录失败次数过多，请 {retry_after} 秒后重试",
+                headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Scope": "login",
+                },
+            )
+        if until:
+            _login_locks.pop(key, None)
+
+
+def record_login_failure(username: str, client_id: str) -> None:
+    """记录一次失败；达到阈值后锁定该账号+IP 组合。"""
+    key = _login_key(username, client_id)
+    now = time.time()
+    with _rate_lock:
+        attempts = [t for t in _login_failures[key] if now - t < LOGIN_FAILURE_WINDOW]
+        attempts.append(now)
+        if len(attempts) >= LOGIN_FAILURE_LIMIT:
+            _login_locks[key] = now + LOGIN_LOCK_SECONDS
+            _login_failures.pop(key, None)
+            logger.warning(
+                "登录失败锁定: user=%s client=%s（%d 次/%d 秒）",
+                username[:50],
+                client_id,
+                LOGIN_FAILURE_LIMIT,
+                LOGIN_FAILURE_WINDOW,
+            )
+            return
+        _login_failures[key] = attempts
+
+
+def clear_login_failures(username: str, client_id: str) -> None:
+    """登录成功后清除失败计数与锁定记录。"""
+    key = _login_key(username, client_id)
+    with _rate_lock:
+        _login_failures.pop(key, None)
+        _login_locks.pop(key, None)
 
 
 def check_principal_rate_limit(request: Request, principal_name: str) -> dict | None:

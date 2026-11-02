@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     app_name: str = "AI Commerce Intelligence Platform"
     app_version: str = "1.0.3"
     debug: bool = False
+    # 限流、AI 并发与每日额度均为进程内计数；默认拒绝多 worker 启动，
+    # 避免 uvicorn/gunicorn 误配后配额按 worker 数量放大。
+    allow_multi_worker: bool = False
 
     db_host: str = "localhost"
     db_port: int = 3306
@@ -164,6 +167,10 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境必须设置 ADMIN_PASSWORD 环境变量！")
         if self.auth_db_user and not self.auth_db_password:
             raise ValueError("设置 AUTH_DB_USER 时必须同时设置 AUTH_DB_PASSWORD")
+        if self.ai_db_user and not self.ai_db_password:
+            raise ValueError("设置 AI_DB_USER 时必须同时设置 AI_DB_PASSWORD")
+        if self.ai_db_user.strip().lower() in {"root", "admin"}:
+            raise ValueError("AI_DB_USER 不能使用 root/admin 等高权限账号")
         if self.ai_max_concurrency < 1:
             raise ValueError("AI_MAX_CONCURRENCY 必须大于 0")
         if self.ai_max_inflight_per_user < 1:
@@ -181,6 +188,10 @@ class Settings(BaseSettings):
             raise ValueError("AUTH_COOKIE_NAME 只能包含字母、数字、下划线和连字符")
         if not 0 <= self.redis_db <= 15 or not 0 <= self.redis_session_db <= 15:
             raise ValueError("REDIS_DB / REDIS_SESSION_DB 必须在 0-15 之间")
+        if self.redis_enabled and not self.redis_password:
+            logger.warning(
+                "⚠️ REDIS_ENABLED=true 但 REDIS_PASSWORD 为空：同网段容器可读写缓存与会话"
+            )
         if self.redis_session_db == self.redis_db:
             # 逻辑 DB 只是命名隔离，不改变 allkeys-lru 的全局淘汰；但同库会直接键冲突。
             raise ValueError("REDIS_SESSION_DB 必须与 REDIS_DB 不同，避免会话键与业务缓存键冲突")
@@ -239,6 +250,13 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 ANALYST_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
             if self.db_user == "root":
                 logger.warning("⚠️ 生产环境业务账号为 root，请改用最小权限账号（如 ea_app）")
+            if not self.ai_db_user:
+                # 回落主库账号意味着 LLM 生成的 SQL 会以 ea_app（本地常为 root）执行，
+                # 三层 SQL 防护会退化为纯字符串层；生产环境必须在启动时暴露配置错误。
+                raise ValueError(
+                    "生产环境必须配置 AI_DB_USER（仅 SELECT 的只读账号），"
+                    "禁止回落主库账号执行 AI 生成的 SQL"
+                )
             if not self.auth_cookie_secure:
                 logger.warning(
                     "⚠️ AUTH_COOKIE_SECURE=false：仅在 TLS 已由可信反代终止且全站强制 HTTPS 时使用"
@@ -306,8 +324,13 @@ class Settings(BaseSettings):
 
     @property
     def redis_url(self) -> str:
+        # 密码必须走 quote_plus：openssl rand -base64 会产出 + / = 等字符，
+        # 直接拼接会让 URL 解析出错误的主机或截断密码，表现为"静默认证失败"。
         if self.redis_password:
-            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+            return (
+                f"redis://:{quote_plus(self.redis_password)}"
+                f"@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+            )
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     @property
@@ -315,7 +338,7 @@ class Settings(BaseSettings):
         """会话逻辑 DB 连接串；只是命名隔离，淘汰策略仍由 Redis 实例全局决定。"""
         if self.redis_password:
             return (
-                f"redis://:{self.redis_password}@{self.redis_host}:"
+                f"redis://:{quote_plus(self.redis_password)}@{self.redis_host}:"
                 f"{self.redis_port}/{self.redis_session_db}"
             )
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_session_db}"

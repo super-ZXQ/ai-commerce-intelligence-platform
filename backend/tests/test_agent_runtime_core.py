@@ -372,7 +372,7 @@ async def test_api_adapter_preserves_fields_and_null_token_usage(monkeypatch) ->
                 ),
             }
 
-    monkeypatch.setattr(ai_service, "_runtime", _FakeRuntime())
+    monkeypatch.setattr(ai_service, "_get_default_runtime", lambda: _FakeRuntime())
     response = await ai_service.process_natural_language_query(
         "客单价定义", "thread-1", owner="alice"
     )

@@ -152,7 +152,10 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
     ledger, duplicate = await _insert_ledger_or_duplicate(db, event)
     if duplicate is not None:
         return duplicate
-    assert ledger is not None
+    if ledger is None:
+        # 插入账本后必然返回记录；显式失败比 assert 更可靠
+        # （python -O 会移除 assert，导致后续 None 解引用）。
+        raise RuntimeError("订单事件账本写入后未返回记录")
 
     order_query = select(Order).where(Order.order_no == event.order_id)
     # 创建时无需锁定不存在的订单；MySQL 的间隙锁会让不同订单并发插入互相等待。

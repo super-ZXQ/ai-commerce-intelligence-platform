@@ -30,10 +30,29 @@ class _AnalysisChoice(BaseModel):
     action: Literal["platform", "product", "finish"]
 
 
+def _content_text(content) -> str:
+    """把 OpenAI 兼容提供方的 str / content-blocks 响应统一成纯文本。
+
+    content 为 list 时直接 str() 会得到 Python repr；流式路径此前还会
+    丢弃非 str 的 chunk，导致最终答案为空。
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+        return "".join(parts)
+    return str(content)
+
+
 def _response(message) -> ModelResponse:
     usage = getattr(message, "usage_metadata", None) or {}
     return ModelResponse(
-        content=str(message.content),
+        content=_content_text(message.content),
         input_tokens=usage.get("input_tokens"),
         output_tokens=usage.get("output_tokens"),
         total_tokens=usage.get("total_tokens"),
@@ -234,7 +253,7 @@ SQL：{sql or '未执行'}
         usage: dict = {}
         # stream_usage=True 让最后一个 chunk 携带 usage_metadata，token 统计与 answer 对齐。
         async for chunk in self._client(stream_usage=True).astream(prompt):
-            delta = chunk.content if isinstance(chunk.content, str) else ""
+            delta = _content_text(chunk.content)
             if delta:
                 chunks.append(delta)
                 emit_token(delta)

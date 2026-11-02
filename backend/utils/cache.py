@@ -12,6 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, TypeAdapter
 
+from backend.utils.text_cleaner import sanitize_error
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_TTL = 300
@@ -99,8 +101,10 @@ async def check_redis_health() -> dict:
             "used_memory_human": info.get("used_memory_human", "N/A"),
             "keys": await _redis_client.dbsize(),
         }
-    except Exception as e:
-        return {"status": "error", "detail": str(e), "backend": "redis_fallback_memory"}
+    except Exception as exc:  # noqa: BLE001 - 健康检查需要吞掉所有 Redis 异常
+        # Redis 客户端异常可能包含连接串，日志也必须脱敏。
+        logger.warning("Redis 健康检查失败: %s", sanitize_error(exc))
+        return {"status": "error", "backend": "redis_fallback_memory"}
 
 
 def _make_key(*args, **kwargs) -> str:

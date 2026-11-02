@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -50,9 +51,11 @@ KNOWN_SCOPES = frozenset(
 )
 
 ROLE_SCOPES: dict[str, frozenset[str]] = {
+    # admin 拥有全部权限，包括 /api/monitor 的 admin:manage。
     "admin": KNOWN_SCOPES,
-    "analyst": frozenset({SCOPE_DATA_READ, SCOPE_AI_QUERY}),
-    "viewer": frozenset({SCOPE_DATA_READ, SCOPE_AI_QUERY}),
+    # analyst 可读、可导出、可使用 AI；viewer 只有只读权限，不能导出或调用 AI。
+    "analyst": frozenset({SCOPE_DATA_READ, SCOPE_DATA_EXPORT, SCOPE_AI_QUERY}),
+    "viewer": frozenset({SCOPE_DATA_READ}),
     "ingest": frozenset({SCOPE_EVENTS_WRITE}),
 }
 
@@ -102,6 +105,12 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
+# 真实 bcrypt 哈希，用于"用户不存在/已停用"时执行等时校验。
+# 之前用 "$2b$12$" + "x"*53 是非法盐，checkpw 会立即抛 ValueError，
+# 实测 0.02ms vs 真实校验 ~165ms，反而放大了账号枚举计时侧信道。
+_DUMMY_PASSWORD_HASH = hash_password(secrets.token_hex(16))
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
@@ -120,12 +129,12 @@ def normalize_scopes(raw: str | None) -> frozenset[str]:
 
 
 def effective_scopes(role: str, explicit: str | None) -> frozenset[str]:
-    """角色默认权限与显式权限取并集；未知角色只拥有显式权限。"""
+    """角色默认权限与显式权限取并集；未知角色只拥有显式权限。
+
+    注意：显式权限只应存「角色默认之外的追加项」。把角色默认值也写进
+    auth_users.scopes 会让后续收紧角色对已有账号失效（并集会把旧值加回来）。
+    """
     return ROLE_SCOPES.get(role, frozenset()) | normalize_scopes(explicit)
-
-
-def role_default_scopes(role: str) -> str:
-    return ",".join(sorted(ROLE_SCOPES.get(role, frozenset())))
 
 
 def hash_service_key(api_key: str) -> str:
@@ -242,8 +251,8 @@ async def authenticate_user(
         await session.execute(select(AuthUser).where(AuthUser.username == username))
     ).scalar_one_or_none()
     if user is None or not bool(user.is_active):
-        # 仍执行一次 bcrypt 校验，避免“用户不存在”响应明显更快。
-        verify_password(password, "$2b$12$" + "x" * 53)
+        # 仍执行一次真实 bcrypt 校验，避免“用户不存在”响应明显更快。
+        verify_password(password, _DUMMY_PASSWORD_HASH)
         return None
     if not verify_password(password, user.password_hash):
         return None

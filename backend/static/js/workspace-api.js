@@ -26,10 +26,19 @@ function errorCode(payload) {
   return payload?.detail?.error_code || payload?.error_code || '';
 }
 
+function safeNextPath(value) {
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin) return '/workspace';
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return '/workspace';
+  }
+}
+
 export function redirectToLogin() {
   const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/workspace';
-  window.location.assign(`/login?next=${encodeURIComponent(safeNext)}`);
+  window.location.assign(`/login?next=${encodeURIComponent(safeNextPath(next))}`);
 }
 
 async function parseBody(response) {

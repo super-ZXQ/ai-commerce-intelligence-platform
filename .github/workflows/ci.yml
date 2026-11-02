@@ -180,7 +180,9 @@ jobs:
           ruff --version
 
       - name: 静态检查
-        run: ruff check agent_core backend ai-ecommerce-assistant streamlit_app.py scripts
+        # 统一用 `ruff check .`：手写路径清单曾漏掉 scripts/，让 CI 与本地
+        # 文档给出不同结论。排除项由 ruff.toml 的 extend-exclude 统一声明。
+        run: ruff check .
 
       - name: Agent 离线路由评测
         run: python -m agent_core.evaluation

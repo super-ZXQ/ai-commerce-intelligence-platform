@@ -15,8 +15,10 @@ class UnsafeSQLError(ValueError):
 
 
 _ALLOWED_PREFIXES = {"SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN", "PRAGMA"}
+# 注意：REPLACE()/TRUNCATE() 是 SELECT 中常见的只读函数，不能按关键字拦截；
+# REPLACE INTO / TRUNCATE TABLE 这类语句由前缀白名单与 AST 层拦截。
 _FORBIDDEN_KEYWORDS = re.compile(
-    r"\b(?:INSERT|UPDATE|DELETE|REPLACE|MERGE|DROP|ALTER|TRUNCATE|CREATE|"
+    r"\b(?:INSERT|UPDATE|DELETE|MERGE|DROP|ALTER|CREATE|"
     r"GRANT|REVOKE|RENAME|CALL|EXECUTE|EXEC|SET|USE|LOAD|HANDLER|LOCK|UNLOCK|"
     r"ANALYZE|OPTIMIZE|REPAIR|FLUSH|KILL|INSTALL|UNINSTALL)\b",
     re.IGNORECASE,
@@ -33,6 +35,12 @@ _FORBIDDEN_SELECT_PATTERNS = re.compile(
 # SQLAlchemy Inspector 在 MySQL 上反射表结构时发出的只读元数据语句，
 # 必须放行，否则 describe_table 会被 CREATE 关键字黑名单误伤
 _SHOW_CREATE_METADATA = re.compile(r"\bSHOW\s+CREATE\s+(?:TABLE|VIEW)\b", re.IGNORECASE)
+# SHOW 只放行结构反射与表清单；SHOW GRANTS / VARIABLES / PROCESSLIST 属于信息泄露。
+_SAFE_SHOW = re.compile(
+    r"^\s*SHOW\s+(?:CREATE\s+(?:TABLE|VIEW)|TABLES|FULL\s+COLUMNS|"
+    r"COLUMNS|INDEX|TABLE\s+STATUS|DATABASES)\b",
+    re.IGNORECASE,
+)
 
 
 def _strip_literals_and_comments(sql: str) -> str:
@@ -101,8 +109,13 @@ def is_read_only_sql(sql: str) -> bool:
         return False
 
     cleaned = statements[0]
+    # AST 层会把 (SELECT ...) UNION (SELECT ...) 原样输出为以 "(" 开头的语句；
+    # 先剥掉前导括号再判断前缀，避免合法只读查询在执行层被误杀。
+    cleaned = cleaned.lstrip(" \t\r\n(")
     first_match = re.match(r"([A-Za-z]+)", cleaned)
     if not first_match or first_match.group(1).upper() not in _ALLOWED_PREFIXES:
+        return False
+    if first_match.group(1).upper() == "SHOW" and not _SAFE_SHOW.search(cleaned):
         return False
     # 先剔除 SHOW CREATE TABLE/VIEW 反射语句再做黑名单检查：
     # 其余语句（含 SHOW CREATE PROCEDURE 等）中的 CREATE 关键字依然被拦截
