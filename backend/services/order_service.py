@@ -27,6 +27,8 @@ SORT_COLUMN_MAP = {
 # 与 analytics_service._ORDER_BASE 保持一致：所有经营聚合都排除取消订单；
 # 退款订单仍保留在销售额/订单数中。
 _ORDER_BASE = Order.order_status != "CANCELLED"
+# 排名类指标的订单量同样按 DISTINCT order_id 统计，避免同一订单多行被重复计数。
+_ORDER_COUNT = func.count(func.distinct(Order.order_no))
 
 
 class BIDataVersionChanged(RuntimeError):
@@ -174,6 +176,7 @@ async def get_bi_orders(
         select(
             Order.order_no,
             Order.order_time,
+            Order.order_date,
             Order.payment_time,
             Order.payment_amount,
             Order.user_name,
@@ -204,6 +207,7 @@ async def get_bi_orders(
             BIOrderItem(
                 order_no=row.order_no,
                 order_time=row.order_time,
+                order_date=row.order_date,
                 payment_time=row.payment_time,
                 payment_amount=float(row.payment_amount) if row.payment_amount is not None else None,
                 user_name=row.user_name,
@@ -223,7 +227,7 @@ async def get_product_sales(
     stmt = (
         select(
             Order.product_id,
-            func.count(Order.id).label("order_count"),
+            _ORDER_COUNT.label("order_count"),
             func.sum(Order.payment_amount).label("total_sales"),
         )
         .where(_ORDER_BASE)
@@ -252,7 +256,7 @@ async def get_user_spending(
     stmt = (
         select(
             Order.user_name,
-            func.count(Order.id).label("order_count"),
+            _ORDER_COUNT.label("order_count"),
             func.sum(Order.payment_amount).label("total_spent"),
         )
         .where(_ORDER_BASE)

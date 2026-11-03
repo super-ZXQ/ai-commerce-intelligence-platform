@@ -13,6 +13,9 @@ import pandas as pd
 from backend.utils.rfm_scoring import quantile_scores
 
 _REQUIRED_COLUMNS = ("user_name", "order_time", "order_no", "payment_amount")
+# order_date 是后端与 BI 共用的业务日期口径；旧快照没有该列时回退到
+# order_time 归一日，保证升级前后都能算。新数据优先使用 order_date。
+_OPTIONAL_DATE_COLUMN = "order_date"
 _OUTPUT_COLUMNS = [
     "user_name",
     "last_order_date",
@@ -48,7 +51,10 @@ def score_rfm_frame(
         raise ValueError(f"RFM 输入缺少列：{', '.join(missing)}")
 
     reference_day = _business_day(reference_date)
-    frame = orders.loc[:, _REQUIRED_COLUMNS].copy()
+    columns = list(_REQUIRED_COLUMNS)
+    if _OPTIONAL_DATE_COLUMN in orders.columns:
+        columns.append(_OPTIONAL_DATE_COLUMN)
+    frame = orders.loc[:, columns].copy()
     frame["payment_amount"] = pd.to_numeric(frame["payment_amount"], errors="coerce")
     frame["order_time"] = pd.to_datetime(frame["order_time"], errors="coerce")
     frame = frame[
@@ -59,7 +65,15 @@ def score_rfm_frame(
     order_times = frame["order_time"]
     if order_times.dt.tz is not None:
         order_times = order_times.dt.tz_convert("UTC").dt.tz_localize(None)
-    frame["_order_date"] = order_times.dt.normalize()
+    order_time_dates = order_times.dt.normalize()
+    if _OPTIONAL_DATE_COLUMN in frame.columns:
+        # order_date 是后端所有日期筛选/ RFM 的规范日期；仅在缺失时回退到
+        # order_time，避免两套日期在同一个分群结果里混用。
+        order_dates = pd.to_datetime(frame[_OPTIONAL_DATE_COLUMN], errors="coerce")
+        order_dates = order_dates.fillna(order_time_dates)
+    else:
+        order_dates = order_time_dates
+    frame["_order_date"] = order_dates
     frame = frame[frame["_order_date"] <= reference_day]
     if frame.empty:
         return pd.DataFrame(columns=_OUTPUT_COLUMNS)

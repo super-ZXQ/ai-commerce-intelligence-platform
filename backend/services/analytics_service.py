@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 # 事件账本中的退款发生时间不参与 BI/AI 指标，避免历史 CSV 与运行期数据口径分裂。
 _ORDER_BASE = Order.order_status != "CANCELLED"
 _REFUNDED = Order.is_refunded == "是"
+# 业务口径统一：订单量 = COUNT(DISTINCT order_id)，与 BI 页面 nunique(订单号)
+# 和 RFM 的 frequency 一致。订单表可能因同一订单多行而不唯一，COUNT(id) 会放大。
+_ORDER_COUNT = func.count(func.distinct(Order.order_no))
+_REFUND_ORDER_COUNT = func.count(
+    func.distinct(case((_REFUNDED, Order.order_no), else_=None))
+)
 
 
 @cached(ttl=120, tags=("analytics",), versioned=True)
@@ -29,12 +35,12 @@ async def get_sales_overview(db: AsyncSession) -> SalesOverviewResponse:
     """获取销售总览：总销售额、订单数、客单价、用户数、退款率"""
     stmt = select(
         func.coalesce(func.sum(Order.payment_amount), 0).label("total_sales"),
-        func.count(Order.id).label("total_orders"),
+        _ORDER_COUNT.label("total_orders"),
         func.count(func.distinct(Order.user_name)).label("total_users"),
         func.sum(case((_REFUNDED, Order.payment_amount), else_=0)).label(
             "total_refund_amount"
         ),
-        func.sum(case((_REFUNDED, 1), else_=0)).label("refund_count"),
+        _REFUND_ORDER_COUNT.label("refund_count"),
     ).where(_ORDER_BASE)
     row = (await db.execute(stmt)).one()
 
@@ -79,7 +85,7 @@ async def get_sales_trend(
         select(
             period_expr,
             func.coalesce(func.sum(Order.payment_amount), 0).label("sales"),
-            func.count(Order.id).label("order_count"),
+            _ORDER_COUNT.label("order_count"),
         )
         .where(_ORDER_BASE, *conditions)
         .group_by("period")
@@ -112,7 +118,7 @@ async def get_top_products(
     stmt = (
         select(
             Order.product_id,
-            func.count(Order.id).label("order_count"),
+            _ORDER_COUNT.label("order_count"),
             func.sum(Order.payment_amount).label("total_sales"),
         )
         .where(_ORDER_BASE)
@@ -139,7 +145,7 @@ async def get_user_behavior(db: AsyncSession) -> UserBehaviorResponse:
     """用户行为分析：复购率、活跃度等（优化为2次查询）"""
     stats_stmt = select(
         func.count(func.distinct(Order.user_name)).label("total_users"),
-        func.count(Order.id).label("total_orders"),
+        _ORDER_COUNT.label("total_orders"),
         func.coalesce(func.sum(Order.payment_amount), 0).label("total_sales"),
         func.max(Order.order_date).label("max_date"),
     ).where(_ORDER_BASE)
@@ -152,10 +158,10 @@ async def get_user_behavior(db: AsyncSession) -> UserBehaviorResponse:
     repeat_stmt = (
         select(func.count())
         .select_from(
-            select(func.count(Order.id).label("cnt"))
+            select(_ORDER_COUNT.label("cnt"))
             .where(_ORDER_BASE)
             .group_by(Order.user_name)
-            .having(func.count(Order.id) >= 2)
+            .having(_ORDER_COUNT >= 2)
             .subquery()
         )
     )
@@ -205,12 +211,10 @@ async def get_category_analysis(db: AsyncSession) -> CategoryAnalysisResponse:
     # 显式 .label() 命名，避免下游 row[i] 位置索引脆性
     stmt = select(
         Order.platform_type.label("platform_type"),
-        func.count(Order.id).label("order_count"),
+        _ORDER_COUNT.label("order_count"),
         func.sum(Order.payment_amount).label("total_sales"),
-        (func.sum(Order.payment_amount) / func.count(Order.id)).label("avg_order_value"),
-        (func.sum(case((_REFUNDED, 1), else_=0)) / func.count(Order.id) * 100).label(
-            "refund_rate"
-        ),
+        (func.sum(Order.payment_amount) / _ORDER_COUNT).label("avg_order_value"),
+        (_REFUND_ORDER_COUNT / _ORDER_COUNT * 100).label("refund_rate"),
     ).where(_ORDER_BASE).group_by(Order.platform_type)
 
     result = await db.execute(stmt)

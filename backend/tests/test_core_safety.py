@@ -550,6 +550,26 @@ def test_login_lockout_is_scoped_to_account_and_ip(monkeypatch):
     rate_limiter.check_login_lock("alice", "10.0.0.1")
 
 
+def test_business_order_count_uses_distinct_order_no():
+    """订单表可能同一订单多行；所有经营指标必须按 DISTINCT 订单号统计。"""
+    from sqlalchemy import select
+    from sqlalchemy.dialects import mysql
+
+    from backend.services.analytics_service import _ORDER_COUNT, _REFUND_ORDER_COUNT
+    from backend.services.order_service import _ORDER_COUNT as order_rank_count
+
+    for expression in (_ORDER_COUNT, order_rank_count):
+        sql = str(select(expression).compile(dialect=mysql.dialect())).lower()
+        assert "count(distinct" in sql
+        assert "order_id" in sql
+
+    refund_sql = str(
+        select(_REFUND_ORDER_COUNT).compile(dialect=mysql.dialect())
+    ).lower()
+    assert "count(distinct" in refund_sql
+    assert "case" in refund_sql
+
+
 def test_proxy_headers_are_ignored_by_default():
     request = SimpleNamespace(
         headers={"x-real-ip": "203.0.113.9"},

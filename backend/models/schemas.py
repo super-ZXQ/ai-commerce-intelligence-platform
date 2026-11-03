@@ -43,6 +43,7 @@ class BIOrderItem(BaseModel):
 
     order_no: str = Field(..., description="订单号")
     order_time: datetime = Field(..., description="下单时间")
+    order_date: date | None = Field(None, description="下单日期（业务日期口径）")
     payment_time: datetime | None = Field(None, description="付款时间")
     payment_amount: float | None = Field(None, description="付款金额")
     user_name: str | None = Field(None, description="用户名")

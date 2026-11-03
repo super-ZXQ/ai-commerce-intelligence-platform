@@ -40,3 +40,27 @@ def test_same_day_order_has_zero_recency():
 def test_missing_columns_are_rejected():
     with pytest.raises(ValueError, match="缺少列"):
         score_rfm_frame(pd.DataFrame([{"user_name": "u1"}]), date(2026, 1, 31))
+
+
+def test_order_date_is_the_canonical_business_date():
+    """order_date 存在时必须优先使用，不能再用 order_time 算第二套 R 口径。"""
+    orders = pd.DataFrame(
+        [
+            {
+                "user_name": "u1",
+                "order_time": "2026-01-31 23:00:00",
+                "order_date": "2026-02-01",
+                "order_no": "O1",
+                "payment_amount": 10.0,
+            },
+        ]
+    )
+
+    # 规范日期是 02-01，晚于参考日 01-31，因此该行不进入 RFM。
+    rfm = score_rfm_frame(orders, date(2026, 1, 31), n_bins=5)
+    assert rfm.empty
+
+    # 旧快照没有 order_date 时回退到 order_time 归一化。
+    legacy = orders.drop(columns=["order_date"])
+    rfm = score_rfm_frame(legacy, date(2026, 1, 31), n_bins=5)
+    assert rfm.loc[0, "recency_days"] == 0
