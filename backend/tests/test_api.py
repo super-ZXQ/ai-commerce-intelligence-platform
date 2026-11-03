@@ -733,6 +733,40 @@ def _cancel_event(order_id: str, version: int = 2) -> dict:
 
 class TestOrderEvents:
     @pytest.mark.asyncio
+    async def test_state_event_before_create_is_replayed_on_create(
+        self, authed_client: AsyncClient
+    ):
+        """退款先于创建到达时应留在账本，创建成功后立即重放，不能永久分叉。"""
+        order_id = f"REPLAY-{uuid4().hex[:20]}"
+        before = (await authed_client.get("/api/analytics/sales-overview")).json()
+
+        refund = {
+            "event_id": str(uuid4()),
+            "order_id": order_id,
+            "event_type": "ORDER_REFUNDED",
+            "occurred_at": datetime.now(UTC).isoformat(),
+            "version": 2,
+            "source": "pytest",
+            "payload": {},
+        }
+        rejected = await authed_client.post("/api/order-events", json=refund)
+        assert rejected.status_code == 200
+        assert rejected.json()["results"][0]["status"] == "rejected"
+        assert "订单不存在" in rejected.json()["results"][0]["reason"]
+
+        created = await authed_client.post(
+            "/api/order-events", json=_created_event(order_id)
+        )
+        assert created.status_code == 200
+        assert created.json()["results"][0]["status"] == "processed"
+
+        after = (await authed_client.get("/api/analytics/sales-overview")).json()
+        assert after["total_orders"] == before["total_orders"] + 1
+        assert after["total_refund_amount"] == pytest.approx(
+            before["total_refund_amount"] + 100.0
+        )
+
+    @pytest.mark.asyncio
     async def test_projection_failure_rolls_back_ledger_and_allows_safe_retry(self, monkeypatch):
         """读模型投影失败时，event_id 账本不能残留为“已处理”。"""
         event = OrderEventInput.model_validate(_created_event(f"ROLLBACK-{uuid4().hex[:16]}"))

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -22,6 +23,8 @@ from backend.models.schemas import (
 )
 from backend.services.rfm_service import clear_rfm_snapshot_cache
 from backend.utils.cache import invalidate_tags
+
+logger = logging.getLogger(__name__)
 
 _ACTIVE = "ACTIVE"
 _REFUNDED = "REFUNDED"
@@ -159,6 +162,49 @@ async def apply_order_event(db: AsyncSession, event: OrderEventInput) -> OrderEv
     return result
 
 
+async def _replay_rejected_state_events(db: AsyncSession, order: Order) -> int:
+    """创建订单时重放此前因「订单不存在」被拒的退款/取消事件。
+
+    事件账本已经保存了 payload 与 version，不需要新增死信表。只重放最早的一条
+    终态事件：订单只能进入 REFUNDED 或 CANCELLED 中的一个终态；其余仍保持
+    REJECTED，避免用后续事件覆盖已确定的终态。
+    """
+    rows = (
+        await db.execute(
+            select(OrderEvent)
+            .where(
+                OrderEvent.order_no == order.order_no,
+                OrderEvent.processing_status == _REJECTED,
+                OrderEvent.event_type.in_(("ORDER_REFUNDED", "ORDER_CANCELLED")),
+            )
+            .order_by(OrderEvent.sequence.asc(), OrderEvent.id.asc())
+        )
+    ).scalars().all()
+
+    for ledger in rows:
+        if ledger.sequence <= order.event_version:
+            continue
+        if order.order_status != _ACTIVE:
+            break
+        OrderStatePayload.model_validate(ledger.payload)
+        target_status = _REFUNDED if ledger.event_type == "ORDER_REFUNDED" else _CANCELLED
+        order.order_status = target_status
+        order.is_refunded = "是" if target_status == _REFUNDED else order.is_refunded
+        order.event_version = ledger.sequence
+        order.updated_at = _utc_now_naive()
+        ledger.processing_status = _PROCESSED
+        ledger.processed_at = _utc_now_naive()
+        ledger.failure_reason = None
+        logger.info(
+            "重放订单状态事件: order_id=%s event_type=%s version=%s",
+            order.order_no,
+            ledger.event_type,
+            ledger.sequence,
+        )
+        return 1
+    return 0
+
+
 async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> OrderEventResult:
     """在调用方已开启的事务内写账本与订单读模型。"""
     ledger, duplicate = await _insert_ledger_or_duplicate(db, event)
@@ -186,10 +232,16 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
         # 缺失 payload.order_time 时必须先换算到业务时区，否则日期/小时会跨天。
         order_time = _business_naive(payload.order_time or event.occurred_at)
         # 自增由数据库原子分配；历史卷须先执行 Alembic 升级。
-        db.add(_new_order(event, payload, order_time))
+        order = _new_order(event, payload, order_time)
+        db.add(order)
+        # 若退款/取消先于创建到达，它们在账本里是 REJECTED；创建成功后
+        # 立刻在同一个事务里重放，避免账本与读模型永久分叉。
+        replayed = await _replay_rejected_state_events(db, order)
         await _bump_data_version(db)
         ledger.processing_status = _PROCESSED
         ledger.processed_at = _utc_now_naive()
+        if replayed:
+            logger.info("创建订单后已重放 %d 条先到的状态事件: %s", replayed, event.order_id)
         return _result(event, "processed")
 
     if order is None:
