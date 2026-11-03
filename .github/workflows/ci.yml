@@ -8,6 +8,13 @@ on:
   pull_request:
     branches: [main]
 
+# 显式声明 GITHUB_TOKEN 只需要 contents:read，不依赖仓库「工作流权限」设置里的
+# 默认值：checkout、setup-python 的 pip 缓存、upload-artifact 都不需要写权限。
+# 收紧后即使某个 step 被注入也无法推代码或改仓库状态。
+# 需要更高权限的 job 在自己的 job 里单独申请。
+permissions:
+  contents: read
+
 # 取消同 PR / 同 ref 上正在跑的旧 workflow，节省资源
 concurrency:
   group: ci-${{ github.ref }}
@@ -40,7 +47,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          # 版本与 backend/requirements-dev.txt 保持一致：CI 与本地跑出不同 pytest 结论最难排查。
+          pip install "pytest==9.1.0" "pytest-asyncio==1.4.0"
 
       - name: 跑 AI 助手测试（必跑，强制通过）
         working-directory: ai-ecommerce-assistant

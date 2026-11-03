@@ -13,6 +13,11 @@ on:
     branches: [main]
   workflow_dispatch:  # 支持手动触发
 
+# 默认只读；需要推送镜像的 job 在自己的 permissions 里显式追加 packages:write
+# （job 级 permissions 会整体覆盖这里的默认值，不会被收紧掉）。
+permissions:
+  contents: read
+
 # 防止多个 tag 触发时重复构建
 concurrency:
   group: release-${{ github.ref }}
@@ -27,6 +32,9 @@ jobs:
   prepare:
     name: 准备镜像元数据
     runs-on: ubuntu-latest
+    # 只生成 tag/label，不推送、不写仓库；显式收紧继承的默认 token。
+    permissions:
+      contents: read
     outputs:
       backend_tags: ${{ steps.meta-backend.outputs.tags }}
       backend_labels: ${{ steps.meta-backend.outputs.labels }}

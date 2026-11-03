@@ -1,8 +1,10 @@
 pandas==3.0.3
-pyarrow==24.0.0
-numpy==2.4.6
+# numpy 与 backend 镜像里 pandas 实际解析到的版本一致：两个镜像跑同一个 pandas
+# 却装不同 numpy，会让 BI 与后端在同一份数据上算出不同浮点结果。
+numpy==2.5.4
 plotly==6.8.0
 streamlit==1.58.0
 msgpack==1.2.2
 # BI 页面只经后端 API 读数据与导出，不再安装 MySQL 驱动。
+# pyarrow 已移除：BI 镜像里没有任何 parquet 代码路径（只有 notebook 用它写 parquet）。
 httpx==0.28.1

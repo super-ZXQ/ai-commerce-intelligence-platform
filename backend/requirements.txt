@@ -7,6 +7,10 @@ pymysql==1.2.0
 cryptography==50.0.1
 pydantic==2.13.4
 pydantic-settings==2.14.2
+# numpy 显式锁定而不是让 pandas 间接带入：BI 镜像与后端镜像必须在同一份数据上做
+# 同一套聚合，numpy 版本不同会让浮点求和顺序变化，进而让 RFM 分位边界抖动。
+# 2.5.4 是从已构建的 backend 镜像里实测得到的版本。
+numpy==2.5.4
 pandas==3.0.3
 openpyxl==3.1.5
 python-dotenv==1.2.2

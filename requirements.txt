@@ -1,10 +1,16 @@
-pandas
-pyarrow
-numpy
-matplotlib
-plotly
-streamlit
-jupyter
-openpyxl
-pymysql
-httpx
+# 本地数据分析 / Notebook 依赖（镜像不使用本文件）。
+# 规则：一个包只允许一个版本，且与 backend/requirements.txt、requirements.streamlit.txt、
+# ai-ecommerce-assistant/requirements.txt 里已声明的版本一致；由
+# backend/tests/test_dependencies.py 守卫，避免本地环境与镜像跑不同版本的 pandas/numpy。
+pandas==3.0.3
+# pyarrow 只给 notebook 写 data/cleaned_orders.parquet 用，不进任何镜像。
+pyarrow==26.0.0
+numpy==2.5.4
+# matplotlib 与 jupyter 只用于本地 Notebook，不进入任何镜像：版本按当前已验证的本地环境锁定。
+matplotlib==3.11.2
+plotly==6.8.0
+streamlit==1.58.0
+jupyter==1.1.1
+openpyxl==3.1.5
+pymysql==1.2.0
+httpx==0.28.1

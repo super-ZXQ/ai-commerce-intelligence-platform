@@ -46,7 +46,6 @@ ai-ecommerce-assistant/eval/report.json
 # 本地运行与接口调试产物
 logs/
 test_*.json
--w
 
 # 工具内部计划文件（不入库）
 .zcode/

@@ -10,6 +10,11 @@ concurrency:
   group: docker-smoke-${{ github.ref }}
   cancel-in-progress: true
 
+# 本工作流只读代码 + 本地构建镜像，不推送、不上传产物；收紧默认 token 权限，
+# 避免 PR 里可执行的任意脚本拿到仓库写权限。
+permissions:
+  contents: read
+
 jobs:
   cold-start:
     name: 空卷全栈冷启动
