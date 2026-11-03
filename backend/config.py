@@ -280,13 +280,6 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 ANALYST_PASSWORD 必须为 bcrypt 哈希（python -m backend.utils.auth <明文> 生成）！")
             if self.db_user == "root":
                 logger.warning("⚠️ 生产环境业务账号为 root，请改用最小权限账号（如 ea_app）")
-            if not self.ai_db_user:
-                # 回落主库账号意味着 LLM 生成的 SQL 会以 ea_app（本地常为 root）执行，
-                # 三层 SQL 防护会退化为纯字符串层；生产环境必须在启动时暴露配置错误。
-                raise ValueError(
-                    "生产环境必须配置 AI_DB_USER（仅 SELECT 的只读账号），"
-                    "禁止回落主库账号执行 AI 生成的 SQL"
-                )
             if not self.auth_cookie_secure:
                 logger.warning(
                     "⚠️ AUTH_COOKIE_SECURE=false：仅在 TLS 已由可信反代终止且全站强制 HTTPS 时使用"

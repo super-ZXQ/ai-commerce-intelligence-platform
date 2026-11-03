@@ -111,6 +111,20 @@ def _enforce_single_worker() -> None:
     )
 
 
+def _enforce_ai_db_account() -> None:
+    """AI SQL 只读账号必须在 API 启动时存在。
+
+    放在 API lifespan 而不是全局 Settings：Alembic/db-migrate、导入脚本只需要
+    迁移/主库账号，不应被 AI 配置缺失阻断；而 API 一旦回落主库账号执行 LLM SQL，
+    三层 SQL 防护就退化为纯字符串层。
+    """
+    if not settings.debug and not settings.ai_db_user:
+        raise RuntimeError(
+            "生产环境必须配置 AI_DB_USER（仅 SELECT 的只读账号），"
+            "禁止回落主库账号执行 AI 生成的 SQL"
+        )
+
+
 async def _cache_cleanup_task():
     while True:
         await asyncio.sleep(_CACHE_CLEANUP_INTERVAL)
@@ -125,6 +139,7 @@ async def _cache_cleanup_task():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _enforce_single_worker()
+    _enforce_ai_db_account()
     logger.info("🚀 AI Commerce Intelligence Platform v%s 启动中...", settings.app_version)
     if not await check_db_connection():
         # 生产 API 不应以“表面存活、业务接口全部失败”的状态继续运行。

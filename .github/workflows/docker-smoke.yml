@@ -36,7 +36,7 @@ jobs:
           DB_MIGRATE_PASSWORD=ci-migrate-password
           MIGRATION_DB_USER=ea_migrate
           DB_NAME=ai_commerce_intelligence_platform
-          REDIS_PASSWORD=
+          REDIS_PASSWORD=ci-redis-password-not-a-production-secret
           REDIS_DB=0
           REDIS_SESSION_DB=1
           NGINX_PORT=80

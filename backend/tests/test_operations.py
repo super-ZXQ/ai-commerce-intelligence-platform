@@ -143,7 +143,8 @@ class TestObservability:
             assert "log_format main" in text
             assert "request_id=$request_id" in text
             assert "proxy_set_header X-Request-ID $request_id;" in text
-            assert "add_header X-Request-ID $request_id always;" in text
+            # 响应头由 FastAPI 回写，Nginx 不再重复 add_header。
+            assert "add_header X-Request-ID" not in text
 
 
 class TestTlsLayer:
@@ -217,6 +218,20 @@ class TestWorkerGuard:
         monkeypatch.setattr(main, "settings", SimpleNamespace(allow_multi_worker=True))
         # 显式放行时只记录警告，不应再次抛出。
         main._enforce_single_worker()
+
+    def test_ai_db_account_is_required_by_api_startup(self, monkeypatch):
+        from backend import main
+
+        monkeypatch.setattr(
+            main, "settings", SimpleNamespace(debug=False, ai_db_user="")
+        )
+        with pytest.raises(RuntimeError, match="AI_DB_USER"):
+            main._enforce_ai_db_account()
+
+        monkeypatch.setattr(
+            main, "settings", SimpleNamespace(debug=False, ai_db_user="ea_ai")
+        )
+        main._enforce_ai_db_account()
 
 
 class TestHealthCheckRedisUrl:

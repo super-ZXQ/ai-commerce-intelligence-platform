@@ -131,32 +131,21 @@ services:
     container_name: ea-redis
     restart: unless-stopped
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    # 显式 bind 会关闭 protected-mode 的自动保护，因此必须由 requirepass
-    # 提供认证；未设置 REDIS_PASSWORD 时不加参数（仅适用于内网临时环境）。
+      # 必填：protected-mode 下无密码会拒绝来自其他容器的连接。
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
+    # 显式 bind + requirepass；密码缺失时 Compose 直接拒绝启动该服务。
     command:
       - sh
       - -c
       - |
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          exec redis-server /usr/local/etc/redis/redis.conf --requirepass "$$REDIS_PASSWORD"
-        else
-          exec redis-server /usr/local/etc/redis/redis.conf
-        fi
+        exec redis-server /usr/local/etc/redis/redis.conf --requirepass "$$REDIS_PASSWORD"
     expose:
       - "6379"
     volumes:
       - redis_data:/data
       - ./deploy/redis.conf:/usr/local/etc/redis/redis.conf:ro
     healthcheck:
-      test:
-        - CMD-SHELL
-        - |
-          if [ -n "$$REDIS_PASSWORD" ]; then
-            redis-cli -a "$$REDIS_PASSWORD" ping
-          else
-            redis-cli ping
-          fi | grep -q PONG
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -190,7 +179,7 @@ services:
       AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
       REDIS_DB: 0
       # 会话逻辑 DB 只是命名隔离；同一 Redis 实例的淘汰策略仍全局生效。
       REDIS_SESSION_DB: ${REDIS_SESSION_DB:-1}
