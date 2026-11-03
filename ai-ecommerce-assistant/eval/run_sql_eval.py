@@ -33,10 +33,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from agent_core.model_adapter import OpenAIModelAdapter  # noqa: E402
+from agent_core.prompts import BUSINESS_CONTEXT  # noqa: E402
 from agent_core.sql_safety import SQLValidationError, validate_and_limit_sql  # noqa: E402
 
 DEFAULT_DATASET = Path(__file__).with_name("gold_qa.jsonl")
-BUSINESS_CONTEXT = "## 表结构\n详见下方；只生成针对 orders 表的只读查询。"
+# 与生产共用同一份业务提示词：简化版会让模型在评测里用 order_time 代替
+# order_date，指标不再代表线上行为。
 
 
 def normalize_sql(sql: str) -> str:

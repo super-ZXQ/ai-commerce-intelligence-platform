@@ -14,6 +14,7 @@ from sqlalchemy.engine import Engine
 
 from agent_core import AgentRuntime
 from agent_core.db_schema import describe_table
+from agent_core.prompts import BUSINESS_CONTEXT
 from agent_core.memory import EpisodeSummary, EpisodeTurn, MemoryFact, MemoryTurn
 from agent_core.model_adapter import OpenAIModelAdapter
 from agent_core.prompt_privacy import PromptMasker, derive_masking_key, masking_scope
@@ -35,34 +36,6 @@ from backend.utils.text_cleaner import sanitize_error
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
-
-BUSINESS_CONTEXT = """## 数据时间范围
-- 数据时间范围：2025-01-01 至 2025-12-31（共1年数据）
-- 当用户提到"最近N天"时，指的是数据中的最近N天
-
-## 业务指标定义
-- 付款金额 = 实际销售额（非订单金额）
-- 平台类型枚举值：APP、微信公众号、Web网站、其他
-- 是否退款：是=已退款，否=未退款
-- 退款率 = 退款订单数 / 总订单数
-- 复购率 = 消费2次及以上的用户数 / 总用户数
-- 客单价 = 总付款金额 / 总订单数
-- 数据起止日期仅用于解释“最近”问题；用户未指定时间时，禁止添加 order_time/order_date 条件或全年过滤
-- 订单量必须使用 COUNT(DISTINCT order_id)，禁止使用 COUNT(*)
-- 除非用户明确要求排除退款，否则销售额、订单量、用户数等指标包含退款订单
-- 用户明确指定月份或日期时必须严格使用该范围，不得扩大为全年
-
-## 回答规则
-1. 始终先查看表结构确认列名，再编写 SQL
-2. 日期筛选使用 order_date 列，格式 'YYYY-MM-DD'
-3. 金额查询使用 payment_amount
-4. 退款相关使用 is_refund = '是'（注意：is_refund 是物理列名，
-   ORM 属性名是 is_refunded，本提示词面向原生 SQL，必须用物理列名 is_refund）
-5. SQL 结果较大时使用 LIMIT 限制
-6. 先给出数据结论，再附上 SQL 语句
-7. 用中文回答
-8. 仅回答电商数据相关问题"""
-
 
 def _detect_chart_type(columns: list[str], rows: list) -> str | None:
     if not rows or len(columns) < 2:

@@ -10,7 +10,8 @@
 - [ ] `ADMIN_PASSWORD` / `ANALYST_PASSWORD` 为 bcrypt 哈希，非明文
 - [ ] `DB_ROOT_PASSWORD`、`DB_APP_PASSWORD`、`DB_AI_PASSWORD`、`DB_SYNC_PASSWORD`、
       `DB_EVENT_PASSWORD`、`DB_AUTH_PASSWORD`、`DB_MIGRATE_PASSWORD` 全部独立且随机
-- [ ] 平台模型密钥 `LLM_API_KEY` 只存在于后端环境；Streamlit 无密钥
+- [x] 平台模型密钥 `LLM_API_KEY` 只存在于后端环境；Streamlit 无密钥
+      （2026-11-03 已验证：仅 `ea-backend` 有值，`ea-streamlit`/`ea-ai-assistant` 为空）
 - [ ] 已轮换所有曾出现在日志/截图/聊天中的凭据
 
 ## B. 数据库与数据保留
@@ -89,4 +90,5 @@
 - [ ] 真实最小权限账号验收（CI 已配置 `db-verify`，尚未在目标环境执行）
 - [x] 备份/恢复演练（本机通过：`orders`、`order_events`、`auth_users`、`data_state`、`alembic_version` 行数一致）
 - [x] TLS 握手（自签名证书验证 TLSv1.3 + HSTS + HTTP→HTTPS 跳转）；生产 CA 证书链仍待目标环境验证
+- [x] 真实模型调用（`/api/ai/test` 返回 200；一次自然语言查询完成意图识别、SQL 生成与只读执行，返回真实聚合结果）
 - [ ] 多 worker / 高可用 / binlog PITR（默认启动守卫拒绝多 worker；确需时显式 `ALLOW_MULTI_WORKER=true`，并自行承担配额放大）

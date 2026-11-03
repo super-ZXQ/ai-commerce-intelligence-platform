@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-04T16:16:01",
+  "generated_at": "2026-11-03T14:17:52",
   "rule": {
     "curated": {
       "n": 100,
@@ -33,8 +33,8 @@
         }
       },
       "misclassified": [],
-      "latency_ms_total": 1.7,
-      "latency_ms_per_query": 0.017,
+      "latency_ms_total": 0.76,
+      "latency_ms_per_query": 0.0076,
       "cost_cny": 0.0
     },
     "robustness": {
@@ -75,8 +75,8 @@
           "predicted": "knowledge"
         }
       ],
-      "latency_ms_total": 0.12,
-      "latency_ms_per_query": 0.0048,
+      "latency_ms_total": 0.07,
+      "latency_ms_per_query": 0.0029,
       "cost_cny": 0.0
     },
     "heldout": {
@@ -132,10 +132,177 @@
           "predicted": "data"
         }
       ],
-      "latency_ms_total": 0.05,
-      "latency_ms_per_query": 0.0053,
+      "latency_ms_total": 0.03,
+      "latency_ms_per_query": 0.0034,
       "cost_cny": 0.0
     }
   },
-  "llm": null
+  "llm": {
+    "curated": {
+      "n": 100,
+      "accuracy": 0.91,
+      "macro_f1": 0.9079,
+      "per_intent": {
+        "data": {
+          "precision": 1.0,
+          "recall": 0.8269,
+          "f1": 0.9053
+        },
+        "knowledge": {
+          "precision": 0.9375,
+          "recall": 1.0,
+          "f1": 0.9677
+        },
+        "hybrid": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "clarification": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6667
+        },
+        "blocked": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "misclassified": [
+        {
+          "query": "商品平均付款金额",
+          "expected": "data",
+          "predicted": "knowledge"
+        },
+        {
+          "query": "微信公众号退款率",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "按平台拆分",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "只看最近30天",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "再按销售额排序",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "换成订单量",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "把最低的也列出来",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "和上个月对比",
+          "expected": "data",
+          "predicted": "clarification"
+        },
+        {
+          "query": "再看退款订单",
+          "expected": "data",
+          "predicted": "clarification"
+        }
+      ],
+      "latency_ms_total": 95534.8,
+      "latency_ms_per_query": 955.35,
+      "input_tokens": 26804,
+      "output_tokens": 4648,
+      "cost_cny": 0.0361
+    },
+    "robustness": {
+      "n": 25,
+      "accuracy": 0.96,
+      "macro_f1": 0.9505,
+      "per_intent": {
+        "data": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "knowledge": {
+          "precision": 0.9091,
+          "recall": 1.0,
+          "f1": 0.9524
+        },
+        "hybrid": {
+          "precision": 1.0,
+          "recall": 0.6667,
+          "f1": 0.8
+        },
+        "clarification": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "blocked": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "misclassified": [
+        {
+          "query": "客单价和退款率公式都告诉我",
+          "expected": "hybrid",
+          "predicted": "knowledge"
+        }
+      ],
+      "latency_ms_total": 25027.7,
+      "latency_ms_per_query": 1001.11,
+      "input_tokens": 6731,
+      "output_tokens": 935,
+      "cost_cny": 0.0086
+    },
+    "heldout": {
+      "n": 10,
+      "accuracy": 1.0,
+      "macro_f1": 0.8,
+      "per_intent": {
+        "data": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "knowledge": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "hybrid": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "clarification": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "blocked": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "misclassified": [],
+      "latency_ms_total": 15363.1,
+      "latency_ms_per_query": 1536.31,
+      "input_tokens": 2696,
+      "output_tokens": 485,
+      "cost_cny": 0.0037
+    }
+  }
 }

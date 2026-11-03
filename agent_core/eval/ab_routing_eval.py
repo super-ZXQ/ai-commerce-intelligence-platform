@@ -206,9 +206,22 @@ def build_report(rule_sets: dict[str, dict], llm_sets: dict[str, dict] | None, d
         "已列为下一轮加固 backlog。**调优集与留出集分开报告，避免按考卷改答案。**\n"
     )
     if has_llm:
+        llm_cur = llm_sets["curated"]
+        llm_rob = llm_sets["robustness"]
+        llm_held = llm_sets["heldout"]
+        total_cost = sum(m["cost_cny"] for m in llm_sets.values())
         lines.append(
-            "4. LLM 侧在上述三项上的表现见上表；若其在 heldout 上显著领先，"
-            "则论证'规则优先 + LLM 兜底'的混合路由在真实流量下更稳。\n"
+            f"4. **LLM 路由在 heldout 上 {llm_held['accuracy']*100:.1f}%"
+            f"（规则 {held['accuracy']*100:.1f}%）**，curated {llm_cur['accuracy']*100:.1f}%、"
+            f"robustness {llm_rob['accuracy']*100:.1f}%；代价是约 "
+            f"{llm_cur['latency_ms_per_query']/1000:.2f}s/条与合计 ¥{total_cost:.4f} token 成本。"
+            "规则路由的留出集缺口（导出客户资料、收货地址、记录行写操作、泛宾语盘点）"
+            "正是 LLM 语义理解的长处。\n"
+        )
+        lines.append(
+            "5. 结论：规则路由在 curated/dev 上仍是零成本、微秒级的默认选择；LLM 在留出集上更强，"
+            "因此保留 `llm_router` 作为低置信度请求的兜底方案。heldout 仅 10 条，"
+            "结论需随样本扩大复核。\n"
         )
     else:
         lines.append(
@@ -216,10 +229,10 @@ def build_report(rule_sets: dict[str, dict], llm_sets: dict[str, dict] | None, d
             "预期在 heldout 上明显优于规则。是否切换取决于生产流量中'改写/变体'占比——"
             "若日志显示误路由率超过阈值，即可用本仓库已实现的 `llm_router` 与混合策略补齐。\n"
         )
-    lines.append(
-        "5. 结论：v2 选规则路由是'在已观测流量分布下的最优解'，而非'只会规则路由'；"
-        "本 A/B 框架（含留出集机制）使该决策可被数据复盘与迭代。\n"
-    )
+        lines.append(
+            "5. 结论：v2 选规则路由是'在已观测流量分布下的最优解'，而非'只会规则路由'；"
+            "本 A/B 框架（含留出集机制）使该决策可被数据复盘与迭代。\n"
+        )
 
     lines.append("## 复现命令\n")
     lines.append("```bash")
