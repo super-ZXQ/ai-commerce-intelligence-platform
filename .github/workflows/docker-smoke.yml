@@ -133,7 +133,8 @@ jobs:
 
           # 运行期创建/退款/取消后重启：订单与事件账本必须保留。
           docker compose exec -T backend python - <<'PY'
-          import json
+          import uuid
+
           import httpx
 
           base = "http://localhost:8000"
@@ -148,7 +149,8 @@ jobs:
                   f"{base}/api/order-events",
                   headers=headers,
                   json={
-                      "event_id": f"{order_id}-{version}",
+                      # event_id 的契约是 UUID，不能用 order_id 拼接字符串。
+                      "event_id": str(uuid.uuid4()),
                       "order_id": order_id,
                       "event_type": event_type,
                       "occurred_at": "2026-11-01T10:00:00+00:00",
