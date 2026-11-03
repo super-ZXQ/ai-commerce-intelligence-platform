@@ -194,9 +194,11 @@ jobs:
             -uroot -pci-root-password -Nse \
             "SELECT COUNT(*) FROM ai_commerce_intelligence_platform.orders WHERE order_id LIKE 'CI-RETENTION-%'")"
           test "$retention_rows" = "3"
+          # 按状态名排序而不是按订单号：订单号的字典序会把 CANCELLED 排在
+          # ACTIVE 前面，断言会与业务含义无关地失败。
           retention_status="$(docker compose exec -T mysql mysql \
             -uroot -pci-root-password -Nse \
-            "SELECT GROUP_CONCAT(order_status ORDER BY order_id) FROM ai_commerce_intelligence_platform.orders WHERE order_id LIKE 'CI-RETENTION-%'")"
+            "SELECT GROUP_CONCAT(DISTINCT order_status ORDER BY order_status) FROM ai_commerce_intelligence_platform.orders WHERE order_id LIKE 'CI-RETENTION-%'")"
           test "$retention_status" = "ACTIVE,CANCELLED,REFUNDED"
           ledger_rows="$(docker compose exec -T mysql mysql \
             -uroot -pci-root-password -Nse \
