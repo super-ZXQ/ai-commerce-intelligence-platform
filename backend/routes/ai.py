@@ -283,7 +283,8 @@ async def natural_language_query(
     """非流式 Text-to-SQL。额度、并发与审计全部在后端执行。"""
     config, mode = _resolve_config(request)
     started = time.perf_counter()
-    audit_request_id = str(uuid4())
+    # 与 Nginx/FastAPI 访问日志使用同一个 request_id，便于跨层追踪。
+    audit_request_id = getattr(request.state, "request_id", str(uuid4()))
     try:
         async with ai_execution_slot(principal.name, auth_db):
             response = await asyncio.wait_for(
@@ -396,7 +397,7 @@ async def stream_natural_language_query(
 
     thread_id = body.thread_id or str(uuid4())
     queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
-    audit_request_id = str(uuid4())
+    audit_request_id = getattr(request.state, "request_id", str(uuid4()))
 
     async def _write_audit(outcome: str, response: AIQueryResponse | None, error_category: str) -> None:
         async with auth_session_factory() as session:

@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     app_name: str = "AI Commerce Intelligence Platform"
     app_version: str = "1.0.3"
     debug: bool = False
+    # text：人读日志；json：一行一个 JSON，便于日志系统检索。
+    log_format: str = "text"
     # 限流、AI 并发与每日额度均为进程内计数；默认拒绝多 worker 启动，
     # 避免 uvicorn/gunicorn 误配后配额按 worker 数量放大。
     allow_multi_worker: bool = False
@@ -170,6 +172,8 @@ class Settings(BaseSettings):
         return secret
 
     def model_post_init(self, __context) -> None:  # noqa: PYI063
+        if self.log_format not in {"text", "json"}:
+            raise ValueError("LOG_FORMAT 只能是 text 或 json")
         if self.llm_mode not in {"managed", "byok"}:
             raise ValueError("LLM_MODE 只能是 managed 或 byok")
         if self.allow_byok and not self.llm_allowed_hosts:

@@ -238,6 +238,7 @@ services:
       TRUST_PROXY_HEADERS: "true"
       RAG_STATS_PATH: /app/ai-ecommerce-assistant/data/rag_stats.json
       DEBUG: ${DEBUG:-false}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
       # 默认单 worker；多 worker 会放大进程内限流/AI 并发，必须显式放行。
       ALLOW_MULTI_WORKER: ${ALLOW_MULTI_WORKER:-false}
       AI_DB_USER: ${AI_DB_USER:-ea_ai}

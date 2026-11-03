@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import os
+import re
 import sys
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,14 +50,11 @@ from backend.utils.cache import (
 from backend.utils.cache import clear as clear_cache
 from backend.utils.rate_limiter import check_rate_limit
 from backend.utils.event_metrics import render_prometheus
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+from backend.utils.logging_config import reset_request_id, set_request_id, setup_logging
 
 settings = get_settings()
+setup_logging(settings.log_format)
+logger = logging.getLogger(__name__)
 
 
 _CACHE_CLEANUP_INTERVAL = 300
@@ -228,10 +227,32 @@ def _set_security_headers(response) -> None:
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
 
 
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
+
+
+def _request_id_from(request: Request) -> str:
+    value = request.headers.get("X-Request-ID", "").strip()
+    return value if _REQUEST_ID_RE.fullmatch(value) else uuid4().hex
+
+
 @app.middleware("http")
 async def logging_and_rate_limit_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable],
+):
+    request_id = _request_id_from(request)
+    request.state.request_id = request_id
+    token = set_request_id(request_id)
+    try:
+        return await _handle_request(request, call_next, request_id)
+    finally:
+        reset_request_id(token)
+
+
+async def _handle_request(
+    request: Request,
+    call_next: Callable[[Request], Awaitable],
+    request_id: str,
 ):
     start = time.time()
 
@@ -239,6 +260,7 @@ async def logging_and_rate_limit_middleware(
     if request.method == "OPTIONS" or request.url.path in _SKIP_RATE_LIMIT_PATHS:
         response = await call_next(request)
         duration = (time.time() - start) * 1000
+        response.headers["X-Request-ID"] = request_id
         _set_security_headers(response)
         logger.info(f"{request.method} {request.url.path} - {response.status_code} - {duration:.1f}ms")
         return response
@@ -254,6 +276,7 @@ async def logging_and_rate_limit_middleware(
             content={"error_code": "RATE_LIMITED", "message": str(exc.detail)},
             headers=exc.headers,
         )
+        response.headers["X-Request-ID"] = request_id
         _set_security_headers(response)
         return response
 
@@ -264,6 +287,7 @@ async def logging_and_rate_limit_middleware(
     response.headers["X-RateLimit-Remaining"] = str(limit_info["remaining"])
     response.headers["X-RateLimit-Reset"] = str(limit_info["reset"])
     response.headers["X-Response-Time"] = f"{duration:.1f}ms"
+    response.headers["X-Request-ID"] = request_id
     _set_security_headers(response)
 
     record_request(request.url.path, response.status_code, duration)
@@ -276,7 +300,7 @@ async def logging_and_rate_limit_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.exception(f"未处理异常: {request.method} {request.url.path}")
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={
             "error_code": "INTERNAL_ERROR",
@@ -284,6 +308,9 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": str(exc) if settings.debug else None,
         },
     )
+    response.headers["X-Request-ID"] = getattr(request.state, "request_id", "-")
+    _set_security_headers(response)
+    return response
 
 
 @app.exception_handler(RfmDataUnavailableError)

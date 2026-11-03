@@ -156,6 +156,16 @@ class TestSystem:
         assert r.json()["checks"]["auth_database"] is False
 
     @pytest.mark.asyncio
+    async def test_request_id_is_propagated_and_validated(self, client: AsyncClient):
+        r = await client.get("/health", headers={"X-Request-ID": "trace-abc-123"})
+        assert r.headers["X-Request-ID"] == "trace-abc-123"
+
+        # 客户端提交非法 ID 时后端必须生成自己的 ID，不能原样回显。
+        r = await client.get("/health", headers={"X-Request-ID": "bad id!"})
+        assert r.headers["X-Request-ID"] != "bad id!"
+        assert len(r.headers["X-Request-ID"]) == 32
+
+    @pytest.mark.asyncio
     async def test_openapi_schema(self, client: AsyncClient):
         r = await client.get("/openapi.json")
         assert r.status_code == 200

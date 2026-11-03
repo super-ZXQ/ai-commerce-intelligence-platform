@@ -25,6 +25,14 @@
 - **历史数据**：cutover 前由 `CURRENT_TIMESTAMP` 写入的运维时间可能是 +08；
   本次不做回填，内存/情节 TTL 记录自然过期，跨系统审计排序以 cutover 后数据为准。
 
+### 1.2 日志与请求追踪
+
+- Nginx 为每个请求生成 `$request_id`，通过 `X-Request-ID` 传给 FastAPI 并写入访问日志；
+  FastAPI 接受合法的客户端 ID，非法值会重新生成，并回写响应头。
+- `LOG_FORMAT=json` 时应用日志输出一行一个 JSON（timestamp/level/logger/request_id/message），
+  可直接接入 Loki/ELK/CloudWatch；默认 `text` 保持人读格式。
+- AI 查询审计的 `request_id` 与访问日志使用同一个值，可跨 Nginx/FastAPI/Agent 关联。
+
 ## 2. 服务级别目标（内部目标，非合同 SLA）
 
 | 指标 | 目标 | 测量来源 | 当前状态 |

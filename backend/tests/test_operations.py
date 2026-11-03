@@ -1,6 +1,8 @@
 """部署与运维契约：配置 fail-fast、容器加固、TLS、备份/恢复与授权验收脚本。"""
 from __future__ import annotations
 
+import json
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.config import Settings
+from backend.utils.logging_config import JsonFormatter
 
 _ROOT = Path(__file__).resolve().parents[2]
 
@@ -110,6 +113,37 @@ class TestContainerHardening:
             assert f"${{{variable}:?" in text
         # 覆盖层必须移除构建指令，确保生产只运行固定镜像（db-migrate/data-import/backend/streamlit/ai）。
         assert text.count("build: !reset null") == 5
+
+
+class TestObservability:
+    def test_json_formatter_includes_request_id_and_message(self):
+        formatter = JsonFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="hello %s",
+            args=("world",),
+            exc_info=None,
+        )
+        record.request_id = "trace-123"
+        payload = json.loads(formatter.format(record))
+        assert payload["request_id"] == "trace-123"
+        assert payload["message"] == "hello world"
+        assert payload["level"] == "INFO"
+
+    def test_log_format_is_validated(self):
+        with pytest.raises(ValueError, match="LOG_FORMAT"):
+            _settings(log_format="xml")
+
+    def test_nginx_propagates_request_id(self):
+        for name in ("nginx.conf", "nginx.tls.conf"):
+            text = (_ROOT / "deploy" / name).read_text(encoding="utf-8")
+            assert "log_format main" in text
+            assert "request_id=$request_id" in text
+            assert "proxy_set_header X-Request-ID $request_id;" in text
+            assert "add_header X-Request-ID $request_id always;" in text
 
 
 class TestTlsLayer:
