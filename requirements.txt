@@ -1,9 +1,11 @@
-# 本地数据分析 / Notebook 依赖（镜像不使用本文件）。
+# 本文件是本地数据分析 / Notebook 环境，任何镜像都不安装它（后端装
+# backend/requirements.txt，BI 装 requirements.streamlit.txt）。
 # 规则：一个包只允许一个版本，且与 backend/requirements.txt、requirements.streamlit.txt、
 # ai-ecommerce-assistant/requirements.txt 里已声明的版本一致；由
 # backend/tests/test_dependencies.py 守卫，避免本地环境与镜像跑不同版本的 pandas/numpy。
 pandas==3.0.3
-# pyarrow 只给 notebook 写 data/cleaned_orders.parquet 用，不进任何镜像。
+# notebook 用 pyarrow 写 data/cleaned_orders.parquet；BI 镜像里它作为 streamlit 的硬依赖
+# 同版本存在，所以必须在这里一起 pin，否则本地与镜像各拿一个 pyarrow。
 pyarrow==26.0.0
 numpy==2.5.4
 # matplotlib 与 jupyter 只用于本地 Notebook，不进入任何镜像：版本按当前已验证的本地环境锁定。
