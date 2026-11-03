@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.dialects.mysql import insert
 
 from agent_core.memory import MEMORY_VALUES, MemoryFact, MemoryTurn, extract_memories
@@ -100,7 +100,9 @@ async def remember_turn(turn: MemoryTurn) -> int:
                 source_thread_id=statement.inserted.source_thread_id,
                 source_request_id=statement.inserted.source_request_id,
                 expires_at=statement.inserted.expires_at,
-                updated_at=func.now(),
+                # 与 expires_at / _active_clause 使用同一应用 UTC 时钟；
+                # func.now() 取 MySQL 会话时区，部署切换后会出现两套时间。
+                updated_at=_utc_now_naive(),
             )
             await session.execute(statement)
         await session.commit()

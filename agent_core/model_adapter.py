@@ -188,8 +188,12 @@ class OpenAIModelAdapter:
             self._prompt_rows_max_chars,
         )
         if kept < len(items):
-            # 明确告诉模型少了多少：否则它会按收到的部分行给出「TOP10」这类结论。
-            body += f"（提示词预算 {self._prompt_rows_max_chars} 字符，仅发送前 {kept}/{len(items)} 条）"
+            # 说明必须另起一行：直接拼在 JSON 尾部会让「结果：」这一行不再是合法 JSON，
+            # 模型可能把截断提示当成数据的一部分。
+            body += (
+                f"\n[数据说明] 提示词预算 {self._prompt_rows_max_chars} 字符，"
+                f"仅发送前 {kept}/{len(items)} 条。"
+            )
         return body
 
     def _history_json(self, history: list[Message]) -> str:

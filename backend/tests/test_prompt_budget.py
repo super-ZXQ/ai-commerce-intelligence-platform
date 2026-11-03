@@ -48,9 +48,12 @@ def test_answer_prompt_clips_rows_and_declares_it() -> None:
     prompt = _adapter()._answer_prompt("谁消费最多", "query", [], [], "SELECT 1", _ROWS)
     block = prompt.split("结果：", 1)[1].split("\n", 1)[0]
 
-    assert "仅发送前" in block
-    assert f"/{len(_ROWS)} 条）" in block
-    assert len(block.split("（提示词预算", 1)[0]) <= 300
+    # 截断提示必须在下一行，JSON 行本身仍可被模型直接解析。
+    assert "仅发送前" in prompt
+    assert f"/{len(_ROWS)} 条" in prompt
+    assert len(block) <= 300
+    parsed = json.loads(block)
+    assert 0 < len(parsed) < len(_ROWS)
 
 
 def test_answer_prompt_never_sends_more_rows_than_the_cap() -> None:
