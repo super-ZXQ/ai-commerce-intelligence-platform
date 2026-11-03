@@ -41,7 +41,7 @@
 | 后端读接口 P95 | 缓存命中 < 500ms；数据库查询 < 2s | `/metrics`、访问日志 | 目标，仅本地/CI 冒烟 |
 | AI 查询成功率 | ≥ 95%（不含额度/并发拒绝与用户取消） | `ai_query_audit` + `/metrics` | 目标，真实模型评测为离线样本 |
 | 订单事件写入成功率 | ≥ 99.9%（不含客户端 4xx） | 事件指标 + 应用日志 | 目标，CI 覆盖幂等/乱序/重启保留 |
-| 备份可恢复性 | 每次演练关键表行数一致 | `scripts/backup_restore_drill.sh` | 脚本与 CI 步骤已就绪，本机未执行 |
+| 备份可恢复性 | 每次演练关键表行数一致 | `scripts/backup_restore_drill.sh` | 2026-11-03 本机演练通过（5 张表行数一致） |
 
 告警建议：`/readyz` 连续 3 次失败、5xx 比例 > 1%（5 分钟）、事件写入连续
 `EVENT_WRITE_*`、磁盘使用率 > 80%、备份任务失败或超过 26 小时无新备份。
@@ -170,10 +170,25 @@ curl --fail http://localhost/readyz
 - 数据库账号矩阵与验收命令见 `docs/DB_PERMISSIONS.md`：
   `docker compose --profile verify run --rm db-verify`。
 
+### 9.1 供应链门禁
+
+- CI `security-scan`：gitleaks 扫描完整 git 历史（配置 `.gitleaks.toml`，只放行
+  已确认的占位符/示例值）+ `scripts/dependency_audit.py`（pip-audit）。
+- 依赖门禁用 `--no-deps --disable-pip` 只审计 requirements 中显式 pin 的直接依赖，
+  不下载 torch 等大包；有 fix 版本的公告直接失败，暂无 fix 的打印为 accepted。
+  当前需定期复核的项：
+  - `pillow 12.3.0`（传递依赖）：fastembed 0.9.0 约束 `>=10.3,<13.0`，上游尚未兼容 13.x；
+  - `chromadb 1.5.9`（直接依赖）：已是 PyPI 最新版，相关公告暂无 fix 版本。
+  复核时机：fastembed 放开 pillow 13 或 chromadb 发布新版后立即升级并复跑脚本。
+- 已升级修复：PyJWT 2.15.1、msgpack 1.2.4、setuptools 84.2.1。
+- 容器镜像 CVE 扫描（trivy）与 CodeQL 尚未启用：前者应在镜像构建后接入，
+  后者依赖仓库 Security 功能开关，需在目标仓库确认后再加。
+
 ## 10. 已知限制与未执行项
 
-- 本机 Docker daemon 不可用：**容器冷启动、重启保留、真实授权验收、TLS 握手、
-  备份恢复演练均未在本机执行**；相关脚本与 CI 步骤已就绪。
+- 2026-11-03 本机已验证：全栈容器冷启动（backend/streamlit/ai-assistant 均 healthy）、
+  备份恢复演练（临时库行数一致）、TLS 握手（自签名证书，TLSv1.3 + HSTS）。
+  仍未验证：生产 CA 证书链、异机恢复、真实最小权限账号在目标环境验收。
 - 未配置 binlog/PITR，RPO 只能承诺 ≤ 24 小时。
 - 单机单实例，无自动故障转移；MySQL/Redis 故障期间服务不可用或降级。
 - 限流、AI 并发与每日额度为进程内计数，多 worker 部署会放大配额；默认启动守卫会

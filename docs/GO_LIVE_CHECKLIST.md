@@ -83,10 +83,10 @@
 | 权限验收输出 | |
 | 未执行项与原因 | |
 
-## 未执行项（截至 2026-11-01，本仓库开发环境）
+## 未执行项（截至 2026-11-03，本仓库开发环境）
 
-- [ ] Docker 冷启动全栈（本机 Docker daemon 不可用）
+- [x] Docker 冷启动全栈（backend/streamlit/ai-assistant 均 healthy）
 - [ ] 真实最小权限账号验收（CI 已配置 `db-verify`，尚未在目标环境执行）
-- [ ] 备份/恢复演练（脚本与 CI 步骤已就绪，本机未执行）
-- [ ] TLS 握手与证书链验证（无证书与运行中的 Nginx）
+- [x] 备份/恢复演练（本机通过：`orders`、`order_events`、`auth_users`、`data_state`、`alembic_version` 行数一致）
+- [x] TLS 握手（自签名证书验证 TLSv1.3 + HSTS + HTTP→HTTPS 跳转）；生产 CA 证书链仍待目标环境验证
 - [ ] 多 worker / 高可用 / binlog PITR（默认启动守卫拒绝多 worker；确需时显式 `ALLOW_MULTI_WORKER=true`，并自行承担配额放大）

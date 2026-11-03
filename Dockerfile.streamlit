@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.streamlit.txt .
-RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=84.2.1" \
     && pip install --no-cache-dir -r requirements.streamlit.txt
 
 # 只复制 BI 页面实际需要的文件：COPY . . 会把 data/cleaned_orders.csv（16MB+）

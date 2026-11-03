@@ -1,0 +1,21 @@
+# gitleaks 配置：保留默认规则，只放行已确认的示例值/占位符。
+#
+# 扫描范围是 git 历史（CI 中 fetch-depth: 0），因此曾经提交过、后来删除的文件
+# 也会被检查。下面每一项都必须有明确理由，禁止为"让扫描变绿"整类关闭规则。
+[extend]
+useDefault = true
+
+[allowlist]
+description = "已确认的占位符与示例值，不是可用凭据"
+paths = [
+  # 软著材料里的 access_token 是截断示例（`eyJhbGciOiJIUzI1NiI...`），
+  # 且该目录已在 9e3aabd 中删除并加入 .gitignore。
+  '''copyright_materials/''',
+]
+regexes = [
+  # docker-compose.observability.yml（已删除）中的 Langfuse 示例值，
+  # 注释明确标注 change-me，不是实际部署使用的密钥。
+  '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef''',
+  # RFC 6455 标准示例 Sec-WebSocket-Key，用于冒烟测试握手，不是密钥。
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+]

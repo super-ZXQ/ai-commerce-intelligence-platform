@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY backend/requirements.txt ./backend/
-RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=84.2.1" \
     && pip install --no-cache-dir -r ./backend/requirements.txt
 
 # 情节向量模型：构建时通过镜像源预热；失败不阻塞构建，运行时再懒加载。

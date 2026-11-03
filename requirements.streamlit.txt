@@ -4,7 +4,7 @@ pandas==3.0.3
 numpy==2.5.4
 plotly==6.8.0
 streamlit==1.58.0
-msgpack==1.2.2
+msgpack==1.2.4  # 1.2.3 起修复 CVE-2026-114613
 # BI 页面只经后端 API 读数据与导出，不再安装 MySQL 驱动。
 # pyarrow 不是我们的直接依赖，但 streamlit==1.58.0 硬性要求 pyarrow>=7.0，删掉这行
 # 只会让它变成不受控的传递依赖（实测会漂到当轮最新版）。显式 pin 才谈得上可复现。
