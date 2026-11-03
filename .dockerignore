@@ -12,5 +12,5 @@ test_*.json
 backend_error.log
 backend_output.log
 notebook
-data/datas.xlsx
-data/cleaned_orders.parquet
+# 数据目录由 data-import 服务在运行时挂载，不需要进入任何镜像构建上下文。
+data/

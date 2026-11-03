@@ -10,7 +10,13 @@ COPY requirements.streamlit.txt .
 RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" \
     && pip install --no-cache-dir -r requirements.streamlit.txt
 
-COPY . .
+# 只复制 BI 页面实际需要的文件：COPY . . 会把 data/cleaned_orders.csv（16MB+）
+# 与后端、Agent、Notebook 全部带进镜像，而 BI 只通过 HTTP API 取数。
+COPY streamlit_app.py ./
+COPY bi_api.py bi_rfm.py bi_style.py ./
+COPY backend/__init__.py ./backend/
+COPY backend/utils/__init__.py ./backend/utils/
+COPY backend/utils/rfm_scoring.py ./backend/utils/
 
 RUN mkdir -p /home/app \
     && chown 10001:10001 /home/app

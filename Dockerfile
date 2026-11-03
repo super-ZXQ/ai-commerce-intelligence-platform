@@ -20,8 +20,8 @@ RUN chown -R 10001:10001 /tmp/fastembed_cache 2>/dev/null || true
 COPY backend/ ./backend/
 COPY agent_core/ ./agent_core/
 COPY ai-ecommerce-assistant/knowledge_base/ ./ai-ecommerce-assistant/knowledge_base/
-COPY data/ /app/data/
-COPY sql/ /app/sql/
+# 数据文件不烘进镜像：data-import 服务通过 ./data:/app/data:ro 挂载。
+# 顶层 sql/ 仅作参考 DDL，运行时由 Alembic 迁移，镜像不需要。
 
 RUN python -c "import agent_core" \
     && mkdir -p /home/app \
