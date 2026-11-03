@@ -146,6 +146,14 @@ class TestObservability:
             # 响应头由 FastAPI 回写，Nginx 不再重复 add_header。
             assert "add_header X-Request-ID" not in text
 
+    def test_nginx_uses_relative_login_redirect(self):
+        # 默认 absolute_redirect on 会把 $scheme/$host 写进 Location：
+        # 外部 TLS 终止时可能降级为 http，也增加 Host 伪造风险。
+        for name in ("nginx.conf", "nginx.tls.conf"):
+            text = (_ROOT / "deploy" / name).read_text(encoding="utf-8")
+            assert "absolute_redirect off;" in text
+            assert "return 302 /login?next=$uri;" in text
+
 
 class TestTlsLayer:
     def test_tls_config_terminates_https_with_hsts(self):
