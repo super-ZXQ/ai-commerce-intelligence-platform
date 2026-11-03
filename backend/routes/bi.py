@@ -13,6 +13,7 @@ from backend.database import get_db
 from backend.models.schemas import BIOrderPage
 from backend.services import order_service
 from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
+from backend.utils.pii import has_pii_access, mask_user_name
 
 router = APIRouter(prefix="/api/bi", tags=["BI 看板"])
 settings = get_settings()
@@ -28,7 +29,7 @@ async def bi_orders(
         description="首屏返回的数据版本；后续页必须携带，版本变化时返回 409",
     ),
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """与销售总览使用同一非取消口径；整次分页读取绑定同一数据版本。"""
     if page > 1 and data_version is None:
@@ -56,6 +57,9 @@ async def bi_orders(
                 "data_version": exc.actual,
             },
         ) from exc
+    if not has_pii_access(principal.scopes):
+        for item in result.items:
+            item.user_name = mask_user_name(item.user_name)
     if result.total > settings.export_max_rows:
         raise HTTPException(
             status_code=413,

@@ -9,6 +9,24 @@
 - 首次启动且 `auth_users` 为空时，用 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 引导管理员；
   之后账号变更应使用 `python -m backend.scripts.manage_auth`。
 
+## 权限与字段脱敏
+
+| scope | admin | analyst | viewer | 说明 |
+|-------|-------|---------|--------|------|
+| `data:read` | ✓ | ✓ | ✓ | 订单、BI、RFM 读取 |
+| `data:export` | ✓ | ✓ | — | CSV/Excel 导出 |
+| `data:pii` | ✓ | ✓ | — | 返回完整用户名；缺失时只返回脱敏值 |
+| `ai:query` | ✓ | ✓ | — | AI 问答与模型连接测试 |
+| `events:write` | ✓ | — | — | 订单事件写入 |
+| `admin:manage` | ✓ | — | — | 监控与账号管理 |
+
+`viewer` 默认没有 `data:pii`：`/api/orders`、`/api/orders/filter`、`/api/orders/{id}`、
+`/api/bi/orders`、`/api/users`、`/api/rfm/top-users` 与 `/api/rfm/segments/{segment}`
+返回的 `user_name` 会被脱敏（中文保留姓、英文保留前两位，单字名显示 `*`）。
+需要完整姓名时用 `manage_auth create-user <name> --role viewer --scopes data:pii`
+显式追加；analyst/admin 默认已包含该权限。导出接口本身要求 `data:export`，不在此处重复处理。
+RFM 明细直接引用缓存快照，路由必须先复制再脱敏，禁止原地修改缓存对象。
+
 ## 登录链路
 
 1. 浏览器访问 `POST /api/auth/login`，FastAPI 校验数据库账号并写入 HttpOnly Cookie

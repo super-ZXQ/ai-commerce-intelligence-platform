@@ -11,6 +11,7 @@ from backend.models.schemas import (
     PaginatedResponse,
 )
 from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
+from backend.utils.pii import has_pii_access, mask_user_name
 from backend.services import order_service
 from backend.services.order_service import SORT_COLUMN_MAP
 
@@ -28,7 +29,7 @@ async def list_orders(
     sort_by: str = Query("order_time", description="排序字段"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="排序方向 asc/desc"),
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取所有订单列表，支持分页和排序。
@@ -43,7 +44,11 @@ async def list_orders(
             status_code=400,
             detail=f"无效排序字段 '{sort_by}'，可选值: {VALID_SORT_FIELDS}",
         )
-    return await order_service.get_orders(db, page, page_size, sort_by, sort_order)
+    result = await order_service.get_orders(db, page, page_size, sort_by, sort_order)
+    if not has_pii_access(principal.scopes):
+        for item in result.items:
+            item.user_name = mask_user_name(item.user_name)
+    return result
 
 
 @router.get("/filter", response_model=PaginatedResponse, summary="条件筛选订单")
@@ -63,7 +68,7 @@ async def filter_orders(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     条件筛选订单，支持多维度过滤。
@@ -93,14 +98,18 @@ async def filter_orders(
         sort_by=sort_by,
         sort_order=sort_order,
     )
-    return await order_service.filter_orders(db, filters, page, page_size)
+    result = await order_service.filter_orders(db, filters, page, page_size)
+    if not has_pii_access(principal.scopes):
+        for item in result.items:
+            item.user_name = mask_user_name(item.user_name)
+    return result
 
 
 @router.get("/{order_id}", response_model=OrderResponse, summary="获取订单详情")
 async def get_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     根据订单ID获取单个订单详情。
@@ -108,4 +117,6 @@ async def get_order(
     result = await order_service.get_order_by_id(db, order_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"订单 {order_id} 不存在")
+    if not has_pii_access(principal.scopes):
+        result.user_name = mask_user_name(result.user_name)
     return result

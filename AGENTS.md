@@ -94,6 +94,7 @@ ENTERPRISE_COLORS_FULL = {
 - **时间口径** — 业务列（`order_time`/`order_date`/`payment_time`/`order_hour`/`weekday`）是 Asia/Shanghai 墙钟；运维列（`created_at`/`updated_at`/`expires_at`/`occurred_at`）是 UTC-naive。MySQL 固定 `--default-time-zone=+00:00`，禁止把业务时间做 UTC 换算
 - **请求追踪** — Nginx 生成 `$request_id` 并通过 `X-Request-ID` 传给 FastAPI；应用日志统一注入 request_id，AI 审计也复用它。`LOG_FORMAT=text|json` 控制人读/结构化日志
 - **角色默认权限不写入 `scopes` 列** — 鉴权时 `effective_scopes()` 取「角色默认 ∪ 显式权限」，把角色默认值持久化会让后续收紧角色对已有账号失效（旧值被并集加回来）。`manage_auth create-user` 只在 `--scopes` 时存追加权限
+- **用户名默认脱敏** — `viewer` 没有 `data:pii`，读取接口返回的 `user_name` 必须脱敏；analyst/admin 默认含 `data:pii`。RFM 明细引用缓存快照时必须复制后再脱敏，禁止原地修改缓存对象
 - **公开探针必须边缘限流** — `/readyz` 每次占用业务库、事件库、认证库三个连接并 ping Redis；应用内限流把这些路径排除在桶外，因此必须由 Nginx `probe_edge` zone 兜底
 
 ## 排查路径

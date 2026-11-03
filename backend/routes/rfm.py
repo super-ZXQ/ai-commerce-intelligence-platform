@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
+from backend.utils.pii import has_pii_access, mask_user_name
 from backend.services.rfm_service import (
     VALID_SEGMENTS,
     compute_rfm,
@@ -71,7 +72,7 @@ async def rfm_segment_users(
     f_threshold: int | None = Query(None, ge=1, le=10, description="F 评分阈值，不传则用默认值"),
     m_threshold: int | None = Query(None, ge=1, le=10, description="M 评分阈值，不传则用默认值"),
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     if segment not in VALID_SEGMENTS:
         raise HTTPException(
@@ -87,6 +88,15 @@ async def rfm_segment_users(
         f_threshold=f_threshold,
         m_threshold=m_threshold,
     )
+    if not has_pii_access(principal.scopes):
+        # 明细直接引用缓存快照里的 dict，必须复制后再脱敏，避免污染缓存。
+        result = {
+            **result,
+            "users": [
+                {**user, "user_name": mask_user_name(user.get("user_name"))}
+                for user in result["users"]
+            ],
+        }
     return result
 
 
@@ -96,11 +106,20 @@ async def rfm_top_users(
     reference_date: date | None = Query(None, description="参考日期(YYYY-MM-DD)，默认为最新订单日期"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     result = await get_rfm_top_users(
         db, limit=limit,
         reference_date=reference_date.isoformat() if reference_date else None,
         n_bins=n_bins,
     )
+    if not has_pii_access(principal.scopes):
+        # 同上：top_users 是缓存快照的切片，复制后再脱敏。
+        result = {
+            **result,
+            "top_users": [
+                {**user, "user_name": mask_user_name(user.get("user_name"))}
+                for user in result["top_users"]
+            ],
+        }
     return result

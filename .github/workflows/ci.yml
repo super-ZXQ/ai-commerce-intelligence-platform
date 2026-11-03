@@ -189,6 +189,12 @@ jobs:
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 \
             detect --source /repo --config /repo/.gitleaks.toml --redact --verbose
 
+      - name: 容器与 IaC 配置扫描（trivy）
+        # 只扫描 Dockerfile/Compose 等配置错误，不扫依赖 CVE（避免与 pip-audit 重复）。
+        run: |
+          docker run --rm -v "$PWD:/repo" aquasec/trivy:0.76.1 \
+            config --severity HIGH,CRITICAL --exit-code 1 /repo
+
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:

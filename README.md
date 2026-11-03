@@ -171,6 +171,10 @@ python -m backend.scripts.manage_auth set-password analyst
 python -m backend.scripts.manage_auth create-service bi-exporter --scopes data:read,data:export
 ```
 
+`viewer` 默认只有 `data:read`，读取接口返回的用户名会脱敏；确实需要完整姓名时，
+为该账号追加 `data:pii`（analyst/admin 默认已包含）；导出仍单独要求 `data:export`。
+
+
 也可使用智谱 OpenAI 兼容接口；Key 只写入本机 `.env`，不要提交：
 
 ```env
@@ -634,7 +638,7 @@ python -m pytest ai-ecommerce-assistant/tests/ -v
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
 - `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、统一非取消指标口径（退款保留在毛额、取消剔除）、`data_state.data_version` 单调与并发递增、BI 分页版本冲突（分页期间新增/取消订单返回 409）、页面与后端 RFM 客户名单/数值一致性、版本化缓存键、主体限流隔离、导出上限、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
-- `test_auth_ai_gateway.py` / `test_bi_client.py` — Cookie 会话、角色/服务凭据/账号停用后的 BI 读写边界、`data:export` 后端强制校验、BI 分页完整性与版本冲突整次重试、导出权限映射与显式按钮触发、`/api/ai/test` 的额度/并发/审计闭环、AI 页面无业务答案缓存、BI 页面无数据库直连；另含 `/workspace` 未登录跳转、`data:read` 角色边界、登录页 no-store 与静态资源回归
+- `test_auth_ai_gateway.py` / `test_bi_client.py` — Cookie 会话、角色/服务凭据/账号停用后的 BI 读写边界、`data:export` 后端强制校验、用户名按 `data:pii` 字段级脱敏、BI 分页完整性与版本冲突整次重试、导出权限映射与显式按钮触发、`/api/ai/test` 的额度/并发/审计闭环、AI 页面无业务答案缓存、BI 页面无数据库直连；另含 `/workspace` 未登录跳转、`data:read` 角色边界、登录页 no-store 与静态资源回归
 - `test_bi_rfm.py` — 页面 RFM 日期口径（参考日当天 recency=0）、非付款/未来订单过滤
 - `test_operations.py` — `/livez` 不触库、`/readyz` 三库检查与 503、生产配置 fail-fast、非 root 镜像、Compose 资源上限与 `/readyz` 健康检查、生产镜像固定层、TLS 鉴权/WebSocket/HSTS、备份恢复脚本安全默认值与 shell 语法
 

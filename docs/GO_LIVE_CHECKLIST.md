@@ -51,7 +51,7 @@
 - [ ] 未登录访问 `/BI/`、`/ai/` 跳转 `/login`
 - [ ] 登录后 BI/AI 正常，Streamlit WebSocket 握手为 101
 - [ ] 账号禁用或降低权限后，下一次业务请求立即被拒绝
-- [ ] `viewer` 可读 `/api/bi/orders`，但 `/api/export/rfm-segment` 返回 403
+- [ ] `viewer` 可读 `/api/bi/orders`（`user_name` 为脱敏值），但 `/api/export/rfm-segment` 返回 403
 - [ ] `/docs`、`/metrics` 是否需要对外暴露已确认；如需限制已在 Nginx 加白名单
 
 ## F. 健康与可观测

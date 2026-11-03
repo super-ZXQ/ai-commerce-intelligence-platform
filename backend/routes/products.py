@@ -9,6 +9,7 @@ from backend.models.schemas import (
     UserSpendingResponse,
 )
 from backend.utils.auth import SCOPE_DATA_READ, Principal, require_scope
+from backend.utils.pii import has_pii_access, mask_user_name
 from backend.services import order_service
 
 logger = logging.getLogger(__name__)
@@ -34,11 +35,15 @@ async def list_products(
 async def list_users(
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
     db: AsyncSession = Depends(get_db),
-    _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
     """
     获取用户消费排名列表，按消费总额降序排列。
 
     - **limit**: 返回的用户数量，默认20
     """
-    return await order_service.get_user_spending(db, limit)
+    users = await order_service.get_user_spending(db, limit)
+    if not has_pii_access(principal.scopes):
+        for user in users:
+            user.user_name = mask_user_name(user.user_name)
+    return users

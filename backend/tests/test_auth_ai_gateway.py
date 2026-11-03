@@ -29,7 +29,15 @@ from backend.models.database_models import AIQueryAudit, AuthAuditLog, AuthUser,
 from backend.models.schemas import AgentUsage, AIQueryResponse
 from backend.scripts.manage_auth import _parse_scopes
 from backend.services import ai_limits, ai_service
-from backend.utils.auth import decode_token, effective_scopes, hash_password, hash_service_key
+from backend.utils.auth import (
+    ROLE_SCOPES,
+    SCOPE_DATA_PII,
+    decode_token,
+    effective_scopes,
+    hash_password,
+    hash_service_key,
+)
+from backend.utils.pii import mask_user_name
 
 
 @pytest.fixture
@@ -346,6 +354,63 @@ class TestBIAuthorization:
         )
         assert denied.status_code == 403
         assert "data:export" in denied.text
+
+    @pytest.mark.asyncio
+    async def test_viewer_sees_masked_user_names(self, client: AsyncClient, temp_identity: dict):
+        """viewer 没有 data:pii，订单与排名接口只返回脱敏后的用户名。"""
+        token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        bi = await client.get("/api/bi/orders?page_size=1", headers=headers)
+        assert bi.status_code == 200
+        if bi.json()["items"] and bi.json()["items"][0]["user_name"]:
+            assert "*" in bi.json()["items"][0]["user_name"]
+
+        orders = await client.get("/api/orders?page_size=1", headers=headers)
+        assert orders.status_code == 200
+        items = orders.json()["items"]
+        if items and items[0]["user_name"]:
+            assert "*" in items[0]["user_name"]
+            detail = await client.get(f"/api/orders/{items[0]['id']}", headers=headers)
+            assert detail.status_code == 200
+            assert "*" in detail.json()["user_name"]
+
+        users = await client.get("/api/users?limit=1", headers=headers)
+        assert users.status_code == 200
+        if users.json() and users.json()[0]["user_name"]:
+            assert "*" in users.json()[0]["user_name"]
+
+        top = await client.get("/api/rfm/top-users?limit=1", headers=headers)
+        assert top.status_code == 200
+        if top.json()["top_users"] and top.json()["top_users"][0]["user_name"]:
+            assert "*" in top.json()["top_users"][0]["user_name"]
+
+    @pytest.mark.asyncio
+    async def test_admin_sees_full_name_and_rfm_cache_is_not_poisoned(
+        self, client: AsyncClient, temp_identity: dict, temp_admin: dict
+    ):
+        viewer_token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
+        viewer = await client.get(
+            "/api/rfm/top-users?limit=1",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert viewer.status_code == 200
+        if not viewer.json()["top_users"]:
+            pytest.skip("测试库没有 RFM 数据")
+        masked = viewer.json()["top_users"][0]["user_name"]
+
+        admin_token = await _login(client, temp_admin["username"], temp_admin["password"])
+        admin = await client.get(
+            "/api/rfm/top-users?limit=1",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert admin.status_code == 200
+        full = admin.json()["top_users"][0]["user_name"]
+        if not full:
+            pytest.skip("TOP 用户没有用户名")
+        # 若路由直接修改缓存 dict，admin 会拿到 viewer 脱敏后的值。
+        assert full != masked
+        assert "*" not in full
 
     @pytest.mark.asyncio
     async def test_ingest_role_cannot_read_bi(self, client: AsyncClient, temp_identity: dict):
@@ -851,6 +916,20 @@ class TestManageAuthScopes:
     def test_unknown_explicit_scope_is_rejected(self):
         with pytest.raises(SystemExit, match="未知权限"):
             _parse_scopes("data:read,root:everything")
+
+    def test_pii_scope_only_granted_to_analyst_and_admin(self):
+        assert SCOPE_DATA_PII in ROLE_SCOPES["admin"]
+        assert SCOPE_DATA_PII in ROLE_SCOPES["analyst"]
+        assert SCOPE_DATA_PII not in ROLE_SCOPES["viewer"]
+        assert SCOPE_DATA_PII not in ROLE_SCOPES["ingest"]
+
+    def test_mask_user_name_keeps_short_identifiable_prefix(self):
+        assert mask_user_name("张三") == "张*"
+        assert mask_user_name("张三丰") == "张**"
+        assert mask_user_name("Alice") == "Al***"
+        assert mask_user_name("李") == "*"
+        assert mask_user_name(None) is None
+        assert mask_user_name("  ") == "  "
 
 
 class TestAuthConfigValidation:

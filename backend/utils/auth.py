@@ -42,19 +42,28 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes
 # 权限点是业务路由的唯一判定依据；角色只是默认权限集合。
 SCOPE_DATA_READ = "data:read"
 SCOPE_DATA_EXPORT = "data:export"
+SCOPE_DATA_PII = "data:pii"
 SCOPE_AI_QUERY = "ai:query"
 SCOPE_EVENTS_WRITE = "events:write"
 SCOPE_ADMIN_MANAGE = "admin:manage"
 
 KNOWN_SCOPES = frozenset(
-    {SCOPE_DATA_READ, SCOPE_DATA_EXPORT, SCOPE_AI_QUERY, SCOPE_EVENTS_WRITE, SCOPE_ADMIN_MANAGE}
+    {
+        SCOPE_DATA_READ,
+        SCOPE_DATA_EXPORT,
+        SCOPE_DATA_PII,
+        SCOPE_AI_QUERY,
+        SCOPE_EVENTS_WRITE,
+        SCOPE_ADMIN_MANAGE,
+    }
 )
 
 ROLE_SCOPES: dict[str, frozenset[str]] = {
     # admin 拥有全部权限，包括 /api/monitor 的 admin:manage。
     "admin": KNOWN_SCOPES,
     # analyst 可读、可导出、可使用 AI；viewer 只有只读权限，不能导出或调用 AI。
-    "analyst": frozenset({SCOPE_DATA_READ, SCOPE_DATA_EXPORT, SCOPE_AI_QUERY}),
+    # data:pii 决定接口是否回传完整用户名：analyst/admin 保留原文，viewer 仅见脱敏值。
+    "analyst": frozenset({SCOPE_DATA_READ, SCOPE_DATA_EXPORT, SCOPE_DATA_PII, SCOPE_AI_QUERY}),
     "viewer": frozenset({SCOPE_DATA_READ}),
     "ingest": frozenset({SCOPE_EVENTS_WRITE}),
 }

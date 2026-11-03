@@ -181,8 +181,9 @@ curl --fail http://localhost/readyz
   - `chromadb 1.5.9`（直接依赖）：已是 PyPI 最新版，相关公告暂无 fix 版本。
   复核时机：fastembed 放开 pillow 13 或 chromadb 发布新版后立即升级并复跑脚本。
 - 已升级修复：PyJWT 2.15.1、msgpack 1.2.4、setuptools 84.2.1。
-- 容器镜像 CVE 扫描（trivy）与 CodeQL 尚未启用：前者应在镜像构建后接入，
-  后者依赖仓库 Security 功能开关，需在目标仓库确认后再加。
+- 容器/IaC 配置扫描已用 `trivy config` 接入 CI（仅 HIGH/CRITICAL，0 发现）；
+  CodeQL 通过公开仓库的免费扫描接入（结果进 Security 标签页，不阻塞合并）。
+  镜像层 CVE 扫描仍未启用，需先解决 pillow 受 fastembed 约束无法升级的问题。
 
 ## 10. 已知限制与未执行项
 
