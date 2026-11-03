@@ -273,6 +273,15 @@ def test_history_window_preserves_system_memory_message() -> None:
     assert window[1]["content"] == "q" * 10 + "0"
 
 
+def test_history_window_preserves_reference_memory_message() -> None:
+    """记忆走 reference 通道：不占 system 指令权威，也不能被轮次配对着当孤立消息丢掉。"""
+    history = [{"role": "reference", "content": "相关历史分析：退款率 13.6%"}, *_turn(0, size=10)]
+    window = build_history_window(history, max_chars=120)
+
+    assert window[0] == {"role": "reference", "content": "相关历史分析：退款率 13.6%"}
+    assert [message["role"] for message in window] == ["reference", "user", "assistant"]
+
+
 def test_history_window_returns_empty_for_zero_budget() -> None:
     assert build_history_window(_turn(0), max_chars=0) == []
 

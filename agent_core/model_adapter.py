@@ -10,8 +10,14 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from agent_core.context import DEFAULT_HISTORY_MAX_CHARS, build_history_window
+from agent_core.context import (
+    DEFAULT_HISTORY_MAX_CHARS,
+    DEFAULT_PROMPT_ROWS_MAX_CHARS,
+    build_history_window,
+    fit_json_rows,
+)
 from agent_core.models import AgentIntent, AgentSource, ModelResponse
+from agent_core.prompt_privacy import PromptMasker, active_masker
 from agent_core.provider_policy import (
     build_http_client,
     build_http_clients,
@@ -28,6 +34,13 @@ class _SQLPlan(BaseModel):
 
 class _AnalysisChoice(BaseModel):
     action: Literal["platform", "product", "finish"]
+
+
+# 单次调用的输出上限。不设上限时，提供方默认允许生成到模型最大长度：
+# 一次跑飞的回答既按时长拖垮排队中的其他请求，也直接计入本次费用。
+DEFAULT_MAX_OUTPUT_TOKENS = 1024
+# 发给模型的行数上限；数据库侧另有 LIMIT 收敛到 500 行。
+_ANSWER_ROWS = 50
 
 
 def _content_text(content) -> str:
@@ -72,10 +85,19 @@ class OpenAIModelAdapter:
         timeout: float = 120.0,
         max_retries: int = 1,
         history_max_chars: int = DEFAULT_HISTORY_MAX_CHARS,
+        masking_key: bytes | None = None,
+        max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+        prompt_rows_max_chars: int = DEFAULT_PROMPT_ROWS_MAX_CHARS,
     ):
         self._api_key = api_key
         self._business_context = business_context
         self._history_max_chars = history_max_chars
+        self._max_output_tokens = max(1, max_output_tokens)
+        self._prompt_rows_max_chars = max(64, prompt_rows_max_chars)
+        # 只在调用方没有打开请求域（评测脚本）时生效；请求域里的密钥见
+        # prompt_privacy.masking_scope，None 时退回进程内随机密钥——仍然假名化，
+        # 只是假名不跨进程稳定。
+        self._masking_key = masking_key
         self._allowed_hosts = tuple(allowed_hosts)
         self._resolver = resolver
         self._timeout = timeout
@@ -123,6 +145,7 @@ class OpenAIModelAdapter:
             temperature=0,
             timeout=self._timeout,
             max_retries=self._max_retries,
+            max_tokens=self._max_output_tokens,
             stream_usage=stream_usage,
             http_client=http_client,
             http_async_client=http_async_client,
@@ -130,9 +153,13 @@ class OpenAIModelAdapter:
 
     async def choose_refund_analysis(self, query: str, evidence: list[dict]) -> ModelResponse:
         """根据已完成的聚合结果选择下一项固定工具。"""
+        # 工具清单单独成行且永不裁剪：数据块按预算可能丢掉尾部条目，
+        # 若只靠数据块判断，规划器会重复执行已经跑过的工具。
+        tools = [str(entry.get("tool", "")) for entry in evidence if isinstance(entry, dict)]
         prompt = f"""你是电商退款分析助手。根据证据选择下一步，仅输出 JSON：{{"action":"platform|product|finish"}}。
 问题：{query}
-已完成工具及数据：{json.dumps(evidence, ensure_ascii=False, default=str)}
+已执行工具：{json.dumps(tools, ensure_ascii=False)}
+已完成工具及数据：{self._prompt_json(evidence)}
 整体对比已经完成。平台或商品可各查一次；已查过的工具不可重复。
 用户明确要求按平台或商品分析时，必须先选择尚未执行的对应工具；要求两者时依次执行两者，即使样本较少也应查询并说明局限。
 若未指定拆解维度且证据已足够或样本不足，选择 finish。不要把相关性表述为因果。"""
@@ -146,6 +173,24 @@ class OpenAIModelAdapter:
         result = _response(raw) if raw is not None else ModelResponse(content="")
         result.content = parsed.action
         return result
+
+    def _prompt_json(self, payload: object) -> str:
+        """出域数据的唯一序列化出口：先假名化、再按字符预算截断。
+
+        行数据还要原样返回前端，因此 mask 只作用于这份副本。优先使用调用方
+        为本轮请求打开的映射域（见 prompt_privacy.masking_scope），它能把答案里的
+        假名还原回真实值；评测脚本等没有请求域时退化为一次性脱敏。
+        """
+        masker = active_masker() or PromptMasker(self._masking_key)
+        items = payload if isinstance(payload, list) else [payload]
+        body, kept = fit_json_rows(
+            [masker.mask(item) for item in items],
+            self._prompt_rows_max_chars,
+        )
+        if kept < len(items):
+            # 明确告诉模型少了多少：否则它会按收到的部分行给出「TOP10」这类结论。
+            body += f"（提示词预算 {self._prompt_rows_max_chars} 字符，仅发送前 {kept}/{len(items)} 条）"
+        return body
 
     def _history_json(self, history: list[Message]) -> str:
         """按字符预算裁剪历史；SQL 与回答两条提示词共用同一窗口。"""
@@ -210,7 +255,7 @@ class OpenAIModelAdapter:
 会话上下文：{self._history_json(history)}
 引用知识：{source_context or '无'}
 SQL：{sql or '未执行'}
-结果：{json.dumps(rows[:50], ensure_ascii=False, default=str)}
+结果：{self._prompt_json(rows[:_ANSWER_ROWS])}
 若结果为空，请明确说明。知识问答先用中文业务术语解释，再按需附公式；
 如果结果是多步退款分析，严格引用各步骤数据，说明比较窗口和分子分母；数据只能显示关联，不能证明退款原因；数据不足时明确说明。
 只要使用了引用知识，答案末尾必须使用“【来源】文件名 / 章节”列出至少一个实际来源。"""

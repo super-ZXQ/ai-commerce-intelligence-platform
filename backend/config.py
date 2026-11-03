@@ -11,9 +11,13 @@ _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 
 logger = logging.getLogger(__name__)
 
+# DEBUG 且未配置 JWT_SECRET 时的兜底值。它随源码公开，因此凡是从 jwt_secret 派生
+# 的密钥（例如提示词假名化）都必须把它当作「没有可用密钥」处理。
+_DEV_JWT_PLACEHOLDER = "dev-only-insecure-secret-do-not-use-in-production"
 _INSECURE_JWT_SECRETS = {
     "change-this-secret-in-production",
     "your_jwt_secret_key_change_this_in_production",
+    _DEV_JWT_PLACEHOLDER,
 }
 _INSECURE_ADMIN_PASSWORDS = {
     "change-this-admin-password",
@@ -86,6 +90,10 @@ class Settings(BaseSettings):
     agent_session_max_turns: int = 6
     agent_session_max_sessions: int = 1000
     agent_history_max_chars: int = 2000
+    # 出域预算：结果集按字符上限约束一次请求能带走多少样本，输出 token 上限
+    # 防止单次生成跑飞（费用、超时与排队时长都会按它放大）。
+    agent_prompt_rows_max_chars: int = 4000
+    agent_llm_max_output_tokens: int = 1024
 
     # 长期偏好：只存白名单键值，按认证主体隔离。
     agent_memory_enabled: bool = True
@@ -148,6 +156,19 @@ class Settings(BaseSettings):
             if item.strip()
         )
 
+    @property
+    def prompt_masking_secret(self) -> str:
+        """可用于派生「结果集出域假名」密钥的机密；不可用时返回空串。
+
+        假名按密钥 HMAC，密钥公开就等于没做假名化（低熵姓名可被离线穷举还原）。
+        DEBUG 兜底值随源码公开、弱密钥可被字典命中，因此这里判定「没有可用密钥」，
+        由 prompt_privacy 退回进程内随机密钥——仍然假名化，只是假名不跨进程稳定。
+        """
+        secret = self.jwt_secret
+        if not secret or secret in _INSECURE_JWT_SECRETS or len(secret) < 32:
+            return ""
+        return secret
+
     def model_post_init(self, __context) -> None:  # noqa: PYI063
         if self.llm_mode not in {"managed", "byok"}:
             raise ValueError("LLM_MODE 只能是 managed 或 byok")
@@ -155,7 +176,7 @@ class Settings(BaseSettings):
             raise ValueError("启用 BYOK 时必须配置 LLM_PROVIDER_ALLOWLIST")
         if not self.jwt_secret:
             if self.debug:
-                self.jwt_secret = "dev-only-insecure-secret-do-not-use-in-production"
+                self.jwt_secret = _DEV_JWT_PLACEHOLDER
                 logger.warning("⚠️ JWT_SECRET 未设置，使用开发模式默认密钥，请勿用于生产环境！")
             else:
                 raise ValueError("生产环境必须设置 JWT_SECRET 环境变量！")
@@ -202,6 +223,11 @@ class Settings(BaseSettings):
             or self.agent_history_max_chars < 1
         ):
             raise ValueError("AGENT_SESSION_* / AGENT_HISTORY_MAX_CHARS 必须大于 0")
+        if self.agent_prompt_rows_max_chars < 200:
+            # 低于一行结果都可能放不下；发送空数组会让模型误判「查询结果为空」。
+            raise ValueError("AGENT_PROMPT_ROWS_MAX_CHARS 至少 200")
+        if not 64 <= self.agent_llm_max_output_tokens <= 32000:
+            raise ValueError("AGENT_LLM_MAX_OUTPUT_TOKENS 必须在 64-32000 之间")
         if self.agent_memory_ttl_days < 0:
             raise ValueError("AGENT_MEMORY_TTL_DAYS 不能小于 0")
         if not 1 <= self.agent_memory_max_facts <= 100:

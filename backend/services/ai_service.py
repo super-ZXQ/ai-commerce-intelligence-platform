@@ -16,6 +16,7 @@ from agent_core import AgentRuntime
 from agent_core.db_schema import describe_table
 from agent_core.memory import EpisodeSummary, EpisodeTurn, MemoryFact, MemoryTurn
 from agent_core.model_adapter import OpenAIModelAdapter
+from agent_core.prompt_privacy import PromptMasker, derive_masking_key, masking_scope
 from agent_core.provider_policy import (
     ModelConfig,
     ProviderPolicyError,
@@ -212,6 +213,11 @@ async def _runtime_execute(sql: str) -> list[dict]:
     return await asyncio.to_thread(_execute_query_with_columns, sql)
 
 
+def _prompt_masking_key() -> bytes:
+    """提示词假名密钥；配置里没有可用机密时退回进程内随机密钥。"""
+    return derive_masking_key(settings.prompt_masking_secret)
+
+
 @lru_cache(maxsize=1)
 def _get_default_adapter() -> OpenAIModelAdapter:
     """延迟构造托管模型适配器。
@@ -227,6 +233,9 @@ def _get_default_adapter() -> OpenAIModelAdapter:
         business_context=BUSINESS_CONTEXT,
         allowed_hosts=settings.llm_allowed_hosts,
         history_max_chars=settings.agent_history_max_chars,
+        masking_key=_prompt_masking_key(),
+        max_output_tokens=settings.agent_llm_max_output_tokens,
+        prompt_rows_max_chars=settings.agent_prompt_rows_max_chars,
     )
 
 
@@ -354,6 +363,9 @@ def _runtime_for(config: ModelConfig | None) -> AgentRuntime:
         business_context=BUSINESS_CONTEXT,
         allowed_hosts=settings.llm_allowed_hosts,
         history_max_chars=settings.agent_history_max_chars,
+        masking_key=_prompt_masking_key(),
+        max_output_tokens=settings.agent_llm_max_output_tokens,
+        prompt_rows_max_chars=settings.agent_prompt_rows_max_chars,
     )
     runtime = _build_runtime(adapter)
     _runtime_cache[fingerprint] = (runtime, adapter)
@@ -369,16 +381,20 @@ def _runtime_for(config: ModelConfig | None) -> AgentRuntime:
     return runtime
 
 
-def _state_to_response(state: dict[str, Any]) -> AIQueryResponse:
+def _state_to_response(state: dict[str, Any], masker: PromptMasker | None = None) -> AIQueryResponse:
     result = state["result"]
     visualization = None
     if result.rows:
         columns = list(result.rows[0])
         visualization = _build_visualization(columns, [list(item.values()) for item in result.rows])
+    answer = result.answer
+    if masker is not None:
+        # 模型只看到假名；返回给用户的文本按本轮映射换回原值。
+        answer = masker.restore(answer)
     return AIQueryResponse(
         sql=result.sql,
         result=result.rows,
-        answer=result.answer,
+        answer=answer,
         visualization=visualization,
         sql_error=result.sql_error,
         request_id=state["request_id"],
@@ -422,8 +438,9 @@ async def process_natural_language_query(
 ) -> AIQueryResponse:
     """非流式入口；配额、并发与审计由路由层统一执行。"""
     runtime = _runtime_for(config)
-    state = await runtime.invoke(query, owner=owner, thread_id=thread_id)
-    return _state_to_response(state)
+    with masking_scope(_prompt_masking_key()) as masker:
+        state = await runtime.invoke(query, owner=owner, thread_id=thread_id)
+        return _state_to_response(state, masker)
 
 
 async def stream_natural_language_query(
@@ -437,14 +454,15 @@ async def stream_natural_language_query(
 ) -> AIQueryResponse:
     """流式入口：步骤与 token 经回调下发，返回值与非流式完全一致。"""
     runtime = _runtime_for(config)
-    state = await runtime.astream(
-        query,
-        owner=owner,
-        thread_id=thread_id,
-        on_step=on_step,
-        on_token=on_token,
-    )
-    return _state_to_response(state)
+    with masking_scope(_prompt_masking_key()) as masker:
+        state = await runtime.astream(
+            query,
+            owner=owner,
+            thread_id=thread_id,
+            on_step=on_step,
+            on_token=on_token,
+        )
+        return _state_to_response(state, masker)
 
 
 async def test_model_connection(config: ModelConfig) -> bool:
