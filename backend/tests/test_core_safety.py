@@ -83,6 +83,46 @@ def test_qualified_table_is_rejected():
 
 
 @pytest.mark.parametrize("sql", [
+    # 优化器提示会原样下发到数据库，却能反向拆掉本层防线：SET_VAR 关掉服务端
+    # 超时/放大缓冲区，JOIN_ORDER 改写执行计划；apply_execution_guard 只重写第一个
+    # SELECT 的提示，UNION 右臂里的会漏过，因此必须在 AST 层整体清除。
+    "SELECT /*+ SET_VAR(max_execution_time=0) */ id FROM orders",
+    "SELECT id FROM orders UNION SELECT /*+ SET_VAR(join_buffer_size=100000000) */ id FROM orders",
+    "SELECT /*+ JOIN_ORDER(orders) */ id FROM orders",
+    "SELECT /*+ MAX_EXECUTION_TIME(0) */ id FROM orders",
+])
+def test_optimizer_hints_are_stripped(sql):
+    assert "/*+" not in validate_and_limit_sql(sql, max_rows=500)
+
+
+@pytest.mark.parametrize(("sql", "reason"), [
+    # CTE 与授权表重名会被白名单当作"已知 CTE 别名"剔除，从而用模型自造的行冒充真实结果。
+    ("WITH orders AS (SELECT 'fake' AS x) SELECT * FROM orders", "重名"),
+    # 子查询 LIMIT 只裁中间结果，根节点收敛到 500 并不能阻止 99 万行先被物化。
+    ("SELECT * FROM (SELECT * FROM orders LIMIT 999999) t", "子查询"),
+    ("SELECT id FROM orders LIMIT 999999 UNION SELECT id FROM orders", "子查询"),
+    # 咨询锁不返回业务数据，却能长时间占住连接池里的连接。
+    ("SELECT GET_LOCK('a', 60) FROM orders", "不允许的数据库函数"),
+    ("SELECT RELEASE_LOCK('a') FROM orders", "不允许的数据库函数"),
+])
+def test_ast_layer_rejects_resource_abuse(sql, reason):
+    with pytest.raises(SQLValidationError, match=reason):
+        validate_and_limit_sql(sql, max_rows=500)
+
+
+@pytest.mark.parametrize("sql", [
+    # 收紧不能误伤正常分析口径：小的子查询 LIMIT 与 OFFSET 分页必须照常放行，
+    # 否则模型会被迫改写成语义不同的 SQL。
+    "SELECT id FROM (SELECT id FROM orders LIMIT 50) t",
+    "SELECT id FROM orders LIMIT 100 OFFSET 200",
+    "WITH totals AS (SELECT payment_amount AS n FROM orders) SELECT SUM(n) FROM totals",
+])
+def test_legitimate_limits_are_preserved(sql):
+    result = validate_and_limit_sql(sql, max_rows=500)
+    assert "LIMIT 50" in result or "LIMIT 100" in result or "LIMIT 500" in result
+
+
+@pytest.mark.parametrize("sql", [
     "SELECT REPLACE(platform_type, 'APP', '应用') FROM orders LIMIT 100",
     "SELECT TRUNCATE(payment_amount, 0) FROM orders LIMIT 100",
 ])
@@ -231,6 +271,67 @@ async def test_rfm_snapshot_prevents_concurrent_recalculation(monkeypatch):
 
     assert calls == 1
     assert len(results) == 5
+    rfm_service.clear_rfm_snapshot_cache()
+
+
+@pytest.mark.asyncio
+async def test_rfm_snapshot_is_scoped_to_data_version(monkeypatch):
+    """另一进程（导入 CLI / 事件摄入）递增 data_version 后，陈旧快照不能被复用。
+
+    键里缺版本号时，下一次请求会以 ":v{新版本}" 为键调用 @cached(versioned=True)，
+    把旧快照当成新数据写入 Redis，版本化保证被击穿且固化 600 秒。
+    """
+    rfm_service.clear_rfm_snapshot_cache()
+    calls = 0
+    version = {"value": 7}
+
+    class _VersionSession:
+        async def scalar(self, _statement):
+            return version["value"]
+
+    async def fake_build(_db, reference_date=None, n_bins=5):
+        nonlocal calls
+        calls += 1
+        return {"reference_date": "2024-01-01", "total_users": calls}
+
+    monkeypatch.setattr(rfm_service, "_build_rfm_snapshot", fake_build)
+
+    assert (await rfm_service._get_rfm_snapshot(_VersionSession()))["total_users"] == 1
+    assert (await rfm_service._get_rfm_snapshot(_VersionSession()))["total_users"] == 1
+    assert calls == 1
+
+    version["value"] = 8
+    assert (await rfm_service._get_rfm_snapshot(_VersionSession()))["total_users"] == 2
+    assert calls == 2
+    rfm_service.clear_rfm_snapshot_cache()
+
+
+@pytest.mark.asyncio
+async def test_clear_rfm_snapshot_cache_keeps_inflight_lock(monkeypatch):
+    """数据变更随时可能触发清空；不能回收正在被等待的锁，也不能撑爆锁字典。"""
+    rfm_service.clear_rfm_snapshot_cache()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def slow_build(_db, reference_date=None, n_bins=5):
+        nonlocal calls
+        calls += 1
+        entered.set()
+        await release.wait()
+        return {"reference_date": "2024-01-01", "total_users": 0}
+
+    monkeypatch.setattr(rfm_service, "_build_rfm_snapshot", slow_build)
+    tasks = [asyncio.create_task(rfm_service._get_rfm_snapshot(object())) for _ in range(3)]
+    await asyncio.wait_for(entered.wait(), 1)
+
+    rfm_service.clear_rfm_snapshot_cache()
+    release.set()
+    await asyncio.gather(*tasks)
+
+    # 清空把锁一并清掉会让 3 个并发请求各自重算，且残留计数键无人回收。
+    assert calls == 1
+    assert len(rfm_service._snapshot_locks) <= 1
     rfm_service.clear_rfm_snapshot_cache()
 
 

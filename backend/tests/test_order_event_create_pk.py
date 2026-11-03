@@ -1,7 +1,7 @@
 """最小可复现测试：ORDER_CREATED 主键分配与 sales-trend NULL period。"""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 import asyncio
 import os
@@ -49,6 +49,16 @@ def test_new_order_uses_database_generated_id():
     event = _event()
     order = _new_order(event, OrderCreatedPayload.model_validate(event.payload), datetime.now(UTC))
     assert order.id is None
+
+
+def test_lag_uses_the_stored_clock_basis():
+    """回归：naive occurred_at 曾恒报 0 延迟，事件积压在指标上完全不可见。"""
+    from backend.routes.order_events import _lag_seconds
+
+    past = datetime.now(UTC) - timedelta(minutes=5)
+    shanghai = past.astimezone(timezone(timedelta(hours=8)))
+    for sample in (past, past.replace(tzinfo=None), shanghai):
+        assert _lag_seconds(sample) == pytest.approx(300, abs=5)
 
 
 @pytest.mark.asyncio

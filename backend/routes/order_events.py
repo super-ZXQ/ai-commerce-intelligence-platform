@@ -26,6 +26,12 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
+def _lag_seconds(occurred_at: datetime) -> float:
+    """事件滞后：naive 输入按落库约定视为 UTC，不能当成 0 延迟——那会永久隐藏积压。"""
+    occurred = occurred_at.replace(tzinfo=UTC) if occurred_at.tzinfo is None else occurred_at
+    return (datetime.now(UTC) - occurred).total_seconds()
+
+
 @router.post("", response_model=OrderEventBatchResponse, status_code=status.HTTP_200_OK, summary="摄入订单事件")
 async def ingest_order_events(
     request: OrderEventInput | OrderEventBatchRequest,
@@ -65,7 +71,7 @@ async def ingest_order_events(
                 detail={"error_code": "EVENT_WRITE_UNAVAILABLE", "message": "订单事件暂时无法处理"},
             ) from exc
         finally:
-            lag = (datetime.now(UTC) - event.occurred_at.astimezone(UTC)).total_seconds() if event.occurred_at.tzinfo else 0
+            lag = _lag_seconds(event.occurred_at)
             # result 尚未可用的异常路径也会有可观测的 received/error 记录。
             outcome = result.status if result is not None else "error"
             record_event(event.event_type, outcome, time.perf_counter() - started, lag)

@@ -10,6 +10,13 @@ import bisect
 import math
 from collections.abc import Sequence
 
+# 分群的业务归组本身就是指标口径的一部分，必须与分群规则放在同一处：
+# BI 看板、/api/rfm/*、导出与 AI 分析共用，避免同一个"高价值客户"给出两个数字。
+# 高价值不能按"重要"前缀子串判定——重要挽留客户属于流失预警，
+# 一般价值客户反而是真实的高贡献群体。
+HIGH_VALUE_SEGMENTS = frozenset({"重要价值客户", "重要发展客户", "重要保持客户"})
+AT_RISK_SEGMENTS = frozenset({"重要挽留客户"})
+
 
 def quantile_scores(values: Sequence[float], n_bins: int = 5) -> list[int]:
     """对输入值进行稳定的分位评分，并保持原始顺序。

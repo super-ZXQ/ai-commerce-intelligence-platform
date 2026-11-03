@@ -1,6 +1,12 @@
 from sqlalchemy import JSON, Column, Date, DateTime, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects import mysql
 
 from backend.database import Base
+
+# 列型必须与已部署 DDL（backend/alembic/versions/0001-0006）逐一对齐：
+# ORM 声明成 INT/NUMERIC(10,2) 时，任何走 create_all 的环境都会建出一个比生产更窄、
+# 且丢失 UNSIGNED 约束的 schema，测试通过的写入可能在生产溢出。
+# 漂移由 backend/tests/test_alembic_migrations.py 的 ORM↔schema 守卫拦住。
 
 
 class Order(Base):
@@ -10,17 +16,17 @@ class Order(Base):
     order_no = Column("order_id", String(50), unique=True, nullable=False, index=True)
     user_name = Column("user_name", String(100), index=True)
     product_id = Column("product_id", String(50), index=True)
-    order_amount = Column("order_amount", Numeric(10, 2))
-    payment_amount = Column("payment_amount", Numeric(10, 2))
+    order_amount = Column("order_amount", Numeric(18, 2))
+    payment_amount = Column("payment_amount", Numeric(18, 2))
     channel_id = Column("channel_id", String(50))
     platform_type = Column("platform_type", String(50), index=True)
     order_time = Column("order_time", DateTime, index=True)
     payment_time = Column("payment_time", DateTime)
     is_refunded = Column("is_refund", String(10))
-    discount_amount = Column("discount_amount", Numeric(10, 2))
+    discount_amount = Column("discount_amount", Numeric(18, 2))
     payment_duration_sec = Column("payment_duration_sec", Integer)
     order_date = Column("order_date", Date, index=True)
-    order_hour = Column("order_hour", Integer)
+    order_hour = Column("order_hour", mysql.TINYINT(unsigned=True))
     weekday = Column("weekday", String(20))
     # 历史 CSV 行默认视为已经付款的有效订单；后续状态只能由事件流推进。
     order_status = Column("order_status", String(20), nullable=False, default="ACTIVE", index=True)
@@ -33,13 +39,13 @@ class AuthUser(Base):
 
     __tablename__ = "auth_users"
 
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
     username = Column("username", String(100), unique=True, nullable=False, index=True)
     password_hash = Column("password_hash", String(255), nullable=False)
     role = Column("role", String(20), nullable=False, default="viewer")
     scopes = Column("scopes", String(512), nullable=False, default="")
-    is_active = Column("is_active", Integer, nullable=False, default=1)
-    token_version = Column("token_version", Integer, nullable=False, default=1)
+    is_active = Column("is_active", mysql.TINYINT(1), nullable=False, default=1)
+    token_version = Column("token_version", mysql.INTEGER(unsigned=True), nullable=False, default=1)
     created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
     updated_at = Column("updated_at", DateTime, nullable=False, server_default=func.now())
     last_login_at = Column("last_login_at", DateTime, nullable=True)
@@ -50,12 +56,12 @@ class ServiceClient(Base):
 
     __tablename__ = "service_clients"
 
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
     name = Column("name", String(100), unique=True, nullable=False, index=True)
     key_prefix = Column("key_prefix", String(16), nullable=False, index=True)
-    key_hash = Column("key_hash", String(64), unique=True, nullable=False)
+    key_hash = Column("key_hash", mysql.CHAR(64), unique=True, nullable=False)
     scopes = Column("scopes", String(512), nullable=False, default="")
-    is_active = Column("is_active", Integer, nullable=False, default=1)
+    is_active = Column("is_active", mysql.TINYINT(1), nullable=False, default=1)
     created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
     last_used_at = Column("last_used_at", DateTime, nullable=True)
     expires_at = Column("expires_at", DateTime, nullable=True)
@@ -64,7 +70,7 @@ class ServiceClient(Base):
 class AuthAuditLog(Base):
     __tablename__ = "auth_audit_log"
 
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
     principal_type = Column("principal_type", String(20), nullable=False)
     principal_name = Column("principal_name", String(100), nullable=False, index=True)
     action = Column("action", String(50), nullable=False)
@@ -80,19 +86,19 @@ class AIQueryAudit(Base):
 
     __tablename__ = "ai_query_audit"
 
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
     request_id = Column("request_id", String(64), nullable=False, index=True)
     principal_name = Column("principal_name", String(100), nullable=False, index=True)
     thread_id = Column("thread_id", String(128), nullable=False, default="")
     model_mode = Column("model_mode", String(20), nullable=False, default="managed")
     intent = Column("intent", String(32), nullable=False, default="")
     outcome = Column("outcome", String(20), nullable=False)
-    query_sha256 = Column("query_sha256", String(64), nullable=False)
-    query_length = Column("query_length", Integer, nullable=False, default=0)
-    input_tokens = Column("input_tokens", Integer, nullable=True)
-    output_tokens = Column("output_tokens", Integer, nullable=True)
-    total_tokens = Column("total_tokens", Integer, nullable=True)
-    latency_ms = Column("latency_ms", Integer, nullable=True)
+    query_sha256 = Column("query_sha256", mysql.CHAR(64), nullable=False)
+    query_length = Column("query_length", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    input_tokens = Column("input_tokens", mysql.INTEGER(unsigned=True), nullable=True)
+    output_tokens = Column("output_tokens", mysql.INTEGER(unsigned=True), nullable=True)
+    total_tokens = Column("total_tokens", mysql.INTEGER(unsigned=True), nullable=True)
+    latency_ms = Column("latency_ms", mysql.INTEGER(unsigned=True), nullable=True)
     error_category = Column("error_category", String(80), nullable=False, default="")
     created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())
 
@@ -105,7 +111,7 @@ class AgentMemoryFact(Base):
         UniqueConstraint("owner", "memory_key", name="uq_agent_memory_owner_key"),
     )
 
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
     owner = Column("owner", String(100), nullable=False, index=True)
     memory_key = Column("memory_key", String(64), nullable=False)
     memory_value = Column("memory_value", String(255), nullable=False)
@@ -125,7 +131,7 @@ class AgentMemoryEpisode(Base):
         UniqueConstraint("owner", "source_request_id", name="uq_episode_owner_request"),
     )
 
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
     owner = Column("owner", String(100), nullable=False, index=True)
     thread_id = Column("thread_id", String(128), nullable=False, default="")
     source_request_id = Column("source_request_id", String(64), nullable=False)

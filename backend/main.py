@@ -360,9 +360,17 @@ async def workspace_page(request: Request) -> FileResponse | RedirectResponse:
 
 
 @app.get("/logout", include_in_schema=False)
-async def logout_page() -> RedirectResponse:
+async def logout_page(request: Request) -> RedirectResponse:
+    """页面与 AI 助手共用退出入口：必须吊销 Token，而不只是删 Cookie。
+
+    只删 Cookie 会让已泄露的 Bearer Token 在 jwt_expire_minutes 内继续可用，
+    违反「登出必须吊销 Token」；与 POST /api/auth/logout 复用同一段吊销逻辑。
+    """
+    async with auth_session_factory() as auth_db:
+        await auth.revoke_session(request, auth_db)
     redirect = RedirectResponse("/login", status_code=303)
-    redirect.delete_cookie(settings.auth_cookie_name, path="/")
+    auth.clear_session_cookie(redirect)
+    redirect.headers["Cache-Control"] = "no-store"
     return redirect
 
 

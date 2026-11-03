@@ -44,6 +44,51 @@ def _set_session_cookie(response: Response, token: str) -> None:
     )
 
 
+def clear_session_cookie(response: Response) -> None:
+    """删除会话 Cookie 必须带齐签发时的属性，否则 SameSite=None 下浏览器不会真的移除。"""
+    response.delete_cookie(
+        settings.auth_cookie_name,
+        path="/",
+        secure=settings.auth_cookie_secure,
+        httponly=True,
+        samesite=settings.auth_cookie_samesite,
+    )
+
+
+async def revoke_session(request: Request, auth_db: AsyncSession) -> str | None:
+    """吊销当前会话已签发的全部 Token 并记录审计，返回被吊销的用户名（无会话时 None）。
+
+    JWT 是无状态凭据，只删 Cookie 无法阻止已泄露的 Bearer Token 继续使用；递增
+    token_version 后 load_principal_from_token 会在下一次请求时立即拒绝。
+    两条登出通道（POST /api/auth/logout 与页面 GET /logout）必须共用这一段，
+    分头实现正是页面登出漏掉吊销的原因。
+    """
+    try:
+        principal = await get_principal(request, auth_db)
+    except HTTPException:
+        principal = None
+    if principal is None:
+        return None
+
+    if principal.principal_type == "user":
+        await auth_db.execute(
+            update(AuthUser)
+            .where(AuthUser.username == principal.name)
+            .values(token_version=AuthUser.token_version + 1)
+        )
+        await auth_db.commit()
+
+    await record_auth_audit(
+        auth_db,
+        principal_type=principal.principal_type,
+        principal_name=principal.name,
+        action="logout",
+        outcome="success",
+        client=client_ip(request),
+    )
+    return principal.name
+
+
 @router.post("/login", response_model=TokenResponse, summary="用户登录")
 async def login(
     credentials: UserCredentials,
@@ -105,41 +150,9 @@ async def logout(
     response: Response,
     auth_db: AsyncSession = Depends(get_auth_db),
 ) -> dict:
-    """清除浏览器会话 Cookie，并吊销该用户已签发的全部 Token。
-
-    JWT 是无状态凭据，只删 Cookie 无法阻止已泄露的 Bearer Token 继续使用；
-    递增 token_version 后，load_principal_from_token 会在下一次请求时立即拒绝。
-    """
-    principal: Principal | None = None
-    try:
-        principal = await get_principal(request, auth_db)
-    except HTTPException:
-        principal = None
-
-    if principal is not None and principal.principal_type == "user":
-        await auth_db.execute(
-            update(AuthUser)
-            .where(AuthUser.username == principal.name)
-            .values(token_version=AuthUser.token_version + 1)
-        )
-        await auth_db.commit()
-
-    response.delete_cookie(
-        settings.auth_cookie_name,
-        path="/",
-        secure=settings.auth_cookie_secure,
-        httponly=True,
-        samesite=settings.auth_cookie_samesite,
-    )
-    if principal is not None:
-        await record_auth_audit(
-            auth_db,
-            principal_type=principal.principal_type,
-            principal_name=principal.name,
-            action="logout",
-            outcome="success",
-            client=client_ip(request),
-        )
+    """清除浏览器会话 Cookie，并吊销该用户已签发的全部 Token。"""
+    await revoke_session(request, auth_db)
+    clear_session_cookie(response)
     return {"status": "ok"}
 
 

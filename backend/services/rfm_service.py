@@ -9,8 +9,15 @@ from sqlalchemy import and_, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database_models import Order
-from backend.utils.cache import cached
-from backend.utils.rfm_scoring import assign_segment, quantile_scores
+# 复用缓存层的版本读取：快照键与 @cached(versioned=True) 必须使用同一个
+# data_version 来源与同一套"读不到就回退 TTL"的语义，否则两层各自判空会打架。
+from backend.utils.cache import _read_session_data_version, cached
+from backend.utils.rfm_scoring import (
+    AT_RISK_SEGMENTS,
+    HIGH_VALUE_SEGMENTS,
+    assign_segment,
+    quantile_scores,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,20 +39,35 @@ _SEGMENT_PRIORITY = {
     "一般价值客户": 5, "一般发展客户": 6, "一般保持客户": 7, "一般挽留客户": 8,
 }
 
-# 高价值必须按明确分群名判定，不能用子串"重要"：否则"重要挽留客户"
-# 会同时被算作高价值与流失预警，"一般价值客户"反而被排除。
-_HIGH_VALUE_SEGMENTS = frozenset({"重要价值客户", "重要发展客户", "重要保持客户"})
-_AT_RISK_SEGMENTS = frozenset({"重要挽留客户"})
+# 高价值/流失预警的分群归组与分位评分同源于 backend/utils/rfm_scoring，
+# BI 看板与本服务共用同一组常量，不允许各写一份口径。
 
 # 完整用户明细只缓存在当前进程，避免把 7 万+ 用户序列化为超大 Redis Key。
 # Docker 当前使用单 Worker；若未来扩容为多 Worker，各进程会各自维护一份有界快照。
 _SNAPSHOT_TTL_SECONDS = 600
 _SNAPSHOT_MAX_ENTRIES = 8
-_snapshot_cache: OrderedDict[tuple[str | None, int], dict] = OrderedDict()
-_snapshot_locks: dict[tuple[str | None, int], asyncio.Lock] = {}
-# 与 backend/utils/cache.py 同理：锁可能"已取用但还在等待队列中"，
-# 用引用计数保护，防止快照逐出时误回收正在使用的锁
-_snapshot_lock_refs: dict[tuple[str | None, int], int] = {}
+# 键含 data_version：事件摄入/导入 CLI 提交后版本递增，陈旧快照不可能再被
+# 写入新版本键，从而击穿 @cached(versioned=True) 的版本化保证。
+_SnapshotKey = tuple[str | None, int, int | None]
+_snapshot_cache: OrderedDict[_SnapshotKey, dict] = OrderedDict()
+
+
+class _SnapshotLock:
+    """与 backend/utils/cache.py 的 _RefLock 同理：refs 覆盖"已取用但仍在排队"的全周期。
+
+    仅用 lock.locked() 判断空闲会误回收等待中的锁，导致 single-flight 失效；
+    refs 挂在锁对象上而不是平行的字典，也就不会出现"清空字典后 finally 又把键写回去"
+    造成的无界增长。
+    """
+
+    __slots__ = ("lock", "refs")
+
+    def __init__(self) -> None:
+        self.lock = asyncio.Lock()
+        self.refs = 0
+
+
+_snapshot_locks: dict[_SnapshotKey, _SnapshotLock] = {}
 
 
 async def _fetch_rfm_raw(db: AsyncSession, ref_date) -> list[dict]:
@@ -201,18 +223,22 @@ async def _get_rfm_snapshot(
     reference_date: str | None = None,
     n_bins: int = 5,
 ) -> dict:
-    """获取有界、带 TTL 的进程内快照，防止并发请求重复执行重计算。"""
-    key = (reference_date, n_bins)
+    """获取有界、带 TTL 且受数据版本约束的进程内快照，防止并发请求重复执行重计算。"""
+    # 读版本必须发生在业务查询之前，与快照共享同一 REPEATABLE READ 语义；
+    # 读不到时返回 None，快照退化为纯 TTL（与 @cached(versioned=True) 一致）。
+    key = (reference_date, n_bins, await _read_session_data_version(db))
     now = time.monotonic()
     cached_snapshot = _snapshot_cache.get(key)
     if cached_snapshot and cached_snapshot["expires_at"] > now:
         _snapshot_cache.move_to_end(key)
         return cached_snapshot["data"]
 
-    lock = _snapshot_locks.setdefault(key, asyncio.Lock())
-    _snapshot_lock_refs[key] = _snapshot_lock_refs.get(key, 0) + 1
+    entry = _snapshot_locks.setdefault(key, _SnapshotLock())
+    # setdefault 与计数之间不能有 await：否则别的协程可能已把我们正在等待的
+    # 锁当成空闲对象回收掉。
+    entry.refs += 1
     try:
-        async with lock:
+        async with entry.lock:
             now = time.monotonic()
             cached_snapshot = _snapshot_cache.get(key)
             if cached_snapshot and cached_snapshot["expires_at"] > now:
@@ -232,25 +258,34 @@ async def _get_rfm_snapshot(
 
             while len(_snapshot_cache) > _SNAPSHOT_MAX_ENTRIES:
                 _snapshot_cache.popitem(last=False)
-            # 只回收无人取用且未持有的锁，防止高基数 reference_date 场景锁字典泄漏
-            for stale_key in [
-                k for k, lk in _snapshot_locks.items()
-                if k not in _snapshot_cache
-                and _snapshot_lock_refs.get(k, 0) == 0
-                and not lk.locked()
-            ]:
-                _snapshot_locks.pop(stale_key, None)
-                _snapshot_lock_refs.pop(stale_key, None)
+            _reclaim_idle_snapshot_locks()
             return snapshot
     finally:
-        _snapshot_lock_refs[key] = _snapshot_lock_refs.get(key, 1) - 1
+        entry.refs -= 1
+        # 只有最后一个持有者才回收：否则会把仍在重计算的锁从字典摘掉，
+        # 让后续请求新建一把锁并行重算，single-flight 失效。
+        if entry.refs == 0 and _snapshot_locks.get(key) is entry:
+            _snapshot_locks.pop(key, None)
+
+
+def _reclaim_idle_snapshot_locks() -> None:
+    """回收既不在快照缓存中、也无人取用的锁，防止高基数 reference_date 造成锁字典泄漏。"""
+    for stale_key in [
+        k for k, entry in _snapshot_locks.items()
+        if k not in _snapshot_cache and entry.refs == 0 and not entry.lock.locked()
+    ]:
+        _snapshot_locks.pop(stale_key, None)
 
 
 def clear_rfm_snapshot_cache() -> None:
-    """清空 RFM 进程内快照；数据源变更后调用。"""
+    """清空 RFM 进程内快照；数据源变更后调用。
+
+    只清数据、不整表清锁：order_event_service 在请求处理过程中就会调用本函数，
+    此时可能有协程正持有快照锁，连带清空锁字典会让它们各跑各的重计算。
+    空闲锁由下一次重建时的回收路径处理。
+    """
     _snapshot_cache.clear()
-    _snapshot_locks.clear()
-    _snapshot_lock_refs.clear()
+    _reclaim_idle_snapshot_locks()
 
 
 def _summary_from_snapshot(snapshot: dict) -> dict:
@@ -409,11 +444,11 @@ async def get_rfm_overview(
     segment_distribution = [{"segment": s["segment"], "count": s["count"], "percentage": s["percentage"]} for s in segments]
     monetary_distribution = [{"segment": s["segment"], "total_monetary": s["total_monetary"], "avg_monetary": s["avg_monetary"]} for s in segments]
 
-    high_value = [s for s in segments if s["segment"] in _HIGH_VALUE_SEGMENTS]
+    high_value = [s for s in segments if s["segment"] in HIGH_VALUE_SEGMENTS]
     high_value_count = sum(s["count"] for s in high_value)
     high_value_monetary = sum(s["total_monetary"] for s in high_value)
 
-    at_risk = [s for s in segments if s["segment"] in _AT_RISK_SEGMENTS]
+    at_risk = [s for s in segments if s["segment"] in AT_RISK_SEGMENTS]
     at_risk_count = sum(s["count"] for s in at_risk)
 
     total_users = rfm_data["total_users"] or 1

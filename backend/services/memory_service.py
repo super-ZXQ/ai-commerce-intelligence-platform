@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.dialects.mysql import insert
@@ -38,8 +38,16 @@ def normalize_memory_key(key: str) -> str:
     return normalized
 
 
+def _utc_now_naive() -> datetime:
+    """DATETIME 列的统一时钟基：不带时区、语义为 UTC。"""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 def _active_clause():
-    return or_(AgentMemoryFact.expires_at.is_(None), AgentMemoryFact.expires_at > func.now())
+    # 写入端和过滤端必须用同一个时钟。MySQL 的 func.now() 取 @@session.time_zone，
+    # 而它由部署决定（本项目当前容器返回 +08），用它比较本应用写出的 UTC 时间会让 TTL
+    # 随部署漂移，所以有效期判断只在应用时钟基内自洽。
+    return or_(AgentMemoryFact.expires_at.is_(None), AgentMemoryFact.expires_at > _utc_now_naive())
 
 
 async def recall_memories(owner: str) -> list[MemoryFact]:
@@ -69,8 +77,9 @@ async def remember_turn(turn: MemoryTurn) -> int:
     if not facts:
         return 0
 
+    # expires_at 与 _active_clause() 同一时钟基；混用 func.now() 会让 TTL 随部署时区偏移。
     expires_at = (
-        datetime.now() + timedelta(days=settings.agent_memory_ttl_days)
+        _utc_now_naive() + timedelta(days=settings.agent_memory_ttl_days)
         if settings.agent_memory_ttl_days > 0
         else None
     )

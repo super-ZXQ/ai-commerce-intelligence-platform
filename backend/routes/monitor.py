@@ -11,8 +11,9 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import text
 
-from backend.database import check_db_connection
+from backend.database import async_session_factory, check_db_connection
 from backend.utils.auth import SCOPE_ADMIN_MANAGE, require_scope
 from backend.utils.cache import check_redis_health
 from backend.utils.cache import stats as cache_stats
@@ -114,11 +115,32 @@ async def get_metrics():
     }
 
 
+async def _db_clock_basis() -> dict:
+    """服务端时钟相对 UTC 的偏移；应用写出的 DATETIME 一律是 UTC-naive。"""
+    async with async_session_factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT @@session.time_zone, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW())")
+            )
+        ).fetchone()
+    offset = int(row[1] or 0)
+    return {
+        "session_time_zone": str(row[0]),
+        "now_minus_utc_seconds": offset,
+        "utc_aligned": offset == 0,
+    }
+
+
 @router.get("/health/detailed", summary="详细健康检查")
 async def detailed_health():
     checks = {}
     try:
-        checks["database"] = {"status": "ok" if await check_db_connection() else "error"}
+        db_ok = await check_db_connection()
+        checks["database"] = {"status": "ok" if db_ok else "error"}
+        if db_ok:
+            # 只观测、不影响整体状态：偏移取部署的 MySQL 时区，任何用 func.now()
+            # 和 UTC-naive 列比较的地方都会静默偏移同样的小时数。
+            checks["database"]["clock"] = await _db_clock_basis()
     except Exception as exc:  # noqa: BLE001 - 健康检查必须覆盖所有驱动异常
         # 驱动异常可能包含主机名、用户名与端口，只入服务端日志，不回显给调用方。
         logger.warning("详细健康检查数据库探测失败: %s", sanitize_error(exc))

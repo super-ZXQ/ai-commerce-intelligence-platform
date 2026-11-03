@@ -8,7 +8,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from backend.utils.rfm_scoring import assign_segment
+from backend.utils.rfm_scoring import (
+    AT_RISK_SEGMENTS,
+    HIGH_VALUE_SEGMENTS,
+    assign_segment,
+)
 from bi_api import BiApiClient, BiApiError, BiAuthError, BiPermissionError
 from bi_rfm import score_rfm_frame
 from bi_style import BI_DASHBOARD_CSS
@@ -397,14 +401,13 @@ elif page == "RFM 客户分层":
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     with tab1:
         # ── KPI 指标卡 ──
-        # 业务定义：高价值客户 = 全部"重要"前缀的 4 个分层（近期活跃 + 任一F/M高）
-        # 与 RFM 标准术语对齐：包括 重要价值/发展/保持/挽留 客户
-        high_value_segments = ["重要价值客户", "重要发展客户", "重要保持客户", "重要挽留客户"]
-        high_value_mask = rfm['客户分层'].astype(str).isin(high_value_segments)
+        # 口径与 /api/rfm/overview 同源（backend/utils/rfm_scoring 单一定义）：
+        # 高价值 = 重要价值/发展/保持；重要挽留属流失预警，两边不重复计数。
+        high_value_mask = rfm['客户分层'].astype(str).isin(HIGH_VALUE_SEGMENTS)
         high_value_count = int(high_value_mask.sum())
         high_value_pct = high_value_count / total_users * 100 if total_users > 0 else 0
 
-        risk_mask = rfm['客户分层'].astype(str).isin(["一般挽留客户"])
+        risk_mask = rfm['客户分层'].astype(str).isin(AT_RISK_SEGMENTS)
         risk_count = int(risk_mask.sum())
         risk_pct = risk_count / total_users * 100 if total_users > 0 else 0
 
@@ -418,14 +421,14 @@ elif page == "RFM 客户分层":
                 f"{high_value_pct:.1f}%",
                 delta=f"目标 ≥30%  {'达标' if high_value_pct >= 30 else '未达标'}",
             )
-            st.caption("重要价值 + 重要发展 + 重要保持 + 重要挽留")
+            st.caption("重要价值 + 重要发展 + 重要保持（与 /api/rfm 同口径）")
         with k2:
             st.metric(
                 "流失风险客户",
                 f"{risk_count:,}",
                 delta=f"占比 {risk_pct:.1f}%  {'预警' if risk_pct > 50 else '可控'}",
             )
-            st.caption("一般挽留客户（R低/F低/M低）")
+            st.caption("重要挽留客户（近期活跃但低频低额，与 /api/rfm 同口径）")
         with k3:
             st.metric(
                 "高价值GMV贡献率",

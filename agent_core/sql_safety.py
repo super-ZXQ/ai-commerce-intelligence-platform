@@ -12,6 +12,11 @@ _MYSQL_TIMEOUT_HINT = "MAX_EXECUTION_TIME"
 # 避免只改其中一层造成"校验通过但执行时全量物化"。
 DEFAULT_MAX_ROWS = 500
 
+# 咨询锁与 sleep/benchmark 同类：不返回业务数据，却能长时间占住一条连接。
+_DANGEROUS_FUNCTIONS = frozenset(
+    {"sleep", "benchmark", "load_file", "get_lock", "release_lock", "is_free_lock"}
+)
+
 
 class SQLValidationError(ValueError):
     pass
@@ -27,6 +32,37 @@ def _integer_limit(value: exp.Expression | None) -> int | None:
         except (TypeError, ValueError):
             return None
     return None
+
+
+def _strip_optimizer_hints(expression: exp.Expression) -> None:
+    """丢弃模型注入的全部优化器提示，执行时限稍后由 apply_execution_guard 唯一注入。
+
+    提示不参与执行计划校验，却能反向拆掉本层的防线：SET_VAR(max_execution_time=0)
+    关掉服务端超时、SET_VAR(join_buffer_size=...) 放大内存、JOIN_ORDER 改写连接顺序，
+    而 apply_execution_guard 只重写第一个 SELECT 的提示，UNION 右臂与子查询里的
+    提示会原样下发，因此必须在 AST 层整体清除。
+    """
+    for node in list(expression.walk()):
+        if node.args.get("hint") is not None:
+            node.set("hint", None)
+
+
+def _reject_unsafe_nested_limits(expression: exp.Expression, max_rows: int) -> None:
+    """拒绝子查询与 UNION 分支里超限或不可证明的 LIMIT。
+
+    根节点的 LIMIT 可以安全改写；子查询的 LIMIT 一旦被静默收敛，
+    "取 99 万行再聚合"就变成"取 500 行再聚合"，返回的是一个看起来正确的错误数字。
+    宁可对模型报错让它重写，也不能产出失真口径。
+    """
+    for node in expression.walk():
+        if node is expression or not isinstance(node, exp.Query):
+            continue
+        limit = node.args.get("limit")
+        if limit is None:
+            continue
+        value = _integer_limit(limit.expression)
+        if value is None or value < 0 or value > max_rows:
+            raise SQLValidationError("子查询的 LIMIT 超出上限或无法证明为安全整数")
 
 
 def validate_and_limit_sql(
@@ -63,24 +99,34 @@ def validate_and_limit_sql(
     if any(expression.find(node_type) is not None for node_type in forbidden):
         raise SQLValidationError("查询包含写入或结构变更操作")
 
-    dangerous_functions = {"sleep", "benchmark", "load_file"}
     if any(
-        isinstance(node, exp.Anonymous) and node.name.lower() in dangerous_functions
+        isinstance(node, exp.Anonymous) and node.name.lower() in _DANGEROUS_FUNCTIONS
         for node in expression.walk()
     ):
         raise SQLValidationError("查询包含不允许的数据库函数")
+
+    # 提示必须在表白名单校验前清除：SET_VAR 之类只有在这里才会被处理，
+    # 一旦放行就随 SQL 文本一路下发到数据库。
+    _strip_optimizer_hints(expression)
+    _reject_unsafe_nested_limits(expression, max_rows)
 
     join_count = sum(1 for node in expression.walk() if isinstance(node, exp.Join))
     if join_count > max_joins:
         raise SQLValidationError(f"查询包含 {join_count} 个 JOIN，超出 {max_joins} 个上限")
 
     cte_names = {cte.alias_or_name.lower() for cte in expression.find_all(exp.CTE)}
+    allowed_names = {name.lower() for name in allowed_tables}
+    # CTE 与授权表同名会让 "WITH orders AS (SELECT '假数据' AS x) SELECT * FROM orders"
+    # 通过白名单（下面按 CTE 名剔除是有意为之），把模型自己造的行当作真实查询结果返回。
+    shadowed = cte_names & allowed_names
+    if shadowed:
+        raise SQLValidationError(f"CTE 名称与授权表重名，会伪造查询结果：{sorted(shadowed)}")
     tables = list(expression.find_all(exp.Table))
     # 只比较裸表名会让 otherdb.orders 绕过白名单；所有表都不允许带库名/目录前缀。
     if any(table.db or table.catalog for table in tables):
         raise SQLValidationError("查询不允许使用库名或目录前缀")
     table_names = {table.name.lower() for table in tables} - cte_names
-    if table_names - {name.lower() for name in allowed_tables}:
+    if table_names - allowed_names:
         raise SQLValidationError("查询访问了未授权的数据表")
 
     limit = expression.args.get("limit")

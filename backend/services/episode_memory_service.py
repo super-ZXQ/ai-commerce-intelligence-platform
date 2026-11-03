@@ -8,9 +8,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects.mysql import insert
 
 from agent_core.memory import (
@@ -42,8 +42,18 @@ class EpisodeRecord:
     has_vector: bool
 
 
+def _utc_now_naive() -> datetime:
+    """DATETIME 列的统一时钟基：不带时区、语义为 UTC。"""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 def _active_clause():
-    return or_(AgentMemoryEpisode.expires_at.is_(None), AgentMemoryEpisode.expires_at > func.now())
+    # 与 save_episode 写 expires_at 用的是同一个应用时钟；func.now() 的时区由 MySQL
+    # 会话决定，跨基比较会让 TTL 在不同部署下偏移不同小时数。
+    return or_(
+        AgentMemoryEpisode.expires_at.is_(None),
+        AgentMemoryEpisode.expires_at > _utc_now_naive(),
+    )
 
 
 def _cosine(left: list[float], right: list[float]) -> float:
@@ -111,8 +121,9 @@ async def save_episode(turn: EpisodeTurn) -> bool:
     if not summary:
         return False
 
+    # 与 _active_clause() 同一时钟基，避免 expires_at 和有效期判断分属两套时间。
     expires_at = (
-        datetime.now() + timedelta(days=settings.agent_episode_ttl_days)
+        _utc_now_naive() + timedelta(days=settings.agent_episode_ttl_days)
         if settings.agent_episode_ttl_days > 0
         else None
     )
@@ -141,7 +152,7 @@ async def save_episode(turn: EpisodeTurn) -> bool:
             delete(AgentMemoryEpisode).where(
                 AgentMemoryEpisode.owner == turn.owner,
                 AgentMemoryEpisode.expires_at.is_not(None),
-                AgentMemoryEpisode.expires_at <= func.now(),
+                AgentMemoryEpisode.expires_at <= _utc_now_naive(),
             )
         )
         keep_ids = (

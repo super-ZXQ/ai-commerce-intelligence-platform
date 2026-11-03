@@ -249,6 +249,25 @@ class TestSessionCookie:
         # 同一个 Bearer Token 在登出后必须立即失效。
         assert (await client.get("/api/orders", headers=headers)).status_code == 401
 
+    @pytest.mark.asyncio
+    async def test_page_logout_also_revokes_bearer_token(
+        self, client: AsyncClient, temp_identity: dict
+    ):
+        """GET /logout 是 AI 助手与浏览器实际使用的退出入口，不能只删 Cookie。
+
+        两条登出通道若分头实现，页面通道会漏掉 token_version 递增，
+        已泄露的 Bearer Token 仍可用到 jwt_expire_minutes 到期。
+        """
+        token = await _login(client, temp_identity["viewer"], "viewer-pass-123")
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (await client.get("/api/orders", headers=headers)).status_code == 200
+
+        logout = await client.get("/logout")
+        assert logout.status_code == 303
+
+        assert (await client.get("/api/orders", headers=headers)).status_code == 401
+        assert (await client.get("/api/auth/verify")).status_code == 401
+
 
 class TestRoleAndAccountState:
     @pytest.mark.asyncio

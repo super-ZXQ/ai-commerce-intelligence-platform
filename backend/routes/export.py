@@ -190,9 +190,15 @@ async def export_rfm_segment(
     segment: str = Query(..., description="RFM 分群名称"),
     reference_date: date | None = Query(None, description="参考日期 YYYY-MM-DD"),
     n_bins: int = Query(5, ge=3, le=10, description="分位数分组数"),
-    r_threshold: int = Query(3, ge=2, le=10, description="R 评分阈值"),
-    f_threshold: int = Query(3, ge=2, le=10, description="F 评分阈值"),
-    m_threshold: int = Query(3, ge=2, le=10, description="M 评分阈值"),
+    r_threshold: int | None = Query(
+        None, ge=2, le=10, description="R 评分阈值；缺省按 n_bins 推导，与 BI 页面同口径"
+    ),
+    f_threshold: int | None = Query(
+        None, ge=2, le=10, description="F 评分阈值；缺省按 n_bins 推导，与 BI 页面同口径"
+    ),
+    m_threshold: int | None = Query(
+        None, ge=2, le=10, description="M 评分阈值；缺省按 n_bins 推导，与 BI 页面同口径"
+    ),
     limit: int = Query(200, ge=1, le=1000, description="导出条数"),
     db: AsyncSession = Depends(get_db),
     _principal: Principal = Depends(require_scope(SCOPE_DATA_EXPORT)),
@@ -203,7 +209,10 @@ async def export_rfm_segment(
             status_code=400,
             detail=f"无效分群名称: {segment}，可选值: {rfm_service.VALID_SEGMENTS}",
         )
-    if max(r_threshold, f_threshold, m_threshold) > n_bins:
+    # 阈值缺省时交给服务层按 max(2, ceil(n_bins*0.6)) 推导：这里写死默认 3
+    # 会让 n_bins=10 的导出人群与页面分群完全是两拨人，而文档声称同口径。
+    explicit_thresholds = [t for t in (r_threshold, f_threshold, m_threshold) if t is not None]
+    if explicit_thresholds and max(explicit_thresholds) > n_bins:
         raise HTTPException(status_code=400, detail="评分阈值不能大于分位数分组数")
 
     rows = await rfm_service.get_rfm_segment_export_rows(

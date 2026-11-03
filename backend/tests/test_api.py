@@ -1,4 +1,5 @@
 import asyncio
+import math
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -580,6 +581,32 @@ class TestRFMExport:
         )
         assert invalid_threshold.status_code == 400
 
+    @pytest.mark.asyncio
+    async def test_rfm_export_threshold_defaults_match_page(self, authed_client: AsyncClient):
+        """缺省阈值必须等于服务层按 n_bins 推导的页面口径，而不是写死的 3。
+
+        路由写死默认 3 时，n_bins=10 的导出人群与 /api/rfm/segments 的分群是两拨人，
+        而接口文档声称同口径——这类"同名不同义"最难被使用者发现。
+        """
+        segments = (await authed_client.get("/api/rfm/segments", params={"n_bins": 10})).json()
+        derived = segments["score_threshold"]
+        assert derived == max(2, math.ceil(10 * 0.6))
+        assert derived != 3  # 旧的写死默认值在本参数组合下就是错口径
+
+        params = {"segment": "重要价值客户", "n_bins": 10, "limit": 500}
+        default_export = await authed_client.get("/api/export/rfm-segment", params=params)
+        explicit_export = await authed_client.get(
+            "/api/export/rfm-segment",
+            params={
+                **params,
+                "r_threshold": derived,
+                "f_threshold": derived,
+                "m_threshold": derived,
+            },
+        )
+        assert default_export.status_code == 200, default_export.text
+        assert default_export.text == explicit_export.text
+
 
 class TestRFMPageBackendConsistency:
     @pytest.mark.asyncio
@@ -934,6 +961,15 @@ class TestMonitor:
         r = await authed_client.get("/api/monitor/health/detailed")
         assert r.status_code == 200
         assert "checks" in r.json()
+
+    @pytest.mark.asyncio
+    async def test_detailed_health_reports_db_clock_basis(self, authed_client: AsyncClient):
+        """服务端时钟偏移必须可见：应用把 DATETIME 统一写成 UTC-naive，偏移会让
+        任何和 func.now() 比较的有效期静默错位。"""
+        r = await authed_client.get("/api/monitor/health/detailed")
+        clock = r.json()["checks"]["database"]["clock"]
+        assert isinstance(clock["session_time_zone"], str)
+        assert clock["utc_aligned"] is (clock["now_minus_utc_seconds"] == 0)
 
 
 class TestRateLimiting:

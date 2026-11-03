@@ -45,6 +45,15 @@ class TestProductionConfigFailFast:
         with pytest.raises(ValueError, match="CACHE_TTL_SECONDS"):
             _settings(cache_ttl_seconds=0)
 
+    def test_outbound_prompt_budget_limits_are_bounded(self):
+        """出域预算配错必须启动即失败：过小会让结果集一行都发不出去。"""
+        with pytest.raises(ValueError, match="AGENT_PROMPT_ROWS_MAX_CHARS"):
+            _settings(agent_prompt_rows_max_chars=100)
+        with pytest.raises(ValueError, match="AGENT_LLM_MAX_OUTPUT_TOKENS"):
+            _settings(agent_llm_max_output_tokens=32)
+        with pytest.raises(ValueError, match="AGENT_LLM_MAX_OUTPUT_TOKENS"):
+            _settings(agent_llm_max_output_tokens=200_000)
+
     def test_managed_key_rejects_non_https_base_url(self):
         with pytest.raises(ValueError, match="https"):
             _settings(llm_api_key="sk-test", llm_base_url="http://api.deepseek.com")

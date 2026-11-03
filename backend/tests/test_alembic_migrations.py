@@ -327,6 +327,60 @@ def test_alembic_upgrade_head_on_mysql_if_available():
     engine.dispose()
 
 
+def _normalize_mysql_type(value: str) -> str:
+    """压成可比较形式：MySQL 里 NUMERIC≡DECIMAL、INTEGER≡INT，只是同义词。"""
+    return value.lower().replace(" ", "").replace("numeric", "decimal").replace("integer", "int")
+
+
+def test_orm_column_types_match_migrated_schema_on_mysql_if_available():
+    """ORM 列型必须等于迁移实际建出的列型，防止模型与生产 schema 各自漂移。
+
+    后果不是纸面的：backend/scripts/migrate_event_schema.py 仍走 create_all，
+    ORM 写 INT 就建出比生产窄的主键，写 NUMERIC(10,2) 就装不下真实 GMV。
+    """
+    if os.environ.get("SKIP_MYSQL_ALEMBIC") == "1":
+        pytest.skip("SKIP_MYSQL_ALEMBIC=1")
+    ok, s, exc = _mysql_ready()
+    if not ok:
+        pytest.skip(f"MySQL unavailable: {exc}")
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.dialects import mysql
+
+    from backend.database import Base
+    from backend.models import database_models  # noqa: F401 - 注册全部 ORM 表，否则元数据为空
+
+    _alembic("upgrade", "head")
+
+    engine = create_engine(s.database_url)
+    try:
+        with engine.connect() as c:
+            live = {
+                (row[0], row[1]): row[2]
+                for row in c.execute(
+                    text(
+                        "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE "
+                        "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()"
+                    )
+                )
+            }
+        mapped = Base.metadata.sorted_tables
+        assert len(mapped) >= 8, f"ORM 元数据只有 {len(mapped)} 张表，守卫会空转"
+        unmapped = {t.name for t in mapped} - {name for name, _ in live}
+        assert not unmapped, f"迁移后仍缺表: {sorted(unmapped)}"
+
+        drift = []
+        for table in mapped:
+            for column in table.columns:
+                orm_type = _normalize_mysql_type(str(column.type.compile(dialect=mysql.dialect())))
+                db_type = _normalize_mysql_type(live[(table.name, column.name)])
+                if orm_type != db_type:
+                    drift.append(f"{table.name}.{column.name}: ORM={orm_type} DDL={db_type}")
+        assert not drift, "ORM 与迁移 DDL 列型漂移:\n" + "\n".join(drift)
+    finally:
+        engine.dispose()
+
+
 def test_migration_preserves_existing_rows_on_mysql_if_available():
     """upgrade head must not wipe business rows."""
     if os.environ.get("SKIP_MYSQL_ALEMBIC") == "1":
