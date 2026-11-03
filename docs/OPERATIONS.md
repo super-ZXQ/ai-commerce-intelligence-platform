@@ -13,6 +13,18 @@
   不解决淘汰隔离。
 - 不在本文档范围内：多租户、在线支付、计费、PITR、自动故障转移。
 
+### 1.1 时间口径
+
+- **业务时间**：`order_time` / `order_date` / `payment_time` / `order_hour` / `weekday`
+  按 CSV 的 Asia/Shanghai 墙钟存储，不做 UTC 换算；不要把这些列当时间戳做跨时区转换。
+- **运维时间**：`created_at` / `updated_at` / `processed_at` / `expires_at` / `occurred_at`
+  统一为 UTC-naive。MySQL 容器已固定 `TZ=UTC` 与 `--default-time-zone=+00:00`，
+  `CURRENT_TIMESTAMP` 默认值与应用写入的 UTC 对齐。
+- **事件时间**：`occurred_at` 按 UTC 解释，naive 输入视为 UTC；订单读模型的
+  `order_time` 会从事件时间换算到 Asia/Shanghai 墙钟后再落库。
+- **历史数据**：cutover 前由 `CURRENT_TIMESTAMP` 写入的运维时间可能是 +08；
+  本次不做回填，内存/情节 TTL 记录自然过期，跨系统审计排序以 cutover 后数据为准。
+
 ## 2. 服务级别目标（内部目标，非合同 SLA）
 
 | 指标 | 目标 | 测量来源 | 当前状态 |

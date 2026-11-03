@@ -28,11 +28,18 @@ _OUTPUT_COLUMNS = [
 ]
 
 
+_BUSINESS_TZ = "Asia/Shanghai"
+
+
 def _business_day(value) -> pd.Timestamp:
-    """把带/不带时区的参考时间统一为 UTC 日历日，与后端 UTC-naive 日期一致。"""
+    """把带/不带时区的参考时间统一为 Asia/Shanghai 业务日历日。
+
+    业务日期列（order_date/order_time）是墙钟，不做 UTC 换算；只有带时区的
+    输入才需要先落到 Asia/Shanghai，避免用 UTC 日期把跨天订单算错。
+    """
     timestamp = pd.Timestamp(value)
     if timestamp.tzinfo is not None:
-        timestamp = timestamp.tz_convert("UTC").tz_localize(None)
+        timestamp = timestamp.tz_convert(_BUSINESS_TZ).tz_localize(None)
     return timestamp.normalize()
 
 
@@ -64,7 +71,7 @@ def score_rfm_frame(
     ]
     order_times = frame["order_time"]
     if order_times.dt.tz is not None:
-        order_times = order_times.dt.tz_convert("UTC").dt.tz_localize(None)
+        order_times = order_times.dt.tz_convert(_BUSINESS_TZ).dt.tz_localize(None)
     order_time_dates = order_times.dt.normalize()
     if _OPTIONAL_DATE_COLUMN in frame.columns:
         # order_date 是后端所有日期筛选/ RFM 的规范日期；仅在缺失时回退到

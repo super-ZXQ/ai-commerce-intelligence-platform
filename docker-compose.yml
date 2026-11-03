@@ -8,6 +8,10 @@ services:
       MYSQL_DATABASE: ${DB_NAME:-ai_commerce_intelligence_platform}
       MYSQL_CHARSET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
+      # 运维时间戳统一 UTC：应用写入的 DATETIME 与 CURRENT_TIMESTAMP 默认值
+      # 必须使用同一时钟；业务日期列（order_date/order_time）仍是上海墙钟。
+      TZ: UTC
+    command: ["--default-time-zone=+00:00"]
     expose:
       - "3306"
     volumes:

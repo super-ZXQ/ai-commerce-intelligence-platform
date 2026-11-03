@@ -14,7 +14,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
@@ -24,6 +24,11 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 logger = logging.getLogger("reconcile_orders")
+
+
+def _utc_now_naive() -> datetime:
+    """运维审计时间统一为 UTC-naive，与 orders.updated_at 的约定一致。"""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 APPLY_CONFIRMATION = "RECONCILE ORDER STATUS"
 _LOCK_NAME = "ea_orders_reconcile"
@@ -129,7 +134,7 @@ def run_reconcile(
                         "sha": "0" * 64,
                         "operator": operator[:100],
                         "rows": limit,
-                        "ts": datetime.now(),
+                        "ts": _utc_now_naive(),
                     },
                 ).lastrowid
             )
@@ -159,7 +164,7 @@ def run_reconcile(
                             "WHERE order_id = :order_id AND order_status = 'ACTIVE' "
                             "AND event_version = 0 AND updated_at IS NULL"
                         ),
-                        {"order_id": order_id, "now": datetime.now()},
+                        {"order_id": order_id, "now": _utc_now_naive()},
                     ).rowcount
                     if not changed:
                         skipped += 1
@@ -174,7 +179,7 @@ def run_reconcile(
                             "run_id": run_id,
                             "order_id": order_id,
                             "reason": "历史 is_refund=是 且无事件账本",
-                            "ts": datetime.now(),
+                            "ts": _utc_now_naive(),
                         },
                     )
                     updated += 1
@@ -190,7 +195,7 @@ def run_reconcile(
                 ),
                 {
                     "updated": updated,
-                    "ts": datetime.now(),
+                    "ts": _utc_now_naive(),
                     "notes": f"skipped={skipped}",
                     "id": run_id,
                 },

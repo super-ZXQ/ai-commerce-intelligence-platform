@@ -3,7 +3,7 @@ import logging
 import math
 import time
 from collections import OrderedDict
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import and_, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -172,7 +172,8 @@ async def _build_rfm_snapshot(
 ) -> dict:
     """计算一份完整 RFM 快照，供汇总、分页和 TOP 用户共同复用。"""
     if reference_date:
-        ref_date = datetime.strptime(reference_date, "%Y-%m-%d").replace(tzinfo=UTC).date()
+        # 业务日期是墙钟日期：解析成 date 后不附加任何时区。
+        ref_date = datetime.strptime(reference_date, "%Y-%m-%d").date()
     else:
         max_date_stmt = select(func.max(Order.order_date))
         result = await db.execute(max_date_stmt)

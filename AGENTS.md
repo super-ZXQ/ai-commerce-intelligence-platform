@@ -91,6 +91,7 @@ ENTERPRISE_COLORS_FULL = {
 - **生产环境 AI 只读账号** — `DEBUG=false` 时必须配置 `AI_DB_USER`/`AI_DB_PASSWORD`，禁止回落主库 root/admin 账号
 - **默认单 worker** — `backend/main.py` 启动守卫检测 `WEB_CONCURRENCY` / `GUNICORN_WORKERS` / `UVICORN_WORKERS` / `--workers`；大于 1 且未设置 `ALLOW_MULTI_WORKER=true` 时拒绝启动（进程内限流与 AI 并发会按 worker 放大）
 - **登录失败锁定** — 按「账号+客户端 IP」计数，5 次/5 分钟触发 5 分钟锁定，成功登录清零；禁止改成全局账号锁定（可被用来锁死 admin）
+- **时间口径** — 业务列（`order_time`/`order_date`/`payment_time`/`order_hour`/`weekday`）是 Asia/Shanghai 墙钟；运维列（`created_at`/`updated_at`/`expires_at`/`occurred_at`）是 UTC-naive。MySQL 固定 `--default-time-zone=+00:00`，禁止把业务时间做 UTC 换算
 - **角色默认权限不写入 `scopes` 列** — 鉴权时 `effective_scopes()` 取「角色默认 ∪ 显式权限」，把角色默认值持久化会让后续收紧角色对已有账号失效（旧值被并集加回来）。`manage_auth create-user` 只在 `--scopes` 时存追加权限
 - **公开探针必须边缘限流** — `/readyz` 每次占用业务库、事件库、认证库三个连接并 ping Redis；应用内限流把这些路径排除在桶外，因此必须由 Nginx `probe_edge` zone 兜底
 

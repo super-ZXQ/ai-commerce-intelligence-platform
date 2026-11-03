@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -29,11 +30,21 @@ _PROCESSED = "PROCESSED"
 _REJECTED = "REJECTED"
 
 
+_BUSINESS_TZ = ZoneInfo("Asia/Shanghai")
+
+
 def _utc_naive(value: datetime) -> datetime:
-    """MySQL DATETIME 不保存时区；统一落 UTC，避免事件源时区影响版本时序审计。"""
+    """MySQL DATETIME 不保存时区；运维/事件时间统一落 UTC。"""
     if value.tzinfo is None:
         return value
     return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def _business_naive(value: datetime) -> datetime:
+    """业务日期/时间按 Asia/Shanghai 墙钟落库，不做 UTC 换算。"""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(_BUSINESS_TZ).replace(tzinfo=None)
 
 
 def _utc_now_naive() -> datetime:
@@ -109,6 +120,7 @@ def _new_order(
     order_seq_id 为 None 时由数据库分配，避免并发事务读取相同的最大值。
     显式主键参数保留给需要导入已有编号的调用方。
     """
+    order_time = _business_naive(order_time)
     return Order(
         id=order_seq_id,
         order_no=event.order_id,
@@ -170,7 +182,9 @@ async def _apply_in_transaction(db: AsyncSession, event: OrderEventInput) -> Ord
                 return _reject(ledger, event, "事件版本不高于当前订单版本")
             return _reject(ledger, event, "订单已存在，拒绝重复创建")
         payload = OrderCreatedPayload.model_validate(event.payload)
-        order_time = _utc_naive(payload.order_time or event.occurred_at)
+        # 业务日期字段看的是 Asia/Shanghai 墙钟；事件 occurred_at 是 UTC，
+        # 缺失 payload.order_time 时必须先换算到业务时区，否则日期/小时会跨天。
+        order_time = _business_naive(payload.order_time or event.occurred_at)
         # 自增由数据库原子分配；历史卷须先执行 Alembic 升级。
         db.add(_new_order(event, payload, order_time))
         await _bump_data_version(db)

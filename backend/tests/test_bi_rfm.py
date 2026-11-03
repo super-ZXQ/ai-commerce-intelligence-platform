@@ -42,6 +42,26 @@ def test_missing_columns_are_rejected():
         score_rfm_frame(pd.DataFrame([{"user_name": "u1"}]), date(2026, 1, 31))
 
 
+def test_tz_aware_order_time_uses_shanghai_business_day():
+    """带时区的 order_time 必须先落到上海墙钟，不能按 UTC 日期切业务日。"""
+    orders = pd.DataFrame(
+        [
+            {
+                "user_name": "u1",
+                "order_time": "2026-01-31T16:30:00+00:00",
+                "order_no": "O1",
+                "payment_amount": 10.0,
+            },
+        ]
+    )
+
+    # 16:30 UTC = 02-01 00:30 上海；参考日 01-31 时该订单属于未来，不进入 RFM。
+    assert score_rfm_frame(orders, date(2026, 1, 31), n_bins=5).empty
+
+    rfm = score_rfm_frame(orders, date(2026, 2, 1), n_bins=5)
+    assert rfm.loc[0, "recency_days"] == 0
+
+
 def test_order_date_is_the_canonical_business_date():
     """order_date 存在时必须优先使用，不能再用 order_time 算第二套 R 口径。"""
     orders = pd.DataFrame(

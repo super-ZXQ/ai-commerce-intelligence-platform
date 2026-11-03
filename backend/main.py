@@ -18,6 +18,7 @@ from backend.database import (
     check_auth_db_connection,
     check_db_connection,
     check_event_db_connection,
+    db_clock_offset_seconds,
     engine,
     event_engine,
 )
@@ -129,6 +130,14 @@ async def lifespan(app: FastAPI):
     if not await check_db_connection():
         # 生产 API 不应以“表面存活、业务接口全部失败”的状态继续运行。
         raise RuntimeError("数据库连接失败，终止后端启动")
+    clock_offset = await db_clock_offset_seconds()
+    if clock_offset:
+        # 应用写 UTC-naive，MySQL 的 CURRENT_TIMESTAMP 默认值却按会话时区；
+        # 非 0 偏移会让 memory/episode 等依赖 server_default 的列混用两套时间。
+        logger.warning(
+            "⚠️ MySQL 会话时区相对 UTC 偏移 %s 秒；请设置 --default-time-zone=+00:00",
+            clock_offset,
+        )
     logger.info("✅ 数据库连接检查完成")
     if not await check_event_db_connection():
         raise RuntimeError("事件数据库连接失败，终止后端启动")

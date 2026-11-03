@@ -1,7 +1,7 @@
 """最小可复现测试：ORDER_CREATED 主键分配与 sales-trend NULL period。"""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 import asyncio
 import os
@@ -43,6 +43,19 @@ def test_new_order_assigns_explicit_seq_id():
     assert order.payment_amount == Decimal("80.00")
     assert order.order_status == "ACTIVE"
     assert order.event_version == 1
+
+
+def test_new_order_uses_shanghai_wall_clock_for_business_fields():
+    """业务列是上海墙钟：UTC 事件时间不能直接用来算 order_date/hour/weekday。"""
+    event = _event()
+    payload = OrderCreatedPayload.model_validate(event.payload)
+    # 2026-01-31 16:30 UTC == 2026-02-01 00:30 Asia/Shanghai
+    order = _new_order(event, payload, datetime(2026, 1, 31, 16, 30, tzinfo=UTC))
+
+    assert order.order_time == datetime(2026, 2, 1, 0, 30)
+    assert order.order_date == date(2026, 2, 1)
+    assert order.order_hour == 0
+    assert order.weekday == "Sunday"
 
 
 def test_new_order_uses_database_generated_id():

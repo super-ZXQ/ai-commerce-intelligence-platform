@@ -22,7 +22,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -370,7 +370,7 @@ def _log_run_started(
                 "mode": mode,
                 "operator": operator[:100],
                 "rows_read": rows_read,
-                "started_at": datetime.now(),
+                "started_at": datetime.now(UTC).replace(tzinfo=None),
             },
         )
         return int(result.lastrowid)
@@ -397,7 +397,7 @@ def _log_run_finished(
                 "status": status,
                 "rows_imported": rows_imported,
                 "backup_table": backup_table,
-                "finished_at": datetime.now(),
+                "finished_at": datetime.now(UTC).replace(tzinfo=None),
                 "error_message": error_message,
                 "notes": notes,
                 "id": run_id,
@@ -506,7 +506,7 @@ def run_import(
         database_url = database_url_from_env()
 
     engine = create_engine(database_url, pool_pre_ping=True, pool_recycle=1800)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     suffix = uuid4().hex[:6]
     staging = f"orders_staging_{timestamp}_{suffix}"
     backup = f"orders_backup_{timestamp}_{suffix}"
@@ -567,7 +567,7 @@ def run_import(
                     "VALUES ('orders_csv_sha256', :sha), ('orders_imported_at', :ts) "
                     "ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)"
                 ),
-                {"sha": stats.sha256, "ts": datetime.now().isoformat(timespec="seconds")},
+                {"sha": stats.sha256, "ts": datetime.now(UTC).isoformat(timespec="seconds")},
             )
         _log_run_finished(
             engine,

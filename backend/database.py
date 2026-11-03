@@ -101,6 +101,19 @@ async def check_auth_db_connection() -> bool:
         return False
 
 
+async def db_clock_offset_seconds() -> int | None:
+    """MySQL 会话时区相对 UTC 的偏移；非 0 会让 CURRENT_TIMESTAMP 默认值漂移。"""
+    try:
+        async with engine.connect() as conn:
+            value = await conn.scalar(
+                text("SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW())")
+            )
+        return int(value or 0)
+    except Exception as exc:  # noqa: BLE001 - 只用于启动诊断
+        logger.warning("读取 MySQL 时区偏移失败: %s", sanitize_error(exc))
+        return None
+
+
 async def check_db_connection() -> bool:
     try:
         async with engine.connect() as conn:
