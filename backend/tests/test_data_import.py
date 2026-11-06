@@ -266,6 +266,67 @@ async def test_upload_xlsx_streaming_path(importer_client: AsyncClient, cleanup_
 
 
 @pytest.mark.asyncio
+async def test_insert_orders_safely_empty_batch_is_noop():
+    """空候选批次不能触发「仅含默认值」的 INSERT：orders 会因缺少 order_id 以 1364 中断。"""
+    from backend.services.data_import_service import _insert_orders_safely
+
+    async with async_session_factory() as session:
+        inserted, failed = await _insert_orders_safely(session, [])
+        assert inserted == []
+        assert failed == []
+
+
+@pytest.mark.asyncio
+async def test_execute_preserves_seq_id_and_refund_flag(
+    importer_client: AsyncClient, cleanup_runs, cleanup_orders
+):
+    """Core insert 必须使用列键：order_seq_id 不能退化为自增，is_refund 不能写成 NULL。"""
+    order_id = _unique_order_id()
+    seq_id = 200000 + uuid.uuid4().int % 100000
+    cleanup_orders.append(order_id)
+    header = (
+        "订单顺序编号,订单号,用户名,商品编号,订单金额,付款金额,渠道编号,平台类型,"
+        "下单时间,付款时间,是否退款,优惠金额,支付耗时_秒\n"
+    )
+    content = (
+        header
+        + f"{seq_id},{order_id},user-refund,P1,150.00,150.00,c1,APP,"
+        "2025-03-02 10:00:00,2025-03-02 10:00:05,是,0,5\n"
+    ).encode("utf-8")
+
+    response = await _upload(importer_client, content)
+    assert response.status_code == 202, response.text
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+
+    status_payload = await _wait_until(importer_client, run_id, "validated")
+    confirmed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/confirm",
+        json={"expected_sha256": status_payload["sha256"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    executed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/execute",
+        json={"confirm_token": confirmed.json()["confirm_token"]},
+    )
+    assert executed.status_code == 202, executed.text
+
+    final = await _wait_until(importer_client, run_id, "completed", timeout=20.0)
+    # 一致性校验必须真正生效：退款行的状态/事件版本要能对上账本。
+    assert final["counts"]["rows_inserted"] == 1
+    assert final["counts"]["rows_refunded"] == 1
+
+    async with async_session_factory() as session:
+        order = (
+            await session.execute(select(Order).where(Order.order_no == order_id))
+        ).scalar_one()
+        assert order.id == seq_id
+        assert order.is_refunded == "是"
+        assert order.order_status == "REFUNDED"
+        assert order.event_version == 2
+
+
+@pytest.mark.asyncio
 async def test_confirm_and_execute_import(
     importer_client: AsyncClient, cleanup_runs, cleanup_orders
 ):

@@ -1264,8 +1264,11 @@ def _order_values(row: DataImportRow, now: datetime) -> dict[str, Any]:
     if not isinstance(normalized, dict):
         raise ValueError("暂存行缺少规范化数据")
     refund = normalized.get("is_refund") == "是"
+    # 这里写的是 Core insert 的列键（Column.name），不是 ORM 属性名：
+    # Order.id 映射到 order_seq_id、is_refunded 映射到 is_refund，用属性名传参会被
+    # SQLAlchemy 的 executemany 静默丢弃，导致主键自增、退款标记为 NULL。
     return {
-        "id": normalized.get("order_seq_id"),
+        "order_seq_id": normalized.get("order_seq_id"),
         "order_id": normalized["order_id"],
         "user_name": normalized.get("user_name"),
         "product_id": normalized.get("product_id"),
@@ -1275,7 +1278,7 @@ def _order_values(row: DataImportRow, now: datetime) -> dict[str, Any]:
         "platform_type": normalized["platform_type"],
         "order_time": _wall_datetime(normalized.get("order_time")),
         "payment_time": _wall_datetime(normalized.get("payment_time")),
-        "is_refunded": "是" if refund else "否",
+        "is_refund": "是" if refund else "否",
         "discount_amount": Decimal(normalized.get("discount_amount") or "0.00"),
         "payment_duration_sec": normalized.get("payment_duration_sec") or 0,
         "order_date": date.fromisoformat(normalized["order_date"]),
@@ -1362,6 +1365,10 @@ async def _insert_orders_safely(
 ) -> tuple[list[DataImportRow], list[tuple[DataImportRow, str, str]]]:
     """批量插入，唯一键冲突时回退到逐行插入，只让冲突行失败。"""
     values = [value for _, value in pairs]
+    if not values:
+        # executemany 传空列表仍会发一条「仅含默认值」的 INSERT，
+        # 对 orders 来说必然缺少 order_id 并以 1364 中断整次执行。
+        return [], []
     try:
         async with db.begin_nested():
             await db.execute(insert(Order.__table__), values)
