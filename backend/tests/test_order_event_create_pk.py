@@ -64,6 +64,47 @@ def test_new_order_uses_database_generated_id():
     assert order.id is None
 
 
+@pytest.mark.asyncio
+async def test_freshness_uses_write_time_not_business_time():
+    """回归：历史订单补录的 occurred_at 很旧，但 freshness 必须按 processed_at 计算。"""
+    from sqlalchemy import delete
+
+    from backend.database import async_session_factory
+    from backend.models.database_models import OrderEvent
+    from backend.routes.order_events import get_event_freshness
+
+    marker = f"FRESH-{uuid4().hex[:8]}"
+    async with async_session_factory() as session:
+        session.add(
+            OrderEvent(
+                event_id=str(uuid4()),
+                order_no=marker,
+                event_type="ORDER_CREATED",
+                occurred_at=datetime(2020, 1, 1),
+                sequence=1,
+                source="freshness-test",
+                payload={},
+                processing_status="PROCESSED",
+                processed_at=datetime.now(UTC).replace(tzinfo=None),
+            )
+        )
+        await session.commit()
+        try:
+            result = await get_event_freshness(db=session, _principal=None)
+            assert set(result) >= {
+                "data_updated_at",
+                "last_event_occurred_at",
+                "last_import_at",
+                "freshness_seconds",
+            }
+            updated = datetime.fromisoformat(result["data_updated_at"])
+            expected = max((datetime.now(UTC) - updated).total_seconds(), 0)
+            assert result["freshness_seconds"] == pytest.approx(expected, abs=5)
+        finally:
+            await session.execute(delete(OrderEvent).where(OrderEvent.order_no == marker))
+            await session.commit()
+
+
 def test_lag_uses_the_stored_clock_basis():
     """回归：naive occurred_at 曾恒报 0 延迟，事件积压在指标上完全不可见。"""
     from backend.routes.order_events import _lag_seconds
