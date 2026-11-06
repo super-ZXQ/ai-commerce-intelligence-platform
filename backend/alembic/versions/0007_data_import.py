@@ -74,9 +74,13 @@ def upgrade() -> None:
                 UNIQUE KEY uq_data_import_rows_run_row (run_id, row_no),
                 KEY idx_data_import_rows_run_status (run_id, status),
                 KEY idx_data_import_rows_order (order_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """
         )
+    else:
+        # 早期版本没写 COLLATE，MySQL 8 会落到 utf8mb4_0900_ai_ci；与 orders/
+        # order_events 的 utf8mb4_unicode_ci 做等值连接会报 Illegal mix of collations。
+        _align_rows_table_collation()
 
 
 def downgrade() -> None:
@@ -100,6 +104,22 @@ def _existing_run_columns() -> set[str]:
         )
     ).fetchall()
     return {str(row[0]).lower() for row in rows}
+
+
+def _align_rows_table_collation() -> None:
+    """把已存在的暂存表对齐到 orders/order_events 的排序规则（幂等）。"""
+    bind = op.get_bind()
+    collation = bind.execute(
+        text(
+            "SELECT TABLE_COLLATION FROM information_schema.TABLES "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'data_import_rows'"
+        )
+    ).scalar()
+    if collation and str(collation).lower() != "utf8mb4_unicode_ci":
+        op.execute(
+            "ALTER TABLE data_import_rows "
+            "CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+        )
 
 
 def _table_exists(table_name: str) -> bool:

@@ -85,3 +85,25 @@ class ImportPreviewResponse(BaseModel):
     valid: list[ImportRowItem] = Field(default_factory=list)
     conflict: list[ImportRowItem] = Field(default_factory=list)
     invalid: list[ImportRowItem] = Field(default_factory=list)
+
+
+class ImportConfirmRequest(BaseModel):
+    """二次确认必须携带预览里展示的文件摘要，防止确认的不是同一份文件。"""
+
+    expected_sha256: str = Field(..., min_length=64, max_length=64)
+
+
+class ImportConfirmResponse(BaseModel):
+    run: ImportRunStatus
+    # 首次确认返回令牌；重复确认会轮换令牌，running/completed 时不再返回。
+    confirm_token: str | None = None
+
+
+class ImportExecuteRequest(BaseModel):
+    confirm_token: str = Field(..., min_length=16, max_length=128)
+
+
+class ImportResultResponse(BaseModel):
+    run: ImportRunStatus
+    failed: list[ImportRowItem] = Field(default_factory=list)
+    skipped: int = 0

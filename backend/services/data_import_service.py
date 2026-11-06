@@ -10,9 +10,14 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import hmac
+import io
 import logging
 import os
+import secrets
 import tempfile
+import uuid
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -22,20 +27,25 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import delete, func, insert, select, text, update
+from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.database import import_session_factory
-from backend.models.database_models import DataImportRow, DataImportRun, Order
+from backend.models.database_models import DataImportRow, DataImportRun, Order, OrderEvent
 from backend.models.import_schemas import (
     ImportColumnMapping,
     ImportCounts,
     ImportPreviewResponse,
+    ImportResultResponse,
     ImportRowItem,
     ImportRowPage,
     ImportRunStatus,
 )
+from backend.services.rfm_service import clear_rfm_snapshot_cache
+from backend.utils.cache import invalidate_tags
 from backend.utils.pii import mask_user_name
 from backend.utils.text_cleaner import sanitize_error
 
@@ -62,6 +72,14 @@ ROW_FAILED = "failed"
 _PREVIEW_STATUSES = (ROW_VALID, ROW_CONFLICT, ROW_INVALID)
 _ROW_PAGE_STATUSES = frozenset(
     {ROW_VALID, ROW_CONFLICT, ROW_INVALID, ROW_SKIPPED, ROW_IMPORTED, ROW_FAILED}
+)
+_FAILED_EXPORT_STATUSES = (ROW_INVALID, ROW_FAILED)
+
+# 导入互斥锁必须是稳定字符串：同一实例的多个进程/任务共用一把锁。
+_IMPORT_LOCK_NAME = ("ea_data_import_" + settings.db_name)[:64]
+# 确定性 UUIDv5 命名空间：同一文件、同一行、同一事件类型重放时得到同一 event_id。
+_IMPORT_EVENT_NAMESPACE = uuid.uuid5(
+    uuid.NAMESPACE_URL, "ai-commerce-intelligence-platform/data-import"
 )
 
 CONFLICT_POLICIES = ("reject", "skip")
@@ -94,8 +112,10 @@ class CanonicalField:
 CANONICAL_FIELDS: tuple[CanonicalField, ...] = (
     CanonicalField("order_seq_id", ("订单顺序编号", "order_seq_id"), False),
     CanonicalField("order_id", ("订单号", "order_id"), True),
-    CanonicalField("user_name", ("用户名", "user_name"), False),
-    CanonicalField("product_id", ("商品编号", "product_id"), False),
+    # 用户名与商品编号虽非订单主键，但 BI/RFM 依赖二者做分层与商品分析：
+    # 缺列时整批数据都无法进入分析口径，因此在表头阶段就拒绝。
+    CanonicalField("user_name", ("用户名", "user_name"), True),
+    CanonicalField("product_id", ("商品编号", "product_id"), True),
     CanonicalField("order_amount", ("订单金额", "order_amount"), True),
     CanonicalField("payment_amount", ("付款金额", "payment_amount"), True),
     CanonicalField("channel_id", ("渠道编号", "channel_id"), False),
@@ -388,7 +408,11 @@ def normalize_row(raw: dict[str, str], sources: dict[str, str]) -> tuple[dict[st
         order_seq_id = None
 
     user_name = _clean_text(value_of("user_name"), "用户名", 100, errors)
+    if not user_name:
+        errors.append(("REQUIRED_FIELD", "用户名不能为空"))
     product_id = _clean_text(value_of("product_id"), "商品编号", 50, errors)
+    if not product_id:
+        errors.append(("REQUIRED_FIELD", "商品编号不能为空"))
     channel_id = _clean_text(value_of("channel_id"), "渠道编号", 50, errors)
     platform_type = _clean_text(value_of("platform_type"), "平台类型", 50, errors)
     if not platform_type:
@@ -396,6 +420,12 @@ def normalize_row(raw: dict[str, str], sources: dict[str, str]) -> tuple[dict[st
 
     order_amount = _parse_money(value_of("order_amount"), "订单金额", errors, required=True)
     payment_amount = _parse_money(value_of("payment_amount"), "付款金额", errors, required=True)
+    if order_amount is not None and Decimal(order_amount) <= 0:
+        errors.append(("AMOUNT_NOT_POSITIVE", "订单金额必须大于 0"))
+    if payment_amount is not None and Decimal(payment_amount) <= 0:
+        errors.append(("AMOUNT_NOT_POSITIVE", "付款金额必须大于 0"))
+    if order_amount is not None and payment_amount is not None and Decimal(payment_amount) > Decimal(order_amount):
+        errors.append(("PAYMENT_EXCEEDS_ORDER", "付款金额不能大于订单金额"))
     discount_amount = _parse_money(value_of("discount_amount"), "优惠金额", errors, required=False) or "0.00"
 
     order_time = _parse_datetime(value_of("order_time"), "下单时间", errors, required=True)
@@ -936,3 +966,626 @@ def create_temp_upload(suffix: str) -> Path:
     descriptor, name = tempfile.mkstemp(prefix="ea-import-", suffix=suffix)
     os.close(descriptor)
     return Path(name)
+
+
+# ─────────────────── 二次确认与执行 ───────────────────
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+async def import_lock_is_free() -> bool:
+    """探测 MySQL 命名锁；只用于同步返回 409，真正互斥由执行任务持有锁保证。"""
+    async with import_session_factory() as session:
+        acquired = await session.scalar(
+            text("SELECT GET_LOCK(:name, 0)"), {"name": _IMPORT_LOCK_NAME}
+        )
+        if int(acquired or 0) != 1:
+            return False
+        await session.scalar(text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME})
+        await session.commit()
+        return True
+
+
+async def confirm_run(
+    db: AsyncSession,
+    run_id: int,
+    expected_sha256: str,
+    principal_name: str,
+    *,
+    is_admin: bool,
+) -> tuple[DataImportRun, str | None]:
+    """原子把 validated 推进到 confirmed；重复确认轮换令牌，便于客户重试。"""
+    run = await load_run(db, run_id)
+    assert_run_owner(run, principal_name, is_admin)
+    if expected_sha256.lower() != (run.source_sha256 or "").lower():
+        raise ImportFileError(
+            "IMPORT_SOURCE_MISMATCH",
+            "文件摘要与当前导入任务不一致，请重新上传",
+            http_status=409,
+        )
+    if run.status == RUN_VALIDATING:
+        raise ImportFileError("IMPORT_NOT_VALIDATED", "文件仍在校验中，请稍后再确认", http_status=409)
+    if run.status == RUN_FAILED:
+        raise ImportFileError("IMPORT_RUN_FAILED", "导入任务已失败，不能确认", http_status=409)
+    if run.status in (RUN_RUNNING, RUN_COMPLETED):
+        return run, None
+    if run.status not in (RUN_VALIDATED, RUN_CONFIRMED):
+        raise ImportFileError("IMPORT_STATUS_CONFLICT", "当前状态不能确认", http_status=409)
+
+    token = secrets.token_urlsafe(32)
+    token_hash = _token_hash(token)
+    now = _utc_now_naive()
+    claimed = await db.execute(
+        update(DataImportRun)
+        .where(DataImportRun.id == run_id, DataImportRun.status == run.status)
+        .values(
+            status=RUN_CONFIRMED,
+            confirmed_by=principal_name,
+            confirmed_at=now,
+            confirm_token_hash=token_hash,
+            heartbeat_at=now,
+        )
+    )
+    await db.commit()
+    if (claimed.rowcount or 0) == 0:
+        # 并发确认/执行抢先一步；重新读取后按最新状态返回，不覆盖令牌。
+        await db.refresh(run)
+        if run.status in (RUN_RUNNING, RUN_COMPLETED):
+            return run, None
+        raise ImportFileError("IMPORT_STATUS_CONFLICT", "导入状态已变化，请刷新后重试", http_status=409)
+    await db.refresh(run)
+    return run, token
+
+
+async def request_execution(
+    db: AsyncSession,
+    run_id: int,
+    confirm_token: str,
+    principal_name: str,
+    *,
+    is_admin: bool,
+) -> tuple[DataImportRun, bool]:
+    """校验确认令牌并原子抢占 running；返回 (运行记录, 是否需要调度执行)。"""
+    run = await load_run(db, run_id)
+    assert_run_owner(run, principal_name, is_admin)
+    if run.status in (RUN_RUNNING, RUN_COMPLETED):
+        return run, False
+    if run.status == RUN_FAILED:
+        raise ImportFileError("IMPORT_RUN_FAILED", "导入任务已失败，不能执行", http_status=409)
+    if run.status == RUN_VALIDATING:
+        raise ImportFileError("IMPORT_NOT_VALIDATED", "文件仍在校验中", http_status=409)
+    if run.status == RUN_VALIDATED:
+        raise ImportFileError("IMPORT_NOT_CONFIRMED", "请先完成二次确认", http_status=409)
+    if not run.confirm_token_hash or not hmac.compare_digest(
+        run.confirm_token_hash, _token_hash(confirm_token)
+    ):
+        raise ImportFileError(
+            "IMPORT_CONFIRM_TOKEN_INVALID",
+            "确认令牌无效，请重新确认",
+            http_status=403,
+        )
+    if not await import_lock_is_free():
+        raise ImportFileError(
+            "IMPORT_CONCURRENCY_CONFLICT",
+            "已有导入正在执行，请稍后再试",
+            http_status=409,
+        )
+
+    now = _utc_now_naive()
+    claimed = await db.execute(
+        update(DataImportRun)
+        .where(
+            DataImportRun.id == run_id,
+            DataImportRun.status == RUN_CONFIRMED,
+            DataImportRun.confirm_token_hash == run.confirm_token_hash,
+        )
+        .values(status=RUN_RUNNING, heartbeat_at=now)
+    )
+    await db.commit()
+    if (claimed.rowcount or 0) == 0:
+        await db.refresh(run)
+        if run.status in (RUN_RUNNING, RUN_COMPLETED):
+            return run, False
+        raise ImportFileError("IMPORT_STATUS_CONFLICT", "导入状态已变化，请刷新后重试", http_status=409)
+    await db.refresh(run)
+    return run, True
+
+
+async def _safe_invalidate_import_caches() -> None:
+    """缓存失效失败不能把已提交的导入标记为失败，只记录告警。"""
+    try:
+        await invalidate_tags("analytics", "rfm")
+        clear_rfm_snapshot_cache()
+    except Exception as exc:  # noqa: BLE001 - 缓存是旁路
+        logger.warning("导入后缓存失效失败: %s", sanitize_error(exc))
+
+
+async def _data_version(db: AsyncSession) -> int | None:
+    value = await db.scalar(text("SELECT data_version FROM data_state WHERE id = 1"))
+    return int(value) if value is not None else None
+
+
+def _event_id(source_sha256: str, row_no: int, event_type: str) -> str:
+    """确定性事件 ID：重传同一文件/同一行时不会重复记账。"""
+    return str(uuid.uuid5(_IMPORT_EVENT_NAMESPACE, f"{source_sha256}:{row_no}:{event_type}"))
+
+
+def _wall_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def _order_values(row: DataImportRow, now: datetime) -> dict[str, Any]:
+    """把规范化暂存行转换为 orders 插入值；字段缺失即视为暂存行损坏。"""
+    normalized = row.normalized_json
+    if not isinstance(normalized, dict):
+        raise ValueError("暂存行缺少规范化数据")
+    refund = normalized.get("is_refund") == "是"
+    return {
+        "id": normalized.get("order_seq_id"),
+        "order_id": normalized["order_id"],
+        "user_name": normalized.get("user_name"),
+        "product_id": normalized.get("product_id"),
+        "order_amount": Decimal(normalized["order_amount"]),
+        "payment_amount": Decimal(normalized["payment_amount"]),
+        "channel_id": normalized.get("channel_id"),
+        "platform_type": normalized["platform_type"],
+        "order_time": _wall_datetime(normalized.get("order_time")),
+        "payment_time": _wall_datetime(normalized.get("payment_time")),
+        "is_refunded": "是" if refund else "否",
+        "discount_amount": Decimal(normalized.get("discount_amount") or "0.00"),
+        "payment_duration_sec": normalized.get("payment_duration_sec") or 0,
+        "order_date": date.fromisoformat(normalized["order_date"]),
+        "order_hour": normalized.get("order_hour"),
+        "weekday": normalized.get("weekday"),
+        "order_status": "REFUNDED" if refund else "ACTIVE",
+        "event_version": 2 if refund else 1,
+        "updated_at": now,
+    }
+
+
+def _ledger_events(row: DataImportRow, run: DataImportRun, now: datetime) -> list[dict[str, Any]]:
+    """每个导入订单补记 ORDER_CREATED；退款行再补记 v2 的 ORDER_REFUNDED。"""
+    normalized = row.normalized_json
+    if not isinstance(normalized, dict):
+        return []
+    order_time = _wall_datetime(normalized.get("order_time"))
+    payment_time = _wall_datetime(normalized.get("payment_time")) or order_time
+    if order_time is None:
+        return []
+    payload = {
+        "user_name": normalized.get("user_name"),
+        "product_id": normalized.get("product_id"),
+        "order_amount": normalized.get("order_amount"),
+        "payment_amount": normalized.get("payment_amount"),
+        "platform_type": normalized.get("platform_type"),
+        "channel_id": normalized.get("channel_id"),
+        "discount_amount": normalized.get("discount_amount"),
+        "order_time": normalized.get("order_time"),
+    }
+    events = [
+        {
+            "event_id": _event_id(run.source_sha256, row.row_no, "ORDER_CREATED"),
+            "order_id": row.order_id,
+            "event_type": "ORDER_CREATED",
+            "occurred_at": order_time,
+            "sequence": 1,
+            "source": "data_import",
+            "payload": payload,
+            "processing_status": "PROCESSED",
+            "processed_at": now,
+        }
+    ]
+    if normalized.get("is_refund") == "是":
+        events.append(
+            {
+                "event_id": _event_id(run.source_sha256, row.row_no, "ORDER_REFUNDED"),
+                "order_id": row.order_id,
+                "event_type": "ORDER_REFUNDED",
+                "occurred_at": payment_time or order_time,
+                "sequence": 2,
+                "source": "data_import",
+                "payload": {"reason": "数据导入：源文件标记为退款"},
+                "processing_status": "PROCESSED",
+                "processed_at": now,
+            }
+        )
+    return events
+
+
+async def _existing_conflicts_for_rows(
+    db: AsyncSession, rows: list[DataImportRow]
+) -> tuple[set[str], set[int]]:
+    """执行前再次查询冲突，覆盖“校验后、确认前”其他写路径插入的数据。"""
+    order_ids = [row.order_id for row in rows if row.order_id]
+    seq_ids = [
+        row.normalized_json.get("order_seq_id")
+        for row in rows
+        if isinstance(row.normalized_json, dict) and row.normalized_json.get("order_seq_id")
+    ]
+    existing_orders: set[str] = set()
+    existing_seqs: set[int] = set()
+    if order_ids:
+        result = await db.execute(select(Order.order_no).where(Order.order_no.in_(order_ids)))
+        existing_orders = set(result.scalars().all())
+    if seq_ids:
+        result = await db.execute(select(Order.id).where(Order.id.in_(seq_ids)))
+        existing_seqs = {int(value) for value in result.scalars().all()}
+    return existing_orders, existing_seqs
+
+
+async def _insert_orders_safely(
+    db: AsyncSession, pairs: list[tuple[DataImportRow, dict[str, Any]]]
+) -> tuple[list[DataImportRow], list[tuple[DataImportRow, str, str]]]:
+    """批量插入，唯一键冲突时回退到逐行插入，只让冲突行失败。"""
+    values = [value for _, value in pairs]
+    try:
+        async with db.begin_nested():
+            await db.execute(insert(Order.__table__), values)
+        return [row for row, _ in pairs], []
+    except IntegrityError:
+        inserted: list[DataImportRow] = []
+        failed: list[tuple[DataImportRow, str, str]] = []
+        for row, value in pairs:
+            try:
+                async with db.begin_nested():
+                    await db.execute(insert(Order.__table__), [value])
+                inserted.append(row)
+            except IntegrityError:
+                failed.append((row, "ORDER_CONFLICT", "订单号或顺序编号与已有数据冲突"))
+        return inserted, failed
+
+
+async def _mark_rows_failed(
+    db: AsyncSession, run_id: int, failed: list[tuple[DataImportRow, str, str]]
+) -> None:
+    for row, code, message in failed:
+        await db.execute(
+            update(DataImportRow)
+            .where(DataImportRow.run_id == run_id, DataImportRow.row_no == row.row_no)
+            .values(status=ROW_FAILED, error_code=code, error_message=message[:500])
+        )
+
+
+async def _apply_conflict_policy(db: AsyncSession, run: DataImportRun) -> None:
+    """冲突行在 v1 只有两种去向：失败并继续，或按策略跳过；绝不覆盖已有订单。"""
+    count = int(
+        await db.scalar(
+            select(func.count())
+            .select_from(DataImportRow)
+            .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_CONFLICT)
+        )
+        or 0
+    )
+    if count == 0:
+        return
+    if run.conflict_policy == CONFLICT_POLICY_SKIP:
+        await db.execute(
+            update(DataImportRow)
+            .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_CONFLICT)
+            .values(
+                status=ROW_SKIPPED,
+                error_code="CONFLICT_SKIPPED",
+                error_message="冲突行按策略跳过，未写入订单",
+            )
+        )
+        await db.execute(
+            update(DataImportRun)
+            .where(DataImportRun.id == run.id)
+            .values(rows_skipped=DataImportRun.rows_skipped + count)
+        )
+    else:
+        await db.execute(
+            update(DataImportRow)
+            .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_CONFLICT)
+            .values(status=ROW_FAILED)
+        )
+        await db.execute(
+            update(DataImportRun)
+            .where(DataImportRun.id == run.id)
+            .values(rows_rejected=DataImportRun.rows_rejected + count)
+        )
+    await db.commit()
+
+
+async def _execute_chunk(db: AsyncSession, run: DataImportRun, rows: list[DataImportRow]) -> None:
+    """一个事务内完成 orders 插入、事件补记、版本递增、进度与行状态更新。"""
+    now = _utc_now_naive()
+    existing_orders, existing_seqs = await _existing_conflicts_for_rows(db, rows)
+    candidates: list[tuple[DataImportRow, dict[str, Any]]] = []
+    failed: list[tuple[DataImportRow, str, str]] = []
+    for row in rows:
+        normalized = row.normalized_json
+        seq_id = normalized.get("order_seq_id") if isinstance(normalized, dict) else None
+        try:
+            values = _order_values(row, now)
+        except (KeyError, TypeError, ValueError):
+            failed.append((row, "INVALID_STAGED_ROW", "暂存行数据不完整，请重新上传"))
+            continue
+        if row.order_id in existing_orders:
+            failed.append((row, "ORDER_ID_EXISTS", "订单号已存在，v1 不支持覆盖更新"))
+        elif seq_id and seq_id in existing_seqs:
+            failed.append((row, "ORDER_SEQ_ID_EXISTS", "订单顺序编号已被占用"))
+        else:
+            candidates.append((row, values))
+
+    inserted, insert_failed = await _insert_orders_safely(db, candidates)
+    failed.extend(insert_failed)
+
+    if inserted:
+        events: list[dict[str, Any]] = []
+        for row in inserted:
+            events.extend(_ledger_events(row, run, now))
+        if events:
+            # 确定性 event_id 已存在时保持原账本行不变，保证重放幂等。
+            event_stmt = mysql_insert(OrderEvent.__table__).values(events)
+            event_stmt = event_stmt.on_duplicate_key_update(
+                event_id=OrderEvent.__table__.c.event_id
+            )
+            await db.execute(event_stmt)
+        await db.execute(
+            update(DataImportRow)
+            .where(
+                DataImportRow.run_id == run.id,
+                DataImportRow.row_no.in_([row.row_no for row in inserted]),
+            )
+            .values(status=ROW_IMPORTED, error_code="", error_message="")
+        )
+        await db.execute(text("UPDATE data_state SET data_version = data_version + 1 WHERE id = 1"))
+
+    await _mark_rows_failed(db, run.id, failed)
+    refunded = sum(1 for row in inserted if row.normalized_json.get("is_refund") == "是")
+    await db.execute(
+        update(DataImportRun)
+        .where(DataImportRun.id == run.id)
+        .values(
+            rows_inserted=DataImportRun.rows_inserted + len(inserted),
+            rows_refunded=DataImportRun.rows_refunded + refunded,
+            rows_rejected=DataImportRun.rows_rejected + len(failed),
+            heartbeat_at=now,
+        )
+    )
+    await db.commit()
+    await _safe_invalidate_import_caches()
+
+
+async def _consistency_mismatch_count(db: AsyncSession, run_id: int) -> int:
+    """只读校验：导入行的 orders 水位/状态/退款标记必须与事件账本一致。"""
+    value = await db.scalar(
+        text(
+            """
+            SELECT COUNT(*)
+            FROM data_import_rows r
+            JOIN orders o ON o.order_id = r.order_id
+            WHERE r.run_id = :run_id
+              AND r.status = 'imported'
+              AND (
+                o.event_version <> (
+                    SELECT COALESCE(MAX(e.sequence), 0)
+                    FROM order_events e
+                    WHERE e.order_id = o.order_id
+                )
+                OR (o.is_refund = '是' AND (o.order_status <> 'REFUNDED' OR o.event_version <> 2))
+                OR (o.is_refund <> '是' AND (o.order_status <> 'ACTIVE' OR o.event_version <> 1))
+                OR (
+                    o.is_refund = '是' AND NOT EXISTS (
+                        SELECT 1 FROM order_events e
+                        WHERE e.order_id = o.order_id AND e.event_type = 'ORDER_REFUNDED'
+                    )
+                )
+                OR (
+                    o.is_refund <> '是' AND EXISTS (
+                        SELECT 1 FROM order_events e
+                        WHERE e.order_id = o.order_id AND e.event_type = 'ORDER_REFUNDED'
+                    )
+                )
+              )
+            """
+        ),
+        {"run_id": run_id},
+    )
+    return int(value or 0)
+
+
+async def _finalize_execution(db: AsyncSession, run: DataImportRun) -> None:
+    counts_result = await db.execute(
+        select(DataImportRow.status, func.count())
+        .where(DataImportRow.run_id == run.id)
+        .group_by(DataImportRow.status)
+    )
+    counts = {status: int(total) for status, total in counts_result.all()}
+    imported = counts.get(ROW_IMPORTED, 0)
+    refunded = int(
+        await db.scalar(
+            text(
+                "SELECT COUNT(*) FROM data_import_rows "
+                "WHERE run_id = :run_id AND status = 'imported' "
+                "AND JSON_UNQUOTE(JSON_EXTRACT(normalized_json, '$.is_refund')) = '是'"
+            ),
+            {"run_id": run.id},
+        )
+        or 0
+    )
+    mismatches = await _consistency_mismatch_count(db, run.id)
+    now = _utc_now_naive()
+    values = {
+        "rows_inserted": imported,
+        "rows_refunded": refunded,
+        "rows_skipped": counts.get(ROW_SKIPPED, 0),
+        "rows_rejected": counts.get(ROW_FAILED, 0),
+        "data_version_after": await _data_version(db),
+        "heartbeat_at": now,
+        "finished_at": now,
+    }
+    if mismatches:
+        values.update(
+            status=RUN_FAILED,
+            error_code="IMPORT_CONSISTENCY_FAILED",
+            error_message=f"导入后一致性校验失败：{mismatches} 行的订单状态与事件账本不一致",
+        )
+    else:
+        values.update(status=RUN_COMPLETED, error_code="", error_message="")
+    await db.execute(update(DataImportRun).where(DataImportRun.id == run.id).values(**values))
+    await db.commit()
+
+
+async def _mark_execution_failed(db: AsyncSession, run_id: int, code: str, message: str) -> None:
+    """执行失败时保留已有暂存行与已完成的分块，供失败导出与排查使用。"""
+    now = _utc_now_naive()
+    await db.execute(
+        update(DataImportRun)
+        .where(DataImportRun.id == run_id)
+        .values(
+            status=RUN_FAILED,
+            error_code=code,
+            error_message=message[:500],
+            heartbeat_at=now,
+            finished_at=now,
+        )
+    )
+    await db.commit()
+
+
+async def _execute_run(db: AsyncSession, run: DataImportRun) -> None:
+    chunk_size = max(100, min(settings.data_import_chunk_size, 1000))
+    before = await _data_version(db)
+    await db.execute(
+        update(DataImportRun)
+        .where(DataImportRun.id == run.id)
+        .values(data_version_before=before, heartbeat_at=_utc_now_naive())
+    )
+    await db.commit()
+
+    await _apply_conflict_policy(db, run)
+
+    while True:
+        result = await db.execute(
+            select(DataImportRow)
+            .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_VALID)
+            .order_by(DataImportRow.row_no)
+            .limit(chunk_size)
+        )
+        rows = list(result.scalars())
+        if not rows:
+            break
+        await _execute_chunk(db, run, rows)
+
+    await _finalize_execution(db, run)
+    await _safe_invalidate_import_caches()
+
+
+async def execute_import_run(run_id: int) -> None:
+    """后台执行任务：持有 MySQL GET_LOCK，分块提交，逐块失效缓存。"""
+    async with import_session_factory() as db:
+        run = await db.get(DataImportRun, run_id)
+        if run is None or run.status != RUN_RUNNING:
+            return
+        acquired = await db.scalar(
+            text("SELECT GET_LOCK(:name, 0)"), {"name": _IMPORT_LOCK_NAME}
+        )
+        if int(acquired or 0) != 1:
+            await _mark_execution_failed(
+                db, run_id, "IMPORT_CONCURRENCY_CONFLICT", "已有导入正在执行，本次未启动"
+            )
+            return
+        try:
+            await _execute_run(db, run)
+        except ImportFileError as exc:
+            await _mark_execution_failed(db, run_id, exc.code, exc.message)
+        except Exception as exc:  # noqa: BLE001 - 后台任务不能把异常抛回已返回的请求
+            await db.rollback()
+            logger.exception("导入执行失败 run_id=%s: %s", run_id, sanitize_error(exc))
+            await _mark_execution_failed(
+                db, run_id, "IMPORT_EXECUTION_ERROR", "导入执行失败，请查看失败明细后重试"
+            )
+        finally:
+            await db.scalar(text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME})
+            await db.commit()
+
+
+async def build_execution_result(
+    db: AsyncSession, run: DataImportRun, *, can_view_pii: bool
+) -> ImportResultResponse:
+    failed_result = await db.execute(
+        select(DataImportRow)
+        .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_FAILED)
+        .order_by(DataImportRow.row_no)
+        .limit(settings.data_import_preview_rows)
+    )
+    skipped = int(
+        await db.scalar(
+            select(func.count())
+            .select_from(DataImportRow)
+            .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_SKIPPED)
+        )
+        or 0
+    )
+    return ImportResultResponse(
+        run=build_run_status(run),
+        failed=[_row_item(row, can_view_pii) for row in failed_result.scalars()],
+        skipped=skipped,
+    )
+
+
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value: Any) -> str:
+    """防止 Excel 把订单号/错误信息当成公式执行。"""
+    text_value = "" if value is None else str(value)
+    if text_value.lstrip().startswith(_FORMULA_PREFIXES):
+        return "'" + text_value
+    return text_value
+
+
+async def export_failure_csv(db: AsyncSession, run: DataImportRun) -> tuple[bytes, bool]:
+    """导出 invalid/failed 明细；返回 (CSV 内容, 是否因上限被截断)。"""
+    limit = settings.data_import_error_export_max_rows
+    result = await db.execute(
+        select(DataImportRow)
+        .where(
+            DataImportRow.run_id == run.id,
+            DataImportRow.status.in_(_FAILED_EXPORT_STATUSES),
+        )
+        .order_by(DataImportRow.row_no)
+        .limit(limit + 1)
+    )
+    rows = list(result.scalars())
+    truncated = len(rows) > limit
+    rows = rows[:limit]
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(
+        [
+            "行号",
+            "订单号",
+            "行状态",
+            "错误码",
+            "错误信息",
+            "订单金额",
+            "付款金额",
+            "平台类型",
+            "下单时间",
+        ]
+    )
+    for row in rows:
+        fields = row.normalized_json if isinstance(row.normalized_json, dict) else {}
+        writer.writerow(
+            [
+                _csv_safe(row.row_no),
+                _csv_safe(row.order_id),
+                _csv_safe(row.status),
+                _csv_safe(row.error_code),
+                _csv_safe(row.error_message),
+                _csv_safe(fields.get("order_amount")),
+                _csv_safe(fields.get("payment_amount")),
+                _csv_safe(fields.get("platform_type")),
+                _csv_safe(fields.get("order_time")),
+            ]
+        )
+    # UTF-8 BOM 让 Excel 直接识别中文；BOM 必须在所有内容之前。
+    return ("\ufeff" + buffer.getvalue()).encode("utf-8"), truncated

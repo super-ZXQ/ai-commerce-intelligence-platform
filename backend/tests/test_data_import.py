@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import uuid
 from datetime import datetime
@@ -10,11 +11,17 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from openpyxl import Workbook
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
-from backend.database import auth_session_factory, import_session_factory
+from backend.database import async_session_factory, auth_session_factory, import_session_factory
 from backend.main import app
-from backend.models.database_models import AuthUser, DataImportRow, DataImportRun
+from backend.models.database_models import (
+    AuthUser,
+    DataImportRow,
+    DataImportRun,
+    Order,
+    OrderEvent,
+)
 from backend.utils.auth import hash_password
 
 
@@ -72,6 +79,19 @@ async def cleanup_runs():
         await session.commit()
 
 
+@pytest_asyncio.fixture
+async def cleanup_orders():
+    """执行类测试会真的写入 orders/order_events；结束后按唯一订单号清理。"""
+    order_ids: list[str] = []
+    yield order_ids
+    if not order_ids:
+        return
+    async with async_session_factory() as session:
+        await session.execute(delete(OrderEvent).where(OrderEvent.order_no.in_(order_ids)))
+        await session.execute(delete(Order).where(Order.order_no.in_(order_ids)))
+        await session.commit()
+
+
 def _csv_bytes(rows: list[str]) -> bytes:
     header = (
         "订单号,用户名,商品编号,订单金额,付款金额,渠道编号,平台类型,"
@@ -108,7 +128,7 @@ def test_column_mapping_accepts_chinese_headers_and_reports_unknown():
     from backend.services.data_import_service import build_column_mapping
 
     mapping = build_column_mapping(
-        ["订单号", "用户名", "订单金额", "付款金额", "平台类型", "下单时间", "备注"]
+        ["订单号", "用户名", "商品编号", "订单金额", "付款金额", "平台类型", "下单时间", "备注"]
     )
     assert mapping["missing_required"] == []
     assert mapping["unknown_columns"] == ["备注"]
@@ -131,6 +151,8 @@ def test_normalize_row_derives_fields_and_flags_payment_time_order():
 
     sources = {
         "order_id": "订单号",
+        "user_name": "用户名",
+        "product_id": "商品编号",
         "order_amount": "订单金额",
         "payment_amount": "付款金额",
         "platform_type": "平台类型",
@@ -140,6 +162,8 @@ def test_normalize_row_derives_fields_and_flags_payment_time_order():
     normalized, errors = normalize_row(
         {
             "订单号": "A-1",
+            "用户名": "user-a",
+            "商品编号": "P1",
             "订单金额": "100.005",
             "付款金额": "100",
             "平台类型": "APP",
@@ -156,6 +180,8 @@ def test_normalize_row_derives_fields_and_flags_payment_time_order():
     normalized, errors = normalize_row(
         {
             "订单号": "A-2",
+            "用户名": "user-a",
+            "商品编号": "P1",
             "订单金额": "100",
             "付款金额": "100",
             "平台类型": "APP",
@@ -211,10 +237,19 @@ async def test_upload_xlsx_streaming_path(importer_client: AsyncClient, cleanup_
     workbook = Workbook()
     sheet = workbook.active
     sheet.append(
-        ["订单号", "用户名", "订单金额", "付款金额", "平台类型", "下单时间", "是否退款"]
+        ["订单号", "用户名", "商品编号", "订单金额", "付款金额", "平台类型", "下单时间", "是否退款"]
     )
     sheet.append(
-        [_unique_order_id(), "xlsx-user", 88.5, 88.5, "APP", datetime(2025, 2, 2, 9, 0, 0), "否"]
+        [
+            _unique_order_id(),
+            "xlsx-user",
+            "P1",
+            88.5,
+            88.5,
+            "APP",
+            datetime(2025, 2, 2, 9, 0, 0),
+            "否",
+        ]
     )
     buffer = io.BytesIO()
     workbook.save(buffer)
@@ -228,6 +263,138 @@ async def test_upload_xlsx_streaming_path(importer_client: AsyncClient, cleanup_
     status_payload = await _wait_until(importer_client, run_id, "validated")
     assert status_payload["source_type"] == "xlsx"
     assert status_payload["counts"]["rows_valid"] == 1
+
+
+@pytest.mark.asyncio
+async def test_confirm_and_execute_import(
+    importer_client: AsyncClient, cleanup_runs, cleanup_orders
+):
+    """完整链路：上传 → 校验 → 二次确认 → 执行 → 结果与账本写入。"""
+    order_id = _unique_order_id()
+    cleanup_orders.append(order_id)
+    content = _csv_bytes(
+        [f"{order_id},user-exec,P1,120.00,120.00,c1,APP,2025-03-01 10:00:00,2025-03-01 10:00:05,否,0,5"]
+    )
+
+    response = await _upload(importer_client, content)
+    assert response.status_code == 202, response.text
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+
+    status_payload = await _wait_until(importer_client, run_id, "validated")
+    sha256 = status_payload["sha256"]
+    assert sha256 == hashlib.sha256(content).hexdigest()
+
+    # 摘要不一致必须拒绝，防止确认的不是预览里的同一份文件。
+    mismatch = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/confirm",
+        json={"expected_sha256": "0" * 64},
+    )
+    assert mismatch.status_code == 409
+    assert mismatch.json()["detail"]["error_code"] == "IMPORT_SOURCE_MISMATCH"
+
+    confirmed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/confirm",
+        json={"expected_sha256": sha256},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    token = confirmed.json()["confirm_token"]
+    assert token
+
+    invalid_token = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/execute",
+        json={"confirm_token": "x" * 32},
+    )
+    assert invalid_token.status_code == 403
+    assert invalid_token.json()["detail"]["error_code"] == "IMPORT_CONFIRM_TOKEN_INVALID"
+
+    executed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/execute",
+        json={"confirm_token": token},
+    )
+    assert executed.status_code == 202, executed.text
+
+    final = await _wait_until(importer_client, run_id, "completed", timeout=20.0)
+    assert final["counts"]["rows_inserted"] == 1
+    assert final["counts"]["rows_rejected"] == 0
+    assert final["progress_percent"] == 100.0
+
+    result = (await importer_client.get(f"/api/data-import/runs/{run_id}/result")).json()
+    assert result["run"]["status"] == "completed"
+    assert result["failed"] == []
+
+    async with async_session_factory() as session:
+        order = (
+            await session.execute(select(Order).where(Order.order_no == order_id))
+        ).scalar_one()
+        assert order.order_status == "ACTIVE"
+        assert order.event_version == 1
+        events = (
+            await session.execute(
+                select(OrderEvent)
+                .where(OrderEvent.order_no == order_id)
+                .order_by(OrderEvent.sequence)
+            )
+        ).scalars().all()
+        assert [event.event_type for event in events] == ["ORDER_CREATED"]
+        assert events[0].source == "data_import"
+
+
+@pytest.mark.asyncio
+async def test_refund_row_imports_v2_event_and_failure_csv(importer_client: AsyncClient, cleanup_runs, cleanup_orders):
+    """退款行补记 v2；失败导出带 BOM 且对公式前缀转义。"""
+    refund_order = _unique_order_id()
+    invalid_order = "=cmd|' /C calc'!A0"
+    cleanup_orders.append(refund_order)
+    content = _csv_bytes(
+        [
+            f"{refund_order},user-refund,P1,50.00,50.00,c1,APP,2025-03-02 09:00:00,2025-03-02 09:00:03,是,0,3",
+            f"\"{invalid_order}\",user-bad,P2,10.00,10.00,c1,APP,not-a-date,2025-03-02 09:00:03,否,0,3",
+        ]
+    )
+    response = await _upload(importer_client, content)
+    assert response.status_code == 202, response.text
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+
+    status_payload = await _wait_until(importer_client, run_id, "validated")
+    confirmed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/confirm",
+        json={"expected_sha256": status_payload["sha256"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    executed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/execute",
+        json={"confirm_token": confirmed.json()["confirm_token"]},
+    )
+    assert executed.status_code == 202, executed.text
+
+    final = await _wait_until(importer_client, run_id, "completed", timeout=20.0)
+    assert final["counts"]["rows_inserted"] == 1
+    assert final["counts"]["rows_refunded"] == 1
+
+    async with async_session_factory() as session:
+        order = (
+            await session.execute(select(Order).where(Order.order_no == refund_order))
+        ).scalar_one()
+        assert order.order_status == "REFUNDED"
+        assert order.event_version == 2
+        refunded = (
+            await session.execute(
+                select(OrderEvent).where(
+                    OrderEvent.order_no == refund_order,
+                    OrderEvent.event_type == "ORDER_REFUNDED",
+                )
+            )
+        ).scalar_one()
+        assert refunded.sequence == 2
+
+    export = await importer_client.get(f"/api/data-import/runs/{run_id}/failures.csv")
+    assert export.status_code == 200
+    body = export.content.decode("utf-8")
+    assert body.startswith("\ufeff")
+    # 以 = + - @ 开头的值必须加前缀，避免 Excel 当公式执行。
+    assert "'=cmd" in body
 
 
 @pytest.mark.asyncio

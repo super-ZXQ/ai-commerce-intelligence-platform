@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.database import get_event_db
-from backend.models.database_models import OrderEvent
+from backend.database import get_db, get_event_db
+from backend.models.database_models import DataImportRun, OrderEvent
 from backend.models.schemas import OrderEventBatchRequest, OrderEventBatchResponse, OrderEventInput
 from backend.utils.auth import SCOPE_DATA_READ, SCOPE_EVENTS_WRITE, Principal, require_scope
 from backend.services.order_event_service import apply_order_event
@@ -88,27 +88,47 @@ async def ingest_order_events(
 
 @router.get("/freshness", summary="订单事件与缓存新鲜度")
 async def get_event_freshness(
-    db: AsyncSession = Depends(get_event_db),
+    db: AsyncSession = Depends(get_db),
     _principal: Principal = Depends(require_scope(SCOPE_DATA_READ)),
 ):
-    """返回真实事件水位与本进程缓存生成时间；没有事件时不伪造时间戳。"""
+    """返回写入水位、业务事件水位与本进程缓存生成时间；没有事件时不伪造时间戳。
+
+    freshness_seconds 必须基于最近写入时间（processed_at）而不是业务事件时间
+    （occurred_at）：导入历史订单时 occurred_at 可能很旧，但数据刚刚更新，
+    按业务时间判断会把「刚写完」误报为「数据陈旧」。业务事件时间单独以
+    last_event_occurred_at 返回，供需要区分口径的调用方使用。
+    """
     row = (await db.execute(
         select(
-            func.max(OrderEvent.processed_at).label("data_updated_at"),
+            func.max(OrderEvent.processed_at).label("last_write_at"),
             func.max(OrderEvent.occurred_at).label("last_event_occurred_at"),
         ).where(OrderEvent.processing_status == "PROCESSED")
     )).one()
+    last_import_at = await db.scalar(
+        select(func.max(DataImportRun.finished_at))
+        .where(DataImportRun.status == "completed")
+    )
     cache = operational_snapshot()
     generated_values = list(cache["tag_generated_at"].values())
     generated = max(generated_values) if generated_values else None
     now = datetime.now(UTC)
-    latest = row.last_event_occurred_at
-    if latest is not None and latest.tzinfo is None:
-        latest = latest.replace(tzinfo=UTC)
+
+    def _as_utc(value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+    latest_write = _as_utc(row.last_write_at)
+    latest_business = _as_utc(row.last_event_occurred_at)
+    latest_import = _as_utc(last_import_at)
     return {
-        "data_updated_at": row.data_updated_at.replace(tzinfo=UTC).isoformat() if row.data_updated_at else None,
-        "last_event_occurred_at": latest.isoformat() if latest else None,
+        "data_updated_at": latest_write.isoformat() if latest_write else None,
+        "last_event_occurred_at": latest_business.isoformat() if latest_business else None,
+        "last_import_at": latest_import.isoformat() if latest_import else None,
         "cache_generated_at": datetime.fromtimestamp(generated, tz=UTC).isoformat() if generated else None,
-        "freshness_seconds": round(max((now - latest).total_seconds(), 0), 3) if latest else None,
+        # 只按写入时间衡量新鲜度；历史订单导入不会因为业务时间旧而报陈旧。
+        "freshness_seconds": (
+            round(max((now - latest_write).total_seconds(), 0), 3) if latest_write else None
+        ),
         "cache": cache,
     }

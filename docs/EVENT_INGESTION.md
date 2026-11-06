@@ -72,10 +72,11 @@ Agent 不读取事件写账号的连接串，LLM 也不会获得任何写库工�
 
 `GET /api/order-events/freshness` 返回：
 
-- `data_updated_at`
-- `last_event_occurred_at`
+- `data_updated_at` — 最近一次事件**写库**时间（`processed_at`）。
+- `last_event_occurred_at` — 最近一次业务事件时间（`occurred_at`），历史补录时可能明显早于写入时间。
+- `last_import_at` — 最近一次成功完成的业务导入时间（`data_import_runs.finished_at`）。
 - `cache_generated_at`
-- `freshness_seconds`
+- `freshness_seconds` — 基于 `data_updated_at`（写入时间）计算，而不是业务事件时间；导入历史订单后不会因为 `occurred_at` 较早而误报「数据陈旧」。需要业务时间口径的调用方自行使用 `last_event_occurred_at`。
 
 ## 已有数据卷迁移
 
