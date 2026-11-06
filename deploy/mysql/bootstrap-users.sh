@@ -23,6 +23,8 @@ SYNC_PASSWORD_ESCAPED="$(escape_sql_string "${DB_SYNC_PASSWORD}")"
 EVENT_PASSWORD_ESCAPED="$(escape_sql_string "${DB_EVENT_PASSWORD}")"
 AUTH_PASSWORD_ESCAPED="$(escape_sql_string "${DB_AUTH_PASSWORD}")"
 MIGRATE_PASSWORD_ESCAPED="$(escape_sql_string "${DB_MIGRATE_PASSWORD:-${DB_SYNC_PASSWORD}}")"
+# 业务导入账号；旧部署未配置 DB_IMPORT_PASSWORD 时回落到事件账号密码，避免启动失败。
+IMPORT_PASSWORD_ESCAPED="$(escape_sql_string "${DB_IMPORT_PASSWORD:-${DB_EVENT_PASSWORD}}")"
 
 attempt=1
 until mysql --protocol=TCP -h mysql -uroot -e "SELECT 1" >/dev/null 2>&1; do
@@ -55,6 +57,11 @@ CREATE USER IF NOT EXISTS 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPE
 ALTER USER 'ea_events'@'%' IDENTIFIED BY '${EVENT_PASSWORD_ESCAPED}';
 -- 事件写账号：仅业务库，无 DDL；表级细分在 schema 就绪后可选收紧
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.* TO 'ea_events'@'%';
+
+CREATE USER IF NOT EXISTS 'ea_import'@'%' IDENTIFIED BY '${IMPORT_PASSWORD_ESCAPED}';
+ALTER USER 'ea_import'@'%' IDENTIFIED BY '${IMPORT_PASSWORD_ESCAPED}';
+-- 业务上传写账号：仅业务库，无 DDL；表级最小权限由 apply-grants.sh 收紧。
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.* TO 'ea_import'@'%';
 
 CREATE USER IF NOT EXISTS 'ea_migrate'@'%' IDENTIFIED BY '${MIGRATE_PASSWORD_ESCAPED}';
 ALTER USER 'ea_migrate'@'%' IDENTIFIED BY '${MIGRATE_PASSWORD_ESCAPED}';

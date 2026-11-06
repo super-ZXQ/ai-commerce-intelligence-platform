@@ -11,6 +11,8 @@ DB_NAME="${DB_NAME:?DB_NAME 未设置}"
 : "${DB_APP_PASSWORD:?DB_APP_PASSWORD 未设置}"
 : "${DB_AI_PASSWORD:?DB_AI_PASSWORD 未设置}"
 : "${DB_EVENT_PASSWORD:?DB_EVENT_PASSWORD 未设置}"
+# 与 bootstrap-users.sh 一致：旧部署未配置 DB_IMPORT_PASSWORD 时回落到事件账号密码。
+: "${DB_IMPORT_PASSWORD:=$DB_EVENT_PASSWORD}"
 : "${DB_AUTH_PASSWORD:?DB_AUTH_PASSWORD 未设置}"
 
 fail=0
@@ -69,6 +71,16 @@ expect_ok     "ea_events 可更新 orders"       ea_events "$DB_EVENT_PASSWORD" 
 expect_denied "ea_events 不能删除 data_state" ea_events "$DB_EVENT_PASSWORD" "DELETE FROM data_state WHERE 1 = 0"
 expect_denied "ea_events 不能删除 orders"     ea_events "$DB_EVENT_PASSWORD" "DELETE FROM orders WHERE 1 = 0"
 expect_denied "ea_events 不能读取 auth_users" ea_events "$DB_EVENT_PASSWORD" "SELECT COUNT(*) FROM auth_users"
+
+# ── ea_import：业务上传导入写入 ──
+expect_ok     "ea_import 读取 orders"         ea_import "$DB_IMPORT_PASSWORD" "SELECT COUNT(*) FROM orders"
+expect_ok     "ea_import 读取导入暂存"        ea_import "$DB_IMPORT_PASSWORD" "SELECT COUNT(*) FROM data_import_rows"
+expect_ok     "ea_import 可更新暂存行"         ea_import "$DB_IMPORT_PASSWORD" "UPDATE data_import_rows SET status = status WHERE 1 = 0"
+expect_ok     "ea_import 可删除暂存行"         ea_import "$DB_IMPORT_PASSWORD" "DELETE FROM data_import_rows WHERE 1 = 0"
+expect_ok     "ea_import 可递增 data_version" ea_import "$DB_IMPORT_PASSWORD" "UPDATE data_state SET data_version = data_version WHERE id = 1"
+expect_denied "ea_import 不能删除 orders"     ea_import "$DB_IMPORT_PASSWORD" "DELETE FROM orders WHERE 1 = 0"
+expect_denied "ea_import 不能读取 auth_users" ea_import "$DB_IMPORT_PASSWORD" "SELECT COUNT(*) FROM auth_users"
+expect_denied "ea_import 不能读取认证审计"     ea_import "$DB_IMPORT_PASSWORD" "SELECT COUNT(*) FROM auth_audit_log"
 
 # ── ea_auth：认证/审计表，无业务数据权限 ──
 expect_ok     "ea_auth 读取 auth_users"       ea_auth "$DB_AUTH_PASSWORD" "SELECT COUNT(*) FROM auth_users"

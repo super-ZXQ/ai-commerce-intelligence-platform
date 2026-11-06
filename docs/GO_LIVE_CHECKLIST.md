@@ -9,7 +9,8 @@
 - [ ] `JWT_SECRET` 使用 `openssl rand -hex 32` 生成，长度 ≥ 32，非示例值
 - [ ] `ADMIN_PASSWORD` / `ANALYST_PASSWORD` 为 bcrypt 哈希，非明文
 - [ ] `DB_ROOT_PASSWORD`、`DB_APP_PASSWORD`、`DB_AI_PASSWORD`、`DB_SYNC_PASSWORD`、
-      `DB_EVENT_PASSWORD`、`DB_AUTH_PASSWORD`、`DB_MIGRATE_PASSWORD` 全部独立且随机
+      `DB_EVENT_PASSWORD`、`DB_IMPORT_PASSWORD`、`DB_AUTH_PASSWORD`、`DB_MIGRATE_PASSWORD`
+      全部独立且随机
 - [x] 平台模型密钥 `LLM_API_KEY` 只存在于后端环境；Streamlit 无密钥
       （2026-11-03 已验证：仅 `ea-backend` 有值，`ea-streamlit`/`ea-ai-assistant` 为空）
 - [ ] 已轮换所有曾出现在日志/截图/聊天中的凭据

@@ -32,6 +32,7 @@ jobs:
           DB_AI_PASSWORD=ci-ai-password
           DB_SYNC_PASSWORD=ci-sync-password
           DB_EVENT_PASSWORD=ci-event-password
+          DB_IMPORT_PASSWORD=ci-import-password
           DB_AUTH_PASSWORD=ci-auth-password
           DB_MIGRATE_PASSWORD=ci-migrate-password
           MIGRATION_DB_USER=ea_migrate
@@ -88,10 +89,10 @@ jobs:
             -uroot -pci-root-password -Nse \
             'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
           echo "alembic_version=$version"
-          test "$version" = "0006_episode_memory"
+          test "$version" = "0007_data_import"
 
           for t in orders order_events app_metadata alembic_version data_state \
-                   data_import_runs order_status_reconciliation \
+                   data_import_runs data_import_rows order_status_reconciliation \
                    auth_users service_clients auth_audit_log ai_query_audit \
                    agent_memory_fact agent_memory_episode; do
             docker compose exec -T mysql mysql \

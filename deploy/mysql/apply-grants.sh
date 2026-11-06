@@ -8,6 +8,7 @@ set -eu
 #   ea_app    业务只读（orders/order_events/data_state/导入审计）
 #   ea_ai     AI Text-to-SQL 只读，仅 orders
 #   ea_events 订单与事件写入
+#   ea_import 业务上传导入：订单/事件/data_state/导入审计与暂存
 #   ea_auth   认证、服务凭据与审计表
 #   ea_sync   离线导入（保留库级 DDL，见文档例外说明）
 #   ea_migrate Alembic 迁移（保留库级 DDL）
@@ -48,14 +49,14 @@ missing="$(mysql --protocol=TCP -h mysql -uroot -N -B -e "
     AND table_name IN ('orders','order_events','data_state','data_import_runs',
                        'order_status_reconciliation','auth_users','service_clients',
                        'auth_audit_log','ai_query_audit','agent_memory_fact',
-                       'agent_memory_episode')
+                       'agent_memory_episode','data_import_rows')
 ")"
-if [ "${missing}" != "11" ]; then
-  echo "schema 尚未就绪：期望 11 张表，实际 ${missing} 张；请先完成 db-migrate" >&2
+if [ "${missing}" != "12" ]; then
+  echo "schema 尚未就绪：期望 12 张表，实际 ${missing} 张；请先完成 db-migrate" >&2
   exit 1
 fi
 
-for user in ea_app ea_ai ea_events ea_auth; do
+for user in ea_app ea_ai ea_events ea_import ea_auth; do
   # 旧版本授予的是库级权限；撤销失败（本就没有库级授权）不视为错误。
   mysql --protocol=TCP -h mysql -uroot \
     -e "REVOKE ALL PRIVILEGES ON \`${DB_NAME}\`.* FROM '${user}'@'%';" \
@@ -81,6 +82,13 @@ GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`orders\` TO 'ea_events'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`order_events\` TO 'ea_events'@'%';
 -- 版本行在事件事务内自增；UPDATE 读取 data_version 需要列级 SELECT。
 GRANT SELECT, UPDATE ON \`${DB_NAME}\`.\`data_state\` TO 'ea_events'@'%';
+
+-- 业务导入写账号：可写订单/事件/版本与导入审计暂存，不能读认证表，无 DDL。
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`orders\` TO 'ea_import'@'%';
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`order_events\` TO 'ea_import'@'%';
+GRANT SELECT, UPDATE ON \`${DB_NAME}\`.\`data_state\` TO 'ea_import'@'%';
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`data_import_runs\` TO 'ea_import'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`data_import_rows\` TO 'ea_import'@'%';
 
 -- 认证账号：仅认证、服务凭据与审计表；无业务数据访问权限。
 GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`auth_users\` TO 'ea_auth'@'%';

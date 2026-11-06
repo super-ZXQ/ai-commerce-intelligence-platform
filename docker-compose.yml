@@ -44,6 +44,8 @@ services:
       DB_AI_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       DB_SYNC_PASSWORD: ${DB_SYNC_PASSWORD:?请设置 DB_SYNC_PASSWORD}
       DB_EVENT_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
+      # 业务上传导入账号；留空时 bootstrap 脚本回落到 DB_EVENT_PASSWORD，保证旧部署可启动。
+      DB_IMPORT_PASSWORD: ${DB_IMPORT_PASSWORD:-}
       DB_AUTH_PASSWORD: ${DB_AUTH_PASSWORD:?请设置 DB_AUTH_PASSWORD}
       DB_MIGRATE_PASSWORD: ${DB_MIGRATE_PASSWORD:-}
     volumes:
@@ -114,6 +116,8 @@ services:
       DB_APP_PASSWORD: ${DB_APP_PASSWORD:?请设置 DB_APP_PASSWORD}
       DB_AI_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       DB_EVENT_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
+      # 与 bootstrap 保持一致：未配置时验收脚本回落到 DB_EVENT_PASSWORD。
+      DB_IMPORT_PASSWORD: ${DB_IMPORT_PASSWORD:-}
       DB_AUTH_PASSWORD: ${DB_AUTH_PASSWORD:?请设置 DB_AUTH_PASSWORD}
     volumes:
       - ./deploy/mysql/verify-grants.sh:/verify-grants.sh:ro
@@ -234,6 +238,9 @@ services:
       AI_DB_PASSWORD: ${DB_AI_PASSWORD:?请设置 DB_AI_PASSWORD}
       EVENT_DB_USER: ea_events
       EVENT_DB_PASSWORD: ${DB_EVENT_PASSWORD:?请设置 DB_EVENT_PASSWORD}
+      # 业务上传导入写账号：仅订单/事件/版本/导入审计暂存表；未配置时回落到事件账号。
+      IMPORT_DB_USER: ${IMPORT_DB_USER:-ea_import}
+      IMPORT_DB_PASSWORD: ${DB_IMPORT_PASSWORD:-${DB_EVENT_PASSWORD}}
     volumes:
       - chroma_data:/app/ai-ecommerce-assistant/data:ro
     expose:

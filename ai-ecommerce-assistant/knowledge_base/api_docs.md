@@ -192,4 +192,5 @@ Authorization: Bearer eyJ0eXAi...
 - A: 否，10万+ 历史数据（2025 年），用于 BI 演示，不连接生产环境
 
 ### Q5: 怎么更新数据？
-- A: 替换 `data/cleaned_orders.csv`，重启服务
+- A: 运行期以 MySQL 为准；请通过数据导入接口上传 CSV/Excel（校验 → 预览 → 确认入库）。
+  `data/cleaned_orders.csv` 只是首次初始化的只读快照，替换它并重启不会更新现有数据。

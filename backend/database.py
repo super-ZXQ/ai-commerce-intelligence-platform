@@ -31,6 +31,16 @@ event_engine = create_async_engine(
     echo=settings.debug,
 )
 
+# 业务导入写路径独立连接池：优先 ea_import，未配置时回落到事件账号/主账号。
+import_engine = create_async_engine(
+    settings.import_async_database_url,
+    pool_size=max(1, min(settings.db_pool_size, 5)),
+    max_overflow=max(1, min(settings.db_max_overflow, 5)),
+    pool_recycle=settings.db_pool_recycle,
+    pool_pre_ping=True,
+    echo=settings.debug,
+)
+
 # 认证目录独立连接池：ea_auth 只能访问认证/审计表，不能读取订单。
 auth_engine = create_async_engine(
     settings.auth_async_database_url,
@@ -48,6 +58,11 @@ async_session_factory = async_sessionmaker(
 )
 event_session_factory = async_sessionmaker(
     event_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+import_session_factory = async_sessionmaker(
+    import_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
@@ -74,6 +89,16 @@ async def get_db() -> AsyncSession:
 async def get_event_db() -> AsyncSession:
     """订单事件写入专用会话；路由层只在事件摄入接口注入它。"""
     async with event_session_factory() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+
+async def get_import_db() -> AsyncSession:
+    """业务导入专用会话；上传/确认/执行链路只在这里写导入审计与暂存表。"""
+    async with import_session_factory() as session:
         try:
             yield session
         except Exception:
@@ -131,4 +156,14 @@ async def check_event_db_connection() -> bool:
         return True
     except Exception as exc:
         logger.error("事件数据库连接检查失败: %s", sanitize_error(exc))
+        return False
+
+
+async def check_import_db_connection() -> bool:
+    try:
+        async with import_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception as exc:
+        logger.error("导入数据库连接检查失败: %s", sanitize_error(exc))
         return False

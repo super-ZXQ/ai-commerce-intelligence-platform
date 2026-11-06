@@ -50,7 +50,7 @@ docker exec ea-nginx nginx -s reload
 | `/health` `/livez` `/readyz` `/metrics` | backend:8000 | 公开健康与聚合指标（`/readyz` 含 Redis 检查） |
 | `/demo` `/monitor` `/health-panel` | backend:8000 | 页面；`/monitor`、`/health-panel` 需 `admin:manage` |
 
-主数据文件：`data/cleaned_orders.csv`
+初始化快照（只读）：`data/cleaned_orders.csv`。运行期以 MySQL 为准；新增/修正订单走导入接口，禁止替换 CSV 后重启生效。
 
 ## 页面结构
 
@@ -101,7 +101,7 @@ ENTERPRISE_COLORS_FULL = {
 
 - Streamlit 报错 → 看终端输出 / 检查 `columns()` 和 `reindex` 参数
 - FastAPI 端口占用 → macOS/Linux: `lsof -i :8000`；Windows: `netstat -ano | Select-String ":8000"` 找 PID 后 `Stop-Process`
-- 数据文件 → `data/cleaned_orders.csv`
+- 初始化快照（只读）→ `data/cleaned_orders.csv`；运行期订单数据看 MySQL，勿直接替换 CSV
 - Docker 启动卡住 → 重启 Docker Desktop / `wsl --shutdown`
 - Docker 拉取失败 → 检查 `~/.docker/daemon.json` 镜像加速配置
 

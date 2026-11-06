@@ -45,6 +45,7 @@ SCOPE_DATA_EXPORT = "data:export"
 SCOPE_DATA_PII = "data:pii"
 SCOPE_AI_QUERY = "ai:query"
 SCOPE_EVENTS_WRITE = "events:write"
+SCOPE_DATA_IMPORT = "data:import"
 SCOPE_ADMIN_MANAGE = "admin:manage"
 
 KNOWN_SCOPES = frozenset(
@@ -54,6 +55,7 @@ KNOWN_SCOPES = frozenset(
         SCOPE_DATA_PII,
         SCOPE_AI_QUERY,
         SCOPE_EVENTS_WRITE,
+        SCOPE_DATA_IMPORT,
         SCOPE_ADMIN_MANAGE,
     }
 )
@@ -66,6 +68,8 @@ ROLE_SCOPES: dict[str, frozenset[str]] = {
     "analyst": frozenset({SCOPE_DATA_READ, SCOPE_DATA_EXPORT, SCOPE_DATA_PII, SCOPE_AI_QUERY}),
     "viewer": frozenset({SCOPE_DATA_READ}),
     "ingest": frozenset({SCOPE_EVENTS_WRITE}),
+    # 业务数据导入：可进入工作台并上传文件，但不能直接调用原始事件写入接口。
+    "importer": frozenset({SCOPE_DATA_READ, SCOPE_DATA_IMPORT}),
 }
 
 

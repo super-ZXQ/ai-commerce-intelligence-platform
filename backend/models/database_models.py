@@ -163,3 +163,68 @@ class OrderEvent(Base):
     processing_status = Column("processing_status", String(20), nullable=False, index=True)
     processed_at = Column("processed_at", DateTime, nullable=True)
     failure_reason = Column("failure_reason", Text, nullable=True)
+
+
+class DataImportRun(Base):
+    """业务上传导入的运行记录（草稿/确认/执行/审计共用一条记录）。"""
+
+    __tablename__ = "data_import_runs"
+
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
+    source = Column("source", String(512), nullable=False)
+    source_sha256 = Column("source_sha256", mysql.CHAR(64), nullable=False)
+    mode = Column("mode", String(20), nullable=False)
+    status = Column("status", String(20), nullable=False)
+    operator = Column("operator", String(100), nullable=False)
+    rows_read = Column("rows_read", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_imported = Column("rows_imported", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    backup_table = Column("backup_table", String(64), nullable=True)
+    started_at = Column("started_at", DateTime, nullable=False)
+    finished_at = Column("finished_at", DateTime, nullable=True)
+    error_message = Column("error_message", Text, nullable=True)
+    notes = Column("notes", Text, nullable=True)
+    source_type = Column("source_type", String(10), nullable=False, default="csv")
+    original_filename = Column("original_filename", String(255), nullable=False, default="")
+    source_size_bytes = Column(
+        "source_size_bytes", mysql.BIGINT(unsigned=True), nullable=False, default=0
+    )
+    options_json = Column("options_json", JSON, nullable=True)
+    conflict_policy = Column("conflict_policy", String(20), nullable=False, default="reject")
+    rows_valid = Column("rows_valid", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_conflict = Column("rows_conflict", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_invalid = Column("rows_invalid", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_skipped = Column("rows_skipped", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_rejected = Column("rows_rejected", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_inserted = Column("rows_inserted", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    rows_refunded = Column("rows_refunded", mysql.INTEGER(unsigned=True), nullable=False, default=0)
+    data_version_before = Column(
+        "data_version_before", mysql.INTEGER(unsigned=True), nullable=True
+    )
+    data_version_after = Column(
+        "data_version_after", mysql.INTEGER(unsigned=True), nullable=True
+    )
+    confirmed_by = Column("confirmed_by", String(100), nullable=False, default="")
+    confirmed_at = Column("confirmed_at", DateTime, nullable=True)
+    confirm_token_hash = Column("confirm_token_hash", mysql.CHAR(64), nullable=False, default="")
+    heartbeat_at = Column("heartbeat_at", DateTime, nullable=True)
+    error_code = Column("error_code", String(64), nullable=False, default="")
+
+
+class DataImportRow(Base):
+    """上传草稿的逐行暂存与失败明细；确认后执行，过期由导入入口清理。"""
+
+    __tablename__ = "data_import_rows"
+    __table_args__ = (
+        UniqueConstraint("run_id", "row_no", name="uq_data_import_rows_run_row"),
+    )
+
+    id = Column("id", mysql.BIGINT(unsigned=True), primary_key=True, autoincrement=True)
+    run_id = Column("run_id", mysql.BIGINT(unsigned=True), nullable=False, index=True)
+    row_no = Column("row_no", mysql.INTEGER(unsigned=True), nullable=False)
+    order_id = Column("order_id", String(50), nullable=False, default="")
+    status = Column("status", String(20), nullable=False, index=True)
+    error_code = Column("error_code", String(64), nullable=False, default="")
+    error_message = Column("error_message", String(500), nullable=False, default="")
+    normalized_json = Column("normalized_json", JSON, nullable=True)
+    raw_json = Column("raw_json", JSON, nullable=True)
+    created_at = Column("created_at", DateTime, nullable=False, server_default=func.now())

@@ -213,7 +213,7 @@ def _build_parser() -> argparse.ArgumentParser:
     create_user = sub.add_parser("create-user", help="创建用户")
     create_user.add_argument("--username", required=True)
     create_user.add_argument(
-        "--role", required=True, choices=["admin", "analyst", "viewer", "ingest"]
+        "--role", required=True, choices=["admin", "analyst", "viewer", "ingest", "importer"]
     )
     create_user.add_argument("--scopes", help="在角色默认权限之外追加的权限（逗号分隔）")
     create_user.add_argument("--password", help="仅用于自动化；省略则交互输入")

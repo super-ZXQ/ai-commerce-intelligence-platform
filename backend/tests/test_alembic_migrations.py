@@ -19,7 +19,7 @@ _SEED = _BACKEND / "scripts" / "seed_ci_data.py"
 _BOOTSTRAP_SH = _ROOT / "deploy" / "mysql" / "bootstrap-users.sh"
 _GRANT_SH = _ROOT / "deploy" / "mysql" / "apply-grants.sh"
 # Alembic head 由迁移树决定；测试不再写死单一 revision，避免新增迁移后漏改。
-_HEAD = "0006_episode_memory"
+_HEAD = "0007_data_import"
 # alembic CLI must run from repo root: backend/alembic/ can shadow the package
 _ALEMBIC_CWD = _ROOT
 
@@ -161,6 +161,21 @@ def test_episode_memory_migration_declares_table():
     assert "DROP TABLE IF EXISTS agent_memory_episode" in source
 
 
+def test_data_import_migration_declares_staging_table():
+    source = (_VERSIONS / "0007_data_import.py").read_text(encoding="utf-8")
+    for marker in (
+        "CREATE TABLE data_import_rows",
+        "uq_data_import_rows_run_row",
+        "idx_data_import_rows_run_status",
+        "normalized_json JSON NULL",
+        "confirm_token_hash CHAR(64)",
+        "rows_skipped INT UNSIGNED",
+        "DROP TABLE IF EXISTS data_import_rows",
+    ):
+        assert marker in source, f"0007 missing: {marker}"
+    assert "0006_episode_memory" in source
+
+
 def test_reference_sql_and_baseline_stay_consistent():
     """Reference DDL in sql/01 must not drift from Alembic baseline."""
     ref = _REF_SQL.read_text(encoding="utf-8")
@@ -193,6 +208,7 @@ def test_bootstrap_role_separation():
     assert "ea_ai" in sh and "GRANT SELECT" in sh
     assert "ea_migrate" in sh
     assert "ea_events" in sh
+    assert "ea_import" in sh
     ai_block = sh.split("ea_ai")[1].split("ea_sync")[0]
     for ddl in ("CREATE,", "DROP,", "ALTER,"):
         assert ddl not in ai_block.replace("CREATE USER", ""), "ea_ai must not get DDL grants"
@@ -204,7 +220,7 @@ def test_table_level_grants_are_least_privilege():
     sh = _GRANT_SH.read_text(encoding="utf-8")
     # ea_app 不能读取认证表；ea_ai 只能访问 orders；ea_auth 不能访问业务数据。
     assert "REVOKE ALL PRIVILEGES ON \\`${DB_NAME}\\`.* FROM '${user}'@'%'" in sh
-    assert "for user in ea_app ea_ai ea_events ea_auth; do" in sh
+    assert "for user in ea_app ea_ai ea_events ea_import ea_auth; do" in sh
     assert "GRANT SELECT ON \\`${DB_NAME}\\`.\\`orders\\` TO 'ea_ai'@'%'" in sh
     assert "'ea_auth'@'%'" in sh
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`auth_users\\`" in sh
@@ -214,6 +230,8 @@ def test_table_level_grants_are_least_privilege():
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`agent_memory_fact\\`" in sh
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`agent_memory_episode\\`" in sh
     assert "GRANT SELECT, UPDATE ON \\`${DB_NAME}\\`.\\`data_state\\` TO 'ea_events'@'%'" in sh
+    assert "GRANT SELECT, INSERT, UPDATE ON \\`${DB_NAME}\\`.\\`orders\\` TO 'ea_import'@'%'" in sh
+    assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`data_import_rows\\` TO 'ea_import'@'%'" in sh
     assert "DELETE ON \\`${DB_NAME}\\`.\\`data_state\\`" not in sh
     assert "auth_users" not in sh.split("GRANT SELECT ON")[1].split("ea_ai")[0]
 
@@ -292,6 +310,7 @@ def test_alembic_upgrade_head_on_mysql_if_available():
             "ai_query_audit",
             "agent_memory_fact",
             "agent_memory_episode",
+            "data_import_rows",
         } <= tables
         cols = {row[0] for row in c.execute(text("SHOW COLUMNS FROM orders")).fetchall()}
         assert {"order_seq_id", "order_id", "order_status", "event_version"} <= cols
@@ -488,6 +507,7 @@ def test_empty_database_upgrade_head_on_mysql_if_available(monkeypatch):
                 "ai_query_audit",
                 "agent_memory_fact",
                 "agent_memory_episode",
+                "data_import_rows",
             } <= tables
             assert c.execute(text("SELECT COUNT(*) FROM data_state")).scalar() == 1
             assert (

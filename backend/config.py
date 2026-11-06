@@ -63,6 +63,23 @@ class Settings(BaseSettings):
     order_event_timeout_seconds: float = 5.0
     order_event_batch_max_size: int = 100
 
+    # 业务数据导入专用写账号。Docker 中为 ea_import，仅能写订单、事件、
+    # data_state 与导入审计/暂存表；未配置时回落到事件账号或主库账号，
+    # 保证本地开发与旧部署不会因缺少新变量而启动失败。
+    import_db_user: str = ""
+    import_db_password: str = ""
+    # 上传边界：应用层限制低于 Nginx 的 100m，避免把网络缓冲压力带进解析器。
+    data_import_max_file_bytes: int = 50 * 1024 * 1024
+    data_import_max_rows_csv: int = 200000
+    data_import_max_rows_xlsx: int = 50000
+    data_import_max_columns: int = 64
+    data_import_max_cell_chars: int = 500
+    data_import_chunk_size: int = 500
+    data_import_preview_rows: int = 100
+    data_import_error_export_max_rows: int = 20000
+    # 暂存行与草稿的保留天数；清理在每次新建导入时触发，不引入额外调度器。
+    data_import_staging_ttl_days: int = 7
+
     # 认证目录专用账号。Docker 中为 ea_auth，仅能读写认证/审计表；
     # 未配置时回落主库账户（本地开发/测试）。
     auth_db_user: str = ""
@@ -316,6 +333,27 @@ class Settings(BaseSettings):
         """事件写库连接串；未配置专用账号时仅为本地开发兼容而回落主账号。"""
         user = self.event_db_user or self.db_user
         password = self.event_db_password if self.event_db_user else self.db_password
+        return (
+            f"mysql+aiomysql://{quote_plus(user)}:{quote_plus(password)}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+        )
+
+    @property
+    def import_async_database_url(self) -> str:
+        """业务导入写库连接串。
+
+        优先级：IMPORT_DB_USER → EVENT_DB_USER → 主库账号。这样新部署可以
+        使用最小权限的 ea_import；旧部署未配置新变量时仍能启动并复用事件
+        账号，由运行期授权错误暴露缺失的 grant，而不是让服务起不来。
+        """
+        user = self.import_db_user or self.event_db_user
+        if self.import_db_user:
+            password = self.import_db_password
+        elif self.event_db_user:
+            password = self.event_db_password
+        else:
+            user = self.db_user
+            password = self.db_password
         return (
             f"mysql+aiomysql://{quote_plus(user)}:{quote_plus(password)}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
