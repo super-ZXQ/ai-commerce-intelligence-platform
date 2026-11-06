@@ -69,6 +69,9 @@ svg { display: block; }
 .time-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
 .portfolio-link { font-size: 10.5px; font-weight: 700; color: var(--purple); background: var(--purple-soft); border-radius: 7px; padding: 7px 10px; white-space: nowrap; }
 .portfolio-link:hover { background: #e8e1ff; }
+/* 数据导入入口：移动端隐藏侧栏后仍可从顶栏进入。 */
+.import-toplink { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--purple); border-radius: 7px; padding: 7px 10px; white-space: nowrap; }
+.import-toplink:hover { background: #5b3fe0; }
 .logout-btn { border: 1px solid var(--line-strong); border-radius: 7px; background: #fff; color: var(--muted-strong); font-size: 10.5px; padding: 7px 10px; white-space: nowrap; }
 .logout-btn:hover { color: var(--red); border-color: #f0cbc5; background: #fff7f6; }
 .avatar { width: 29px; height: 29px; flex: none; border-radius: 50%; background: #232735; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
@@ -399,6 +402,7 @@ svg { display: block; }
   .crumb { font-size: 10px; }
   .portfolio-link { display: none; }
   .avatar { display: none; }
+  .import-toplink { padding: 6px 8px; }
 }
 @media (max-width: 380px) {
   .main { padding-left: 12px; padding-right: 12px; }

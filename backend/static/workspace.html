@@ -17,6 +17,7 @@
     <symbol id="ico-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2zm13-15a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5"/></symbol>
     <symbol id="ico-box" viewBox="0 0 24 24"><path d="m3 7 9-4 9 4v10l-9 4-9-4zM3 7l9 5 9-5m-9 5v9"/></symbol>
     <symbol id="ico-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 6 3.5 9 8 11 4.5-2 8-5 8-11V5zM9 12l2 2 4-4"/></symbol>
+    <symbol id="ico-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></symbol>
   </svg>
   <div class="layout">
     <aside class="sidebar">
@@ -32,6 +33,8 @@
         <button class="nav-btn" data-view="rfm"><svg><use href="#ico-users"/></svg>RFM 客户分层</button>
         <button class="nav-btn" data-view="products"><svg><use href="#ico-box"/></svg>订单与商品</button>
       </nav>
+      <div class="side-label" id="import-section" hidden>数据管理</div>
+      <nav class="nav" id="import-nav" hidden aria-label="数据管理导航"><a class="nav-btn" href="/workspace/import"><svg><use href="#ico-upload"/></svg>数据导入</a></nav>
       <div class="side-label" id="monitor-section" hidden>系统</div>
       <nav class="nav" id="monitor-nav" hidden aria-label="系统导航"><button class="nav-btn" data-view="monitor"><svg><use href="#ico-shield"/></svg>运行监控</button></nav>
       <div class="side-bottom">
@@ -46,6 +49,7 @@
         <div class="crumb"><span>工作区</span><em>/</em><span class="muted" id="crumb-name">经营总览</span></div>
         <div class="right-actions">
           <span class="time-label" id="data-freshness">正在读取真实数据</span>
+          <a class="import-toplink" id="import-toplink" href="/workspace/import" hidden>数据导入</a>
           <a class="portfolio-link" href="/BI/" title="打开完整 BI 看板">完整 BI</a>
           <button class="logout-btn" id="logout">退出登录</button>
           <span class="avatar" id="user-avatar" title="当前用户">—</span>

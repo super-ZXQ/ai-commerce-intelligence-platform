@@ -47,6 +47,7 @@ from backend.routes.monitor import (
 from backend.services.rfm_service import RfmDataUnavailableError
 from backend.utils.auth import (
     SCOPE_ADMIN_MANAGE,
+    SCOPE_DATA_IMPORT,
     SCOPE_DATA_READ,
     Principal,
     ensure_bootstrap_users,
@@ -420,6 +421,17 @@ async def workspace_page(request: Request) -> FileResponse | RedirectResponse:
         next_path="/workspace",
         scope=SCOPE_DATA_READ,
         filename="workspace.html",
+    )
+
+
+@app.get("/workspace/import", include_in_schema=False, response_model=None)
+async def workspace_import_page(request: Request) -> FileResponse | RedirectResponse:
+    """数据导入页：服务端强制校验 data:import，无权限直接 403。"""
+    return await _scoped_page(
+        request,
+        next_path="/workspace/import",
+        scope=SCOPE_DATA_IMPORT,
+        filename="import.html",
     )
 
 

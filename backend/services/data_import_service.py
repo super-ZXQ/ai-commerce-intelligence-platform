@@ -645,10 +645,19 @@ async def _stage_batch(
             row.error_message = "订单顺序编号已被占用"
 
     await db.execute(insert(DataImportRow.__table__), [_row_values(row, run_id) for row in batch])
+    # 校验阶段先给出退款行预估数，供二次确认弹窗展示；执行完成后以实际写入数覆盖。
+    refunded = sum(
+        1
+        for row in batch
+        if row.status == ROW_VALID
+        and row.normalized is not None
+        and row.normalized.get("is_refund") == "是"
+    )
+    values: dict[str, Any] = {"rows_read": rows_read, "heartbeat_at": _utc_now_naive()}
+    if refunded:
+        values["rows_refunded"] = DataImportRun.rows_refunded + refunded
     await db.execute(
-        update(DataImportRun)
-        .where(DataImportRun.id == run_id)
-        .values(rows_read=rows_read, heartbeat_at=_utc_now_naive())
+        update(DataImportRun).where(DataImportRun.id == run_id).values(**values)
     )
     await db.commit()
 
@@ -1468,13 +1477,12 @@ async def _execute_chunk(db: AsyncSession, run: DataImportRun, rows: list[DataIm
         await db.execute(text("UPDATE data_state SET data_version = data_version + 1 WHERE id = 1"))
 
     await _mark_rows_failed(db, run.id, failed)
-    refunded = sum(1 for row in inserted if row.normalized_json.get("is_refund") == "是")
     await db.execute(
         update(DataImportRun)
         .where(DataImportRun.id == run.id)
         .values(
             rows_inserted=DataImportRun.rows_inserted + len(inserted),
-            rows_refunded=DataImportRun.rows_refunded + refunded,
+            # 退款数在校验阶段已预估，执行结束时由 _finalize_execution 用实际值覆盖。
             rows_rejected=DataImportRun.rows_rejected + len(failed),
             heartbeat_at=now,
         )

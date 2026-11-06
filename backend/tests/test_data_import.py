@@ -498,6 +498,25 @@ async def test_upload_prunes_expired_runs_but_keeps_active(importer_client: Asyn
 
 
 @pytest.mark.asyncio
+async def test_import_page_anonymous_redirects_to_login(client: AsyncClient):
+    response = await client.get("/workspace/import")
+    assert response.status_code in (302, 303, 307)
+    assert response.headers["location"].endswith("/login?next=/workspace/import")
+
+
+@pytest.mark.asyncio
+async def test_import_page_serves_assets_for_importer(importer_client: AsyncClient):
+    page = await importer_client.get("/workspace/import")
+    assert page.status_code == 200, page.text
+    assert "数据导入" in page.text
+    assert "/static/css/import.css" in page.text
+    assert "/static/js/import.js" in page.text
+    assert page.headers["cache-control"] == "no-store"
+    for asset in ("/static/css/import.css", "/static/js/import.js"):
+        assert (await importer_client.get(asset)).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_upload_rejects_disguised_binary_file(importer_client: AsyncClient):
     response = await _upload(importer_client, b"PK\x03\x04not-a-real-xlsx", filename="fake.csv")
     assert response.status_code == 422

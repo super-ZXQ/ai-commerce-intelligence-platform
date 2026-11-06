@@ -1023,6 +1023,18 @@ class TestWorkspacePage:
         assert "data:read" in response.json()["detail"]
 
     @pytest.mark.asyncio
+    async def test_viewer_without_import_scope_gets_403(self, client: AsyncClient, temp_identity: dict):
+        login = await client.post(
+            "/api/auth/login",
+            json={"username": temp_identity["viewer"], "password": "viewer-pass-123"},
+        )
+        assert login.status_code == 200
+        # 导入页必须由服务端校验 data:import，不能只靠前端隐藏入口。
+        response = await client.get("/workspace/import")
+        assert response.status_code == 403
+        assert "data:import" in response.json()["detail"]
+
+    @pytest.mark.asyncio
     async def test_login_page_is_not_cached_and_keeps_role_scene(self, client: AsyncClient):
         response = await client.get("/login")
         assert response.status_code == 200
@@ -1041,6 +1053,8 @@ class TestWorkspacePage:
             "/static/js/workspace-charts.js",
             "/static/css/login.css",
             "/static/js/login.js",
+            "/static/css/import.css",
+            "/static/js/import.js",
         )
         for path in assets:
             response = await client.get(path)

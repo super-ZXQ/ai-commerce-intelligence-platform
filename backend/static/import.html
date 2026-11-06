@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b24">
+  <title>数据导入 · AI 电商智能分析平台</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/workspace.css?v=20261106">
+  <link rel="stylesheet" href="/static/css/import.css?v=20261106">
+  <script type="module" src="/static/js/import.js"></script>
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="ico-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></symbol>
+    <symbol id="ico-spark" viewBox="0 0 24 24"><path d="M12 2 14.4 9.6 22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></symbol>
+    <symbol id="ico-chart" viewBox="0 0 24 24"><path d="M4 20V13m6 7V8m6 12v-5m5 5V4"/></symbol>
+    <symbol id="ico-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2zm13-15a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5"/></symbol>
+    <symbol id="ico-box" viewBox="0 0 24 24"><path d="m3 7 9-4 9 4v10l-9 4-9-4zM3 7l9 5 9-5m-9 5v9"/></symbol>
+    <symbol id="ico-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 6 3.5 9 8 11 4.5-2 8-5 8-11V5zM9 12l2 2 4-4"/></symbol>
+    <symbol id="ico-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="ico-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+  </svg>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="返回项目介绍">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="brand-copy"><strong>AI 电商智能分析</strong><small>COMMERCE INTELLIGENCE</small></span>
+      </a>
+      <div class="side-label">经营分析</div>
+      <nav class="nav" aria-label="经营分析导航">
+        <a class="nav-btn" href="/workspace#overview"><svg><use href="#ico-grid"/></svg>经营总览</a>
+        <a class="nav-btn" href="/workspace#assistant"><svg><use href="#ico-spark"/></svg>AI 数据问答</a>
+        <a class="nav-btn" href="/workspace#sales"><svg><use href="#ico-chart"/></svg>销售分析</a>
+        <a class="nav-btn" href="/workspace#rfm"><svg><use href="#ico-users"/></svg>RFM 客户分层</a>
+        <a class="nav-btn" href="/workspace#products"><svg><use href="#ico-box"/></svg>订单与商品</a>
+      </nav>
+      <div class="side-label">数据管理</div>
+      <nav class="nav" aria-label="数据管理导航">
+        <a class="nav-btn active" href="/workspace/import" aria-current="page"><svg><use href="#ico-upload"/></svg>数据导入</a>
+      </nav>
+    </aside>
+
+    <div class="shell">
+      <header class="topbar">
+        <div class="crumb"><span>工作区</span><em>/</em><span class="muted">数据导入</span></div>
+        <div class="right-actions">
+          <a class="import-back" href="/workspace">返回工作台</a>
+          <button class="logout-btn" id="logout" type="button">退出登录</button>
+          <span class="avatar" id="user-avatar" title="当前用户">—</span>
+        </div>
+      </header>
+
+      <main class="main import-main" id="main-content">
+        <div class="lead import-lead">
+          <div>
+            <div class="eyebrow">DATA IMPORT</div>
+            <h1>把订单文件安全地变成经营数据。</h1>
+            <p>上传后先在服务端校验、预览，再二次确认分块写入。全流程记录审计与失败原因，已提交分块不会因取消回滚。</p>
+          </div>
+          <span class="import-guard"><svg aria-hidden="true"><use href="#ico-shield"/></svg>仅写入 MySQL · 不改动 CSV 快照</span>
+        </div>
+
+        <ol class="import-steps" aria-label="导入流程">
+          <li><span>01</span><strong>上传文件</strong></li>
+          <li><span>02</span><strong>校验预览</strong></li>
+          <li><span>03</span><strong>确认执行</strong></li>
+          <li><span>04</span><strong>导入历史</strong></li>
+        </ol>
+
+        <div class="import-alert" id="import-alert" role="alert" hidden></div>
+        <div class="import-unauthorized" id="unauthorized-state" hidden>
+          <div class="state-error"><span>当前账号没有数据导入权限（data:import），请联系管理员分配 importer 角色。</span></div>
+        </div>
+
+        <!-- 01 上传 -->
+        <section class="panel import-panel" id="upload-panel" aria-labelledby="upload-title">
+          <div class="panel-head">
+            <div>
+              <div class="step-kicker">STEP 01</div>
+              <h2 class="panel-title" id="upload-title">上传文件</h2>
+              <div class="panel-sub">支持 CSV / XLSX；先校验列映射与逐行数据，不会直接写入订单。</div>
+            </div>
+            <button class="outline-button" id="download-template" type="button">下载 CSV 模板</button>
+          </div>
+
+          <div class="upload-grid">
+            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-describedby="upload-help">
+              <input type="file" id="file-input" accept=".csv,.xlsx" hidden>
+              <span class="drop-icon" aria-hidden="true"><svg><use href="#ico-upload"/></svg></span>
+              <strong id="drop-title">拖拽文件到此处，或点击选择</strong>
+              <span id="upload-help">CSV 支持 UTF-8 / GB18030；XLSX 以只读模式流式解析。单文件大小与行数受服务端上限约束。</span>
+              <span class="file-chip" id="file-name" hidden></span>
+            </div>
+            <div class="detect-box" aria-live="polite">
+              <div class="detect-head">格式与编码识别</div>
+              <dl class="detect-list" id="detect-list">
+                <div><dt>文件</dt><dd>尚未选择</dd></div>
+                <div><dt>格式</dt><dd>—</dd></div>
+                <div><dt>编码</dt><dd>—</dd></div>
+                <div><dt>大小</dt><dd>—</dd></div>
+              </dl>
+            </div>
+          </div>
+
+          <div class="policy-row">
+            <span class="policy-label">冲突策略</span>
+            <label class="radio-card">
+              <input type="radio" name="conflict-policy" value="reject" checked>
+              <span><strong>拒绝冲突行并继续</strong><small>订单号或顺序号已存在时，该行记为拒绝，其余行照常写入</small></span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="conflict-policy" value="skip">
+              <span><strong>跳过冲突行</strong><small>冲突行不写入、也不计入拒绝，继续处理后续行</small></span>
+            </label>
+          </div>
+
+          <div class="upload-actions">
+            <button class="primary" id="upload-btn" type="button" disabled>开始上传并校验</button>
+            <span class="hint">上传只写 MySQL；data/cleaned_orders.csv 是初始化快照，不会被改写。</span>
+          </div>
+          <div class="upload-state" id="upload-state" hidden></div>
+        </section>
+
+        <!-- 02 预览 -->
+        <section class="panel import-panel" id="preview-panel" aria-labelledby="preview-title" hidden>
+          <div class="panel-head">
+            <div>
+              <div class="step-kicker">STEP 02</div>
+              <h2 class="panel-title" id="preview-title">校验预览</h2>
+              <div class="panel-sub" id="preview-sub">等待上传文件</div>
+            </div>
+            <span class="status-pill" id="preview-status" hidden></span>
+          </div>
+
+          <div class="preview-state" id="preview-state">
+            <div class="state-block">还没有可预览的导入任务</div>
+          </div>
+
+          <div id="preview-content" hidden>
+            <div class="summary-grid" id="file-summary"></div>
+
+            <div class="mapping-block">
+              <div class="section-line"><h3>列映射</h3><span class="muted-note">已匹配 = 标准字段名；别名 = 中文表头自动对应；缺失 = 文件未提供</span></div>
+              <div class="mapping-list" id="column-mapping"></div>
+              <div class="chip-line" id="unknown-columns" hidden></div>
+              <div class="chip-line danger" id="missing-columns" hidden></div>
+            </div>
+
+            <div class="count-grid" id="preview-counts"></div>
+
+            <div class="tabs" role="tablist" aria-label="明细分页" id="row-tabs">
+              <button class="tab active" role="tab" aria-selected="true" data-tab="valid" type="button">可新增</button>
+              <button class="tab" role="tab" aria-selected="false" data-tab="conflict" type="button">冲突</button>
+              <button class="tab" role="tab" aria-selected="false" data-tab="invalid" type="button">校验失败</button>
+            </div>
+            <p class="table-note" id="row-table-note">每类最多展示前 100 行，可分页查看。</p>
+            <div class="table-wrap" id="row-table"></div>
+            <div class="pager" id="row-pager"></div>
+
+            <div class="preview-actions">
+              <button class="outline-button" id="download-failures" type="button" hidden>下载失败明细 CSV</button>
+              <button class="primary" id="open-confirm" type="button" hidden>二次确认并导入</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 03 执行 -->
+        <section class="panel import-panel" id="run-panel" aria-labelledby="run-title" hidden>
+          <div class="panel-head">
+            <div>
+              <div class="step-kicker">STEP 03</div>
+              <h2 class="panel-title" id="run-title">执行进度</h2>
+              <div class="panel-sub" id="run-sub">确认后开始分块写入，每块提交后更新进度</div>
+            </div>
+            <span class="status-pill" id="run-status" hidden></span>
+          </div>
+
+          <div class="run-state" id="run-state">
+            <div class="state-block">尚未开始执行</div>
+          </div>
+
+          <div id="run-content" hidden>
+            <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="run-progressbar">
+              <div class="progress-fill" id="run-progress"></div>
+            </div>
+            <div class="progress-meta">
+              <strong id="run-percent">0%</strong>
+              <span id="run-elapsed">已用时 0.0 秒</span>
+            </div>
+            <div class="run-metrics" id="run-metrics"></div>
+            <p class="run-message" id="run-message"></p>
+            <div class="run-actions">
+              <button class="outline-button danger" id="cancel-run" type="button" hidden>取消剩余分块</button>
+              <button class="outline-button" id="refresh-result" type="button" hidden>刷新结果</button>
+            </div>
+            <div class="run-result" id="run-result" hidden></div>
+          </div>
+        </section>
+
+        <!-- 04 历史 -->
+        <section class="panel import-panel" id="history-panel" aria-labelledby="history-title">
+          <div class="panel-head">
+            <div>
+              <div class="step-kicker">STEP 04</div>
+              <h2 class="panel-title" id="history-title">导入历史</h2>
+              <div class="panel-sub" id="history-sub">本人可见；管理员可查看全部账号的导入记录</div>
+            </div>
+            <button class="outline-button" id="refresh-history" type="button">刷新</button>
+          </div>
+          <div class="history-state" id="history-state">
+            <div class="state-block loading">正在加载导入历史…</div>
+          </div>
+          <div class="table-wrap" id="history-table" hidden></div>
+          <div class="pager" id="history-pager"></div>
+        </section>
+
+        <div class="footer-note">上传只写 MySQL · 可取消仅停止后续分块 · 历史默认保留 7 天</div>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="import-dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+    <div class="dialog-head">
+      <div>
+        <div class="step-kicker">FINAL CHECK</div>
+        <h2 id="confirm-title">确认导入</h2>
+      </div>
+      <button class="dialog-close" id="close-confirm" type="button" aria-label="关闭确认弹窗">×</button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-warning">导入不可撤销：已确认的文件会按分块写入订单表，重复上传同一文件不会覆盖已有订单。</div>
+      <div class="dialog-counts" id="confirm-counts"></div>
+      <ul class="dialog-notes">
+        <li>本次只写入 MySQL；不会改动 <code>data/cleaned_orders.csv</code> 初始化快照。</li>
+        <li>取消只会停止后续分块，已经提交的分块会保留。</li>
+        <li>执行结束后服务端会做一次只读一致性校验，不一致会把本次运行标记为失败。</li>
+      </ul>
+    </div>
+    <div class="dialog-actions">
+      <button class="outline-button" id="cancel-confirm" type="button">返回检查</button>
+      <button class="primary" id="submit-confirm" type="button">确认并开始导入</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

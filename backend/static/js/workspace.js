@@ -238,6 +238,10 @@ function canUseAi() {
   return Boolean(state.me?.scopes?.includes('ai:query'));
 }
 
+function canImportData() {
+  return Boolean(state.me?.scopes?.includes('data:import'));
+}
+
 function applyIdentity() {
   const me = state.me;
   if (!me) return;
@@ -253,6 +257,16 @@ function applyIdentity() {
     $('#monitor-section')?.setAttribute('hidden', '');
     $('#monitor-nav')?.setAttribute('hidden', '');
     $('#mobile-monitor')?.setAttribute('hidden', '');
+  }
+  // 导入入口仅对具备 data:import 的账号展示；页面本身仍由服务端 403 兜底。
+  if (canImportData()) {
+    $('#import-section')?.removeAttribute('hidden');
+    $('#import-nav')?.removeAttribute('hidden');
+    $('#import-toplink')?.removeAttribute('hidden');
+  } else {
+    $('#import-section')?.setAttribute('hidden', '');
+    $('#import-nav')?.setAttribute('hidden', '');
+    $('#import-toplink')?.setAttribute('hidden', '');
   }
 }
 
