@@ -90,7 +90,7 @@
               <input type="file" id="file-input" accept=".csv,.xlsx" hidden>
               <span class="drop-icon" aria-hidden="true"><svg><use href="#ico-upload"/></svg></span>
               <strong id="drop-title">拖拽文件到此处，或点击选择</strong>
-              <span id="upload-help">CSV 支持 UTF-8 / GB18030；XLSX 以只读模式流式解析。单文件大小与行数受服务端上限约束。</span>
+              <span id="upload-help">CSV 仅接受 UTF-8（可带 BOM）；XLSX 以只读模式流式解析。单文件大小与行数受服务端上限约束。</span>
               <span class="file-chip" id="file-name" hidden></span>
             </div>
             <div class="detect-box" aria-live="polite">
@@ -192,6 +192,7 @@
             <div class="run-metrics" id="run-metrics"></div>
             <p class="run-message" id="run-message"></p>
             <div class="run-actions">
+              <button class="outline-button" id="resume-run" type="button" hidden>继续执行</button>
               <button class="outline-button danger" id="cancel-run" type="button" hidden>取消剩余分块</button>
               <button class="outline-button" id="refresh-result" type="button" hidden>刷新结果</button>
             </div>

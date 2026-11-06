@@ -33,7 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.database import import_session_factory
+from backend.database import import_engine, import_session_factory
 from backend.models.database_models import DataImportRow, DataImportRun, Order, OrderEvent
 from backend.models.import_schemas import (
     ImportColumnMapping,
@@ -245,6 +245,11 @@ def read_headers(path: Path, source_type: str) -> list[str]:
         raise ImportFileError(
             "IMPORT_ENCODING_UNSUPPORTED",
             "CSV 不是 UTF-8 编码，请另存为 UTF-8（可带 BOM）后重试",
+        ) from exc
+    except csv.Error as exc:
+        raise ImportFileError(
+            "IMPORT_CSV_PARSE_ERROR",
+            "CSV 表头格式无法解析，请检查引号、分隔符与换行后重试",
         ) from exc
 
 
@@ -996,26 +1001,37 @@ async def cancel_run(
     if run.status in (RUN_COMPLETED, RUN_FAILED, RUN_CANCELLED):
         return run
     now = _utc_now_naive()
+    # 未开始执行的两个状态才可原子终止；条件更新确保不会把已进入 running
+    # 或已结束的任务覆盖成 cancelled，也不会谎报「未写入订单」。
+    claimed = await db.execute(
+        update(DataImportRun)
+        .where(
+            DataImportRun.id == run_id,
+            DataImportRun.status.in_((RUN_VALIDATED, RUN_CONFIRMED)),
+        )
+        .values(
+            status=RUN_CANCELLED,
+            cancel_requested=1,
+            finished_at=now,
+            error_code="IMPORT_CANCELLED",
+            error_message="已取消：尚未开始执行，未写入任何订单",
+        )
+    )
+    await db.commit()
+    if (claimed.rowcount or 0) > 0:
+        await db.refresh(run)
+        return run
+
+    # 条件更新落空说明状态已并发变化：重读后按 running 分支只置取消意图。
+    await db.refresh(run)
     if run.status == RUN_RUNNING:
         await db.execute(
             update(DataImportRun)
             .where(DataImportRun.id == run_id, DataImportRun.status == RUN_RUNNING)
             .values(cancel_requested=1, heartbeat_at=now)
         )
-    else:
-        await db.execute(
-            update(DataImportRun)
-            .where(DataImportRun.id == run_id)
-            .values(
-                status=RUN_CANCELLED,
-                cancel_requested=1,
-                finished_at=now,
-                error_code="IMPORT_CANCELLED",
-                error_message="已取消：尚未开始执行，未写入任何订单",
-            )
-        )
-    await db.commit()
-    await db.refresh(run)
+        await db.commit()
+        await db.refresh(run)
     return run
 
 
@@ -1116,15 +1132,22 @@ def _token_hash(token: str) -> str:
 
 
 async def import_lock_is_free() -> bool:
-    """探测 MySQL 命名锁；只用于同步返回 409，真正互斥由执行任务持有锁保证。"""
-    async with import_session_factory() as session:
-        acquired = await session.scalar(
+    """快速探测命名锁是否空闲；仅用于同步返回 409，不作为互斥依据。
+
+    必须使用独立连接：若与调用方会话共用连接，而该连接正持有同名锁，
+    MySQL 的 GET_LOCK 重入语义会返回 1，把「已被占用」误判为空闲。
+    """
+    async with import_engine.connect() as conn:
+        acquired = await conn.scalar(
             text("SELECT GET_LOCK(:name, 0)"), {"name": _IMPORT_LOCK_NAME}
         )
         if int(acquired or 0) != 1:
             return False
-        await session.scalar(text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME})
-        await session.commit()
+        released = await conn.scalar(
+            text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME}
+        )
+        if int(released or 0) != 1:
+            logger.warning("导入锁探测释放失败，锁将随连接关闭释放: %s", _IMPORT_LOCK_NAME)
         return True
 
 
@@ -1206,6 +1229,7 @@ async def request_execution(
             "确认令牌无效，请重新确认",
             http_status=403,
         )
+    # 这里只做快速失败提示；真正的互斥由 execute_import_run 在独占连接上持有命名锁保证。
     if not await import_lock_is_free():
         raise ImportFileError(
             "IMPORT_CONCURRENCY_CONFLICT",
@@ -1256,6 +1280,13 @@ def _wall_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value)
+
+
+def _wall_to_utc_naive(value: datetime | None) -> datetime | None:
+    """业务墙钟（Asia/Shanghai）转 UTC-naive；运维列统一存 UTC-naive。"""
+    if value is None:
+        return None
+    return value.replace(tzinfo=_BUSINESS_TZ).astimezone(UTC).replace(tzinfo=None)
 
 
 def _order_values(row: DataImportRow, now: datetime) -> dict[str, Any]:
@@ -1314,7 +1345,7 @@ def _ledger_events(row: DataImportRow, run: DataImportRun, now: datetime) -> lis
             "event_id": _event_id(run.source_sha256, row.row_no, "ORDER_CREATED"),
             "order_id": row.order_id,
             "event_type": "ORDER_CREATED",
-            "occurred_at": order_time,
+            "occurred_at": _wall_to_utc_naive(order_time),
             "sequence": 1,
             "source": "data_import",
             "payload": payload,
@@ -1328,7 +1359,7 @@ def _ledger_events(row: DataImportRow, run: DataImportRun, now: datetime) -> lis
                 "event_id": _event_id(run.source_sha256, row.row_no, "ORDER_REFUNDED"),
                 "order_id": row.order_id,
                 "event_type": "ORDER_REFUNDED",
-                "occurred_at": payment_time or order_time,
+                "occurred_at": _wall_to_utc_naive(payment_time or order_time),
                 "sequence": 2,
                 "source": "data_import",
                 "payload": {"reason": "数据导入：源文件标记为退款"},
@@ -1594,8 +1625,13 @@ async def _finalize_execution(
         )
     else:
         values.update(status=RUN_COMPLETED, error_code="", error_message="")
-    await db.execute(update(DataImportRun).where(DataImportRun.id == run.id).values(**values))
+    await db.execute(
+        update(DataImportRun)
+        .where(DataImportRun.id == run.id, DataImportRun.status == RUN_RUNNING)
+        .values(**values)
+    )
     await db.commit()
+    await db.refresh(run)
 
 
 async def _mark_execution_failed(db: AsyncSession, run_id: int, code: str, message: str) -> None:
@@ -1603,7 +1639,7 @@ async def _mark_execution_failed(db: AsyncSession, run_id: int, code: str, messa
     now = _utc_now_naive()
     await db.execute(
         update(DataImportRun)
-        .where(DataImportRun.id == run_id)
+        .where(DataImportRun.id == run_id, DataImportRun.status == RUN_RUNNING)
         .values(
             status=RUN_FAILED,
             error_code=code,
@@ -1647,32 +1683,43 @@ async def _execute_run(db: AsyncSession, run: DataImportRun) -> None:
 
 
 async def execute_import_run(run_id: int) -> None:
-    """后台执行任务：持有 MySQL GET_LOCK，分块提交，逐块失效缓存。"""
-    async with import_session_factory() as db:
-        run = await db.get(DataImportRun, run_id)
-        if run is None or run.status != RUN_RUNNING:
-            return
-        acquired = await db.scalar(
+    """后台执行任务：在独占连接上持有 MySQL GET_LOCK，业务会话单独提交。
+
+    锁必须绑定一条不参与业务事务的连接：业务会话 commit 后连接会归还连接池，
+    若在同一会话上获取/释放锁，锁归属会漂移，RELEASE_LOCK 可能落空并泄漏锁。
+    """
+    async with import_engine.connect() as lock_conn:
+        acquired = await lock_conn.scalar(
             text("SELECT GET_LOCK(:name, 0)"), {"name": _IMPORT_LOCK_NAME}
         )
         if int(acquired or 0) != 1:
-            await _mark_execution_failed(
-                db, run_id, "IMPORT_CONCURRENCY_CONFLICT", "已有导入正在执行，本次未启动"
-            )
+            async with import_session_factory() as db:
+                await _mark_execution_failed(
+                    db, run_id, "IMPORT_CONCURRENCY_CONFLICT", "已有导入正在执行，本次未启动"
+                )
             return
         try:
-            await _execute_run(db, run)
-        except ImportFileError as exc:
-            await _mark_execution_failed(db, run_id, exc.code, exc.message)
-        except Exception as exc:  # noqa: BLE001 - 后台任务不能把异常抛回已返回的请求
-            await db.rollback()
-            logger.exception("导入执行失败 run_id=%s: %s", run_id, sanitize_error(exc))
-            await _mark_execution_failed(
-                db, run_id, "IMPORT_EXECUTION_ERROR", "导入执行失败，请查看失败明细后重试"
-            )
+            async with import_session_factory() as db:
+                run = await db.get(DataImportRun, run_id)
+                if run is None or run.status != RUN_RUNNING:
+                    return
+                try:
+                    await _execute_run(db, run)
+                except ImportFileError as exc:
+                    await _mark_execution_failed(db, run_id, exc.code, exc.message)
+                except Exception as exc:  # noqa: BLE001 - 后台任务不能把异常抛回已返回的请求
+                    await db.rollback()
+                    logger.exception("导入执行失败 run_id=%s: %s", run_id, sanitize_error(exc))
+                    await _mark_execution_failed(
+                        db, run_id, "IMPORT_EXECUTION_ERROR", "导入执行失败，请查看失败明细后重试"
+                    )
         finally:
-            await db.scalar(text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME})
-            await db.commit()
+            released = await lock_conn.scalar(
+                text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME}
+            )
+            if int(released or 0) != 1:
+                # 连接关闭也会释放锁，这里记录告警用于排查锁归属漂移。
+                logger.warning("导入锁释放失败 run_id=%s，锁将随连接关闭释放", run_id)
 
 
 async def build_execution_result(

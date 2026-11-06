@@ -11,9 +11,14 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from openpyxl import Workbook
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
 
-from backend.database import async_session_factory, auth_session_factory, import_session_factory
+from backend.database import (
+    async_session_factory,
+    auth_session_factory,
+    import_engine,
+    import_session_factory,
+)
 from backend.main import app
 from backend.models.database_models import (
     AuthUser,
@@ -324,6 +329,17 @@ async def test_execute_preserves_seq_id_and_refund_flag(
         assert order.is_refunded == "是"
         assert order.order_status == "REFUNDED"
         assert order.event_version == 2
+        events = (
+            await session.execute(
+                select(OrderEvent)
+                .where(OrderEvent.order_no == order_id)
+                .order_by(OrderEvent.sequence)
+            )
+        ).scalars().all()
+        assert [event.event_type for event in events] == ["ORDER_CREATED", "ORDER_REFUNDED"]
+        # occurred_at 是运维列：上海墙钟 10:00 必须落库为 UTC-naive 02:00（8 小时偏移）。
+        assert events[0].occurred_at == datetime(2025, 3, 2, 2, 0, 0)
+        assert events[1].occurred_at == datetime(2025, 3, 2, 2, 0, 5)
 
 
 @pytest.mark.asyncio
@@ -507,6 +523,127 @@ async def test_cancel_validated_run_marks_cancelled(importer_client: AsyncClient
     assert payload["status"] == "cancelled"
     assert payload["cancel_requested"] is True
     assert payload["can_confirm"] is False
+
+
+@pytest.mark.asyncio
+async def test_cancel_running_run_only_sets_intent(importer_client: AsyncClient, cleanup_runs):
+    """取消 running 任务只置意图，不得覆盖状态或承诺「未写入订单」。"""
+    response = await _upload(
+        importer_client,
+        _csv_bytes(
+            [
+                f"{_unique_order_id()},user-a,P1,100.00,100.00,c1,APP,"
+                "2025-03-01 10:00:00,2025-03-01 10:00:05,否,0,5"
+            ]
+        ),
+    )
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+    await _wait_until(importer_client, run_id, "validated")
+
+    async with import_session_factory() as db:
+        await db.execute(
+            update(DataImportRun).where(DataImportRun.id == run_id).values(status="running")
+        )
+        await db.commit()
+
+    cancelled = await importer_client.post(f"/api/data-import/runs/{run_id}/cancel")
+    assert cancelled.status_code == 200, cancelled.text
+    payload = cancelled.json()
+    assert payload["status"] == "running"
+    assert payload["cancel_requested"] is True
+    assert payload["error_message"] == ""
+
+    # 已结束的任务再次取消：不得把 completed 覆盖成 cancelled。
+    async with import_session_factory() as db:
+        await db.execute(
+            update(DataImportRun).where(DataImportRun.id == run_id).values(status="completed")
+        )
+        await db.commit()
+    again = await importer_client.post(f"/api/data-import/runs/{run_id}/cancel")
+    assert again.json()["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_import_lock_uses_dedicated_connection(
+    importer_client: AsyncClient, cleanup_runs, cleanup_orders
+):
+    """锁由独立连接持有：探测不会因重入误判，第二个执行请求必须被拒绝。"""
+    from backend.services.data_import_service import (
+        _IMPORT_LOCK_NAME,
+        execute_import_run,
+        import_lock_is_free,
+    )
+
+    order_id = _unique_order_id()
+    cleanup_orders.append(order_id)
+    content = _csv_bytes(
+        [
+            f"{order_id},user-lock,P1,100.00,100.00,c1,APP,"
+            "2025-03-01 10:00:00,2025-03-01 10:00:05,否,0,5"
+        ]
+    )
+    response = await _upload(importer_client, content)
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+    status_payload = await _wait_until(importer_client, run_id, "validated")
+    confirmed = await importer_client.post(
+        f"/api/data-import/runs/{run_id}/confirm",
+        json={"expected_sha256": status_payload["sha256"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+
+    async with import_engine.connect() as lock_conn:
+        acquired = await lock_conn.scalar(
+            text("SELECT GET_LOCK(:name, 0)"), {"name": _IMPORT_LOCK_NAME}
+        )
+        assert acquired == 1
+        try:
+            # 独立连接探测：不能因 GET_LOCK 重入把「已占用」误判为空闲。
+            assert await import_lock_is_free() is False
+            async with import_session_factory() as db:
+                await db.execute(
+                    update(DataImportRun)
+                    .where(DataImportRun.id == run_id)
+                    .values(status="running")
+                )
+                await db.commit()
+            await execute_import_run(run_id)
+        finally:
+            released = await lock_conn.scalar(
+                text("SELECT RELEASE_LOCK(:name)"), {"name": _IMPORT_LOCK_NAME}
+            )
+            assert released == 1
+
+    async with import_session_factory() as db:
+        run = await db.get(DataImportRun, run_id)
+        assert run.status == "failed"
+        assert run.error_code == "IMPORT_CONCURRENCY_CONFLICT"
+    async with async_session_factory() as session:
+        stored = (
+            await session.execute(select(Order).where(Order.order_no == order_id))
+        ).scalar_one_or_none()
+        assert stored is None
+    # 释放后锁可再次获取，证明没有泄漏。
+    assert await import_lock_is_free() is True
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_non_utf8_and_malformed_csv(importer_client: AsyncClient):
+    """编码契约：CSV 仅接受 UTF-8/BOM；csv 解析错误返回明确的格式错误。"""
+    header = "订单号,用户名,商品编号,订单金额,付款金额,平台类型,下单时间,是否退款\n"
+    gb_content = (
+        header + "gb-1,user,P1,1,1,APP,2025-03-01 10:00:00,否\n"
+    ).encode("gb18030")
+    response = await _upload(importer_client, gb_content)
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["error_code"] == "IMPORT_ENCODING_UNSUPPORTED"
+
+    # 单个字段超过 csv 默认 131072 上限：应返回 IMPORT_CSV_PARSE_ERROR，而不是通用 503。
+    malformed = ("A" * 200000 + "\n").encode("utf-8")
+    response = await _upload(importer_client, malformed)
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["error_code"] == "IMPORT_CSV_PARSE_ERROR"
 
 
 @pytest.mark.asyncio

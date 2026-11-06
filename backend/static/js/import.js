@@ -61,6 +61,7 @@ const state = {
   historyTotalPages: 0,
   toastTimer: 0,
   confirming: false,
+  resuming: false,
 };
 
 /* ───────────── 基础工具 ───────────── */
@@ -217,7 +218,7 @@ async function inspectFile(file) {
       new TextDecoder('utf-8', { fatal: true }).decode(bytes);
       encoding = 'UTF-8';
     } catch {
-      encoding = 'GB18030 或其它（服务端自动识别）';
+      encoding = '非 UTF-8（服务端仅接受 UTF-8，可带 BOM）';
     }
   }
 
@@ -363,7 +364,12 @@ async function pollRun() {
         setText($('#preview-sub'), '服务端正在校验…');
         setText($('#preview-state .state-block'), `已读取 ${run.counts?.rows_read || 0} 行，正在校验…`);
       }
-    } else if (run.status === 'confirmed' || run.status === 'running') {
+    } else if (run.status === 'confirmed') {
+      // 已确认但未启动：停止轮询，展示「继续执行」入口，避免无限轮询。
+      stopPolling();
+      showExecutionPanel();
+      renderExecution(run);
+    } else if (run.status === 'running') {
       if (!state.execStartedAt) state.execStartedAt = Date.now();
       showExecutionPanel();
       renderExecution(run);
@@ -804,11 +810,15 @@ function renderExecution(run) {
   } else if (run.status === 'completed') {
     setText(message, '导入完成，并已执行一次只读一致性校验。');
   } else if (run.status === 'confirmed') {
-    setText(message, '已确认，等待执行锁后开始写入。');
+    setText(message, '已确认但尚未开始写入，可点击「继续执行」重新获取确认令牌并启动。');
   } else {
     setText(message, statusMeta(run.status).label);
   }
 
+  const resume = $('#resume-run');
+  resume.toggleAttribute('hidden', run.status !== 'confirmed');
+  resume.disabled = false;
+  resume.textContent = '继续执行';
   const cancel = $('#cancel-run');
   const canCancel = run.status === 'running' && !run.cancel_requested;
   cancel.toggleAttribute('hidden', !canCancel);
@@ -816,7 +826,9 @@ function renderExecution(run) {
   cancel.textContent = '取消剩余分块';
   $('#refresh-result').toggleAttribute('hidden', !TERMINAL_STATUSES.has(run.status));
   const actions = $('.run-actions');
-  if (actions) actions.hidden = !canCancel && !TERMINAL_STATUSES.has(run.status);
+  if (actions) {
+    actions.hidden = !canCancel && !TERMINAL_STATUSES.has(run.status) && run.status !== 'confirmed';
+  }
 }
 
 function renderRunCounts(counts) {
@@ -905,7 +917,13 @@ async function cancelRun() {
     const run = await apiFetch(`/api/data-import/runs/${state.activeRunId}/cancel`, { method: 'POST' });
     state.run = run;
     renderExecution(run);
-    toast('已请求取消：已提交分块保留，剩余分块不再写入。');
+    if (run.status === 'completed' || run.status === 'failed') {
+      toast('任务已结束，未执行取消。');
+    } else if (run.status === 'cancelled') {
+      toast('已取消：尚未开始执行，未写入任何订单。');
+    } else {
+      toast('已请求取消：已提交分块保留，剩余分块不再写入。');
+    }
     if (!TERMINAL_STATUSES.has(run.status)) startPolling();
     else {
       await loadResult(run);
@@ -915,6 +933,42 @@ async function cancelRun() {
     toast(`取消失败：${describeError(error)}`);
     button.disabled = false;
     button.textContent = '取消剩余分块';
+  }
+}
+
+async function resumeRun() {
+  if (!state.activeRunId || state.run?.status !== 'confirmed' || state.resuming) return;
+  const button = $('#resume-run');
+  state.resuming = true;
+  button.disabled = true;
+  button.textContent = '正在启动…';
+  try {
+    // 刷新页面后确认令牌可能已丢失：重新确认会轮换出新令牌。
+    const runId = state.activeRunId;
+    const confirmed = await apiFetch(`/api/data-import/runs/${runId}/confirm`, {
+      method: 'POST',
+      body: { expected_sha256: state.run.sha256 },
+    });
+    const token = confirmed?.confirm_token;
+    if (!token) throw new ApiError('确认令牌未返回，请重新上传文件', 409, 'IMPORT_CONFIRM_TOKEN_MISSING');
+    const executed = await apiFetch(`/api/data-import/runs/${runId}/execute`, {
+      method: 'POST',
+      body: { confirm_token: token },
+    });
+    state.run = executed;
+    state.execStartedAt = Date.now();
+    renderExecution(executed);
+    startPolling();
+    toast('已继续执行导入。');
+  } catch (error) {
+    const message = error?.status === 409
+      ? '已有导入任务正在执行，请等待其结束后重试。'
+      : `继续执行失败：${describeError(error)}`;
+    showAlert(message);
+    button.disabled = false;
+    button.textContent = '继续执行';
+  } finally {
+    state.resuming = false;
   }
 }
 
@@ -1172,6 +1226,7 @@ function bindEvents() {
   });
 
   $('#cancel-run').addEventListener('click', cancelRun);
+  $('#resume-run').addEventListener('click', resumeRun);
   $('#refresh-result').addEventListener('click', () => {
     if (!state.run) return;
     renderExecution(state.run);

@@ -242,7 +242,7 @@ docker compose up -d backend streamlit ai-assistant nginx
 订单 CSV 只能由 `backend/scripts/import_orders.py` 显式导入（应用侧批量 INSERT，不依赖 `LOAD DATA`/`FILE` 权限）；后端启动不再同步或覆盖订单。
 已有运行期订单或事件账本时禁止全量替换；历史退款状态通过 `backend/scripts/reconcile_orders.py` 独立对账（默认 dry-run）。
 
-**工作台数据导入**：具备 `data:import` 权限的账号可在 `/workspace/import` 上传 CSV/XLSX，服务端完成格式/编码识别、列映射、逐行校验与二次确认后才分块写入。上传只写 MySQL（`orders`、`order_events`、`data_state` 与导入审计/暂存表），**不会改动 `data/cleaned_orders.csv` 初始化快照**；该快照仅用于首次显式初始化。冲突默认“该行失败并继续”，也可选择“跳过冲突行”，v1 不支持覆盖已有订单。导入成功后在服务端跑一次只读一致性校验（订单事件水位/状态/退款标记与账本比对），不一致会把本次运行标记失败。导入历史与暂存行默认保留 7 天（`DATA_IMPORT_STAGING_TTL_DAYS`），由每次新建导入前触发的一次性清理回收；执行中可取消，取消只停止后续分块，已提交部分保留。
+**工作台数据导入**：具备 `data:import` 权限的账号可在 `/workspace/import` 上传 CSV/XLSX，服务端完成格式识别（CSV 仅接受 UTF-8，可带 BOM；其他编码直接拒绝）、列映射、逐行校验与二次确认后才分块写入。上传只写 MySQL（`orders`、`order_events`、`data_state` 与导入审计/暂存表），**不会改动 `data/cleaned_orders.csv` 初始化快照**；该快照仅用于首次显式初始化。冲突默认“该行失败并继续”，也可选择“跳过冲突行”，v1 不支持覆盖已有订单。导入成功后在服务端跑一次只读一致性校验（订单事件水位/状态/退款标记与账本比对），不一致会把本次运行标记失败。导入历史与暂存行默认保留 7 天（`DATA_IMPORT_STAGING_TTL_DAYS`），由每次新建导入前触发的一次性清理回收；执行中可取消，取消只停止后续分块，已提交部分保留。
 
 ### Database Schema Management
 
