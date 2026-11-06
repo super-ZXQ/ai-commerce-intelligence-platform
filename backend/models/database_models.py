@@ -208,6 +208,10 @@ class DataImportRun(Base):
     confirm_token_hash = Column("confirm_token_hash", mysql.CHAR(64), nullable=False, default="")
     heartbeat_at = Column("heartbeat_at", DateTime, nullable=True)
     error_code = Column("error_code", String(64), nullable=False, default="")
+    # 取消只设置标记：执行任务在当前分块提交后才读取，已提交部分不会被回滚。
+    cancel_requested = Column(
+        "cancel_requested", mysql.TINYINT(1), nullable=False, default=0
+    )
 
 
 class DataImportRow(Base):

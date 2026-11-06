@@ -103,6 +103,7 @@ docker compose up -d
 | `/` | backend:8000 | 统一导航页（默认入口） |
 | `/login` `/logout` | backend:8000 | 统一登录/退出（公开）；登录后写入 HttpOnly 会话 Cookie |
 | `/workspace` | backend:8000 | 经营工作台（需 `data:read` 会话；未登录 303 跳转登录） |
+| `/workspace/import` | backend:8000 | 数据导入页（需 `data:import` 会话；无权限返回 403） |
 | `/BI/` | streamlit:8501 | BI 看板（需会话；baseUrlPath=/BI，`/BI` 会 301 跳到 `/BI/`） |
 | `/ai/` | ai-assistant:8502 | AI 分析助手（需会话；baseUrlPath=/ai；RAG/模型由后端执行） |
 | `/api/*` | backend:8000 | RESTful API |
@@ -237,9 +238,11 @@ docker compose up -d backend streamlit ai-assistant nginx
 
 **Alembic 是 schema evolution source of truth**（`backend/alembic/`）。
 `sql/01_create_table.sql` 仅保留为参考 DDL，**不再**挂载到 MySQL `initdb.d`；一致性由 `test_alembic_migrations.py` 校验。
-历史数据库需先升级到 Alembic head（当前 `0006_episode_memory`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表，`0004_auth_identity` 增加数据库用户目录、服务凭据与认证/AI 审计表，`0005_agent_memory` 增加按用户隔离的长期偏好表，`0006_episode_memory` 增加压缩情节与向量表。权限矩阵见 `docs/DB_PERMISSIONS.md`。
+历史数据库需先升级到 Alembic head（当前 `0008_data_import_cancel`）：`0002_order_auto_increment` 为旧订单主键补齐自增，`0003_data_protection` 增加数据版本与导入/对账审计表，`0004_auth_identity` 增加数据库用户目录、服务凭据与认证/AI 审计表，`0005_agent_memory` 增加按用户隔离的长期偏好表，`0006_episode_memory` 增加压缩情节与向量表，`0007_data_import` 增加导入运行计数/确认字段与暂存行，`0008_data_import_cancel` 增加执行取消标记。权限矩阵见 `docs/DB_PERMISSIONS.md`。
 订单 CSV 只能由 `backend/scripts/import_orders.py` 显式导入（应用侧批量 INSERT，不依赖 `LOAD DATA`/`FILE` 权限）；后端启动不再同步或覆盖订单。
 已有运行期订单或事件账本时禁止全量替换；历史退款状态通过 `backend/scripts/reconcile_orders.py` 独立对账（默认 dry-run）。
+
+**工作台数据导入**：具备 `data:import` 权限的账号可在 `/workspace/import` 上传 CSV/XLSX，服务端完成格式/编码识别、列映射、逐行校验与二次确认后才分块写入。上传只写 MySQL（`orders`、`order_events`、`data_state` 与导入审计/暂存表），**不会改动 `data/cleaned_orders.csv` 初始化快照**；该快照仅用于首次显式初始化。冲突默认“该行失败并继续”，也可选择“跳过冲突行”，v1 不支持覆盖已有订单。导入成功后在服务端跑一次只读一致性校验（订单事件水位/状态/退款标记与账本比对），不一致会把本次运行标记失败。导入历史与暂存行默认保留 7 天（`DATA_IMPORT_STAGING_TTL_DAYS`），由每次新建导入前触发的一次性清理回收；执行中可取消，取消只停止后续分块，已提交部分保留。
 
 ### Database Schema Management
 

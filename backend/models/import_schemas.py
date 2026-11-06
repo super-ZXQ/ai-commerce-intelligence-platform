@@ -46,7 +46,18 @@ class ImportRunStatus(BaseModel):
     error_message: str = ""
     can_confirm: bool = False
     can_execute: bool = False
+    cancel_requested: bool = False
     progress_percent: float = 0.0
+
+
+class ImportRunListResponse(BaseModel):
+    """导入历史：普通账号只看到本人任务，管理员可看全部。"""
+
+    page: int = 1
+    page_size: int = 20
+    total: int = 0
+    total_pages: int = 0
+    items: list[ImportRunStatus] = Field(default_factory=list)
 
 
 class ImportColumnMapping(BaseModel):

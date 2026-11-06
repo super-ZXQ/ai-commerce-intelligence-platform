@@ -27,6 +27,7 @@ from backend.models.import_schemas import (
     ImportPreviewResponse,
     ImportResultResponse,
     ImportRowPage,
+    ImportRunListResponse,
     ImportRunStatus,
 )
 from backend.services import data_import_service as service
@@ -120,6 +121,17 @@ async def upload_import_file(
         mapping = service.build_column_mapping(headers)
         options = {"conflict_policy": conflict_policy, **mapping}
 
+        # 新建导入前顺手回收过期暂存行/历史；失败只记录告警，不能阻塞本次上传。
+        try:
+            deleted_rows, deleted_runs = await service.cleanup_expired_imports(db)
+            if deleted_runs:
+                logger.info(
+                    "清理过期导入：删除 %s 条任务、%s 条暂存行", deleted_runs, deleted_rows
+                )
+        except Exception as exc:  # noqa: BLE001 - 清理是旁路任务
+            await db.rollback()
+            logger.warning("清理过期导入失败: %s", sanitize_error(exc))
+
         run = DataImportRun(
             source=original,
             source_sha256=digest.hexdigest(),
@@ -154,6 +166,29 @@ async def upload_import_file(
 
     background_tasks.add_task(service.validate_import_run, run.id, str(temp_path))
     return service.build_run_status(run)
+
+
+@router.get(
+    "/runs",
+    response_model=ImportRunListResponse,
+    summary="导入历史：本人可见，管理员可看全部",
+)
+async def list_import_runs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_import_db),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_IMPORT)),
+):
+    try:
+        return await service.list_runs(
+            db,
+            principal_name=principal.name,
+            is_admin=principal.has_scope(SCOPE_ADMIN_MANAGE),
+            page=page,
+            page_size=page_size,
+        )
+    except service.ImportFileError as exc:
+        _raise(exc)
 
 
 @router.get("/runs/{run_id}", response_model=ImportRunStatus, summary="查询导入运行状态")
@@ -282,6 +317,28 @@ async def execute_import_run(
     if should_schedule:
         # 执行时间可能远超前台请求；放到后台任务里，避免阻塞响应。
         background_tasks.add_task(service.execute_import_run, run.id)
+    return service.build_run_status(run)
+
+
+@router.post(
+    "/runs/{run_id}/cancel",
+    response_model=ImportRunStatus,
+    summary="请求取消：执行中只停止后续分块，已提交部分保留",
+)
+async def cancel_import_run(
+    run_id: int,
+    db: AsyncSession = Depends(get_import_db),
+    principal: Principal = Depends(require_scope(SCOPE_DATA_IMPORT)),
+):
+    try:
+        run = await service.cancel_run(
+            db,
+            run_id,
+            principal.name,
+            is_admin=principal.has_scope(SCOPE_ADMIN_MANAGE),
+        )
+    except service.ImportFileError as exc:
+        _raise(exc)
     return service.build_run_status(run)
 
 

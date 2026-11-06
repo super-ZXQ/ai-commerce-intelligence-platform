@@ -5,7 +5,7 @@ import asyncio
 import hashlib
 import io
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -395,6 +395,106 @@ async def test_refund_row_imports_v2_event_and_failure_csv(importer_client: Asyn
     assert body.startswith("\ufeff")
     # 以 = + - @ 开头的值必须加前缀，避免 Excel 当公式执行。
     assert "'=cmd" in body
+
+
+@pytest.mark.asyncio
+async def test_import_history_lists_own_runs(importer_client: AsyncClient, cleanup_runs):
+    order_id = _unique_order_id()
+    response = await _upload(
+        importer_client,
+        _csv_bytes(
+            [
+                f"{order_id},user-a,P1,100.00,100.00,c1,APP,2025-03-01 10:00:00,2025-03-01 10:00:05,否,0,5"
+            ]
+        ),
+    )
+    assert response.status_code == 202, response.text
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+    await _wait_until(importer_client, run_id, "validated")
+
+    listed = await importer_client.get(
+        "/api/data-import/runs", params={"page": 1, "page_size": 20}
+    )
+    assert listed.status_code == 200, listed.text
+    payload = listed.json()
+    assert payload["total"] >= 1
+    assert any(item["run_id"] == run_id for item in payload["items"])
+    # 普通导入员只能看到自己的任务。
+    operators = {item["operator"] for item in payload["items"]}
+    assert len(operators) == 1
+
+
+@pytest.mark.asyncio
+async def test_cancel_validated_run_marks_cancelled(importer_client: AsyncClient, cleanup_runs):
+    response = await _upload(
+        importer_client,
+        _csv_bytes(
+            [
+                f"{_unique_order_id()},user-a,P1,100.00,100.00,c1,APP,2025-03-01 10:00:00,2025-03-01 10:00:05,否,0,5"
+            ]
+        ),
+    )
+    assert response.status_code == 202, response.text
+    run_id = response.json()["run_id"]
+    cleanup_runs.append(run_id)
+    await _wait_until(importer_client, run_id, "validated")
+
+    cancelled = await importer_client.post(f"/api/data-import/runs/{run_id}/cancel")
+    assert cancelled.status_code == 200, cancelled.text
+    payload = cancelled.json()
+    assert payload["status"] == "cancelled"
+    assert payload["cancel_requested"] is True
+    assert payload["can_confirm"] is False
+
+
+@pytest.mark.asyncio
+async def test_upload_prunes_expired_runs_but_keeps_active(importer_client: AsyncClient):
+    """过期清理只删除终态历史，校验/执行中的任务必须保留。"""
+    old = datetime.now() - timedelta(days=30)
+    async with import_session_factory() as session:
+        stale = DataImportRun(
+            source="stale.csv",
+            source_sha256="a" * 64,
+            mode="upload",
+            status="validated",
+            operator="cleanup-user",
+            started_at=old,
+            finished_at=old,
+        )
+        active = DataImportRun(
+            source="active.csv",
+            source_sha256="b" * 64,
+            mode="upload",
+            status="running",
+            operator="cleanup-user",
+            started_at=old,
+            heartbeat_at=old,
+        )
+        session.add_all([stale, active])
+        await session.commit()
+        stale_id, active_id = stale.id, active.id
+
+    response = await _upload(
+        importer_client,
+        _csv_bytes(
+            [
+                f"{_unique_order_id()},user-a,P1,100.00,100.00,c1,APP,2025-03-01 10:00:00,2025-03-01 10:00:05,否,0,5"
+            ]
+        ),
+    )
+    assert response.status_code == 202, response.text
+    async with import_session_factory() as session:
+        assert await session.get(DataImportRun, stale_id) is None
+        assert await session.get(DataImportRun, active_id) is not None
+        await session.execute(delete(DataImportRun).where(DataImportRun.id == active_id))
+        await session.execute(
+            delete(DataImportRow).where(DataImportRow.run_id == response.json()["run_id"])
+        )
+        await session.execute(
+            delete(DataImportRun).where(DataImportRun.id == response.json()["run_id"])
+        )
+        await session.commit()
 
 
 @pytest.mark.asyncio

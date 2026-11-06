@@ -25,7 +25,7 @@
 | `orders` | SELECT | SELECT | SELECT/INSERT/UPDATE | SELECT/INSERT/UPDATE | — |
 | `order_events` | SELECT | — | SELECT/INSERT/UPDATE | SELECT/INSERT/UPDATE | — |
 | `data_state` | SELECT | — | SELECT/UPDATE | SELECT/UPDATE | — |
-| `data_import_runs` | SELECT | — | — | SELECT/INSERT/UPDATE | — |
+| `data_import_runs` | SELECT | — | — | SELECT/INSERT/UPDATE/DELETE | — |
 | `data_import_rows` | — | — | — | SELECT/INSERT/UPDATE/DELETE | — |
 | `order_status_reconciliation` | SELECT | — | — | — | — |
 | `auth_users` | — | — | — | — | SELECT/INSERT/UPDATE/DELETE |
@@ -41,7 +41,7 @@
 - `ea_ai` 只授予 `orders`，即使 Text-to-SQL 黑名单被绕过，也无法读取认证表或其他业务表。
 - `ea_events` 不能删除订单、不能访问认证表；事件幂等由 `order_events.event_id` 唯一键兜底。
 - `ea_events` 可在事件事务内更新 `data_state.data_version`，用于缓存版本切换；该权限不包含 DELETE，不能重置版本或删除版本行。
-- `ea_import` 是业务上传导入专用账号：只能写订单、事件、数据版本与导入审计/暂存表，不能读认证表，也没有任何 DDL 权限。暂存行在校验阶段写入，执行完成后按保留策略清理。
+- `ea_import` 是业务上传导入专用账号：只能写订单、事件、数据版本与导入审计/暂存表，不能读认证表，也没有任何 DDL 权限。暂存行在校验阶段写入，执行完成后按保留策略清理；清理需要删除终态任务及其暂存行，因此 `data_import_runs` 与 `data_import_rows` 各有 DELETE，且删除范围不包含 `orders`/`order_events`。
 - `ea_import` 与 `ea_events` 共用订单/事件写权限，但用途分离：事件 API 走 `ea_events`，上传导入走 `ea_import`，任一账号被轮换不会影响另一条写路径。
 - `ea_auth` 无任何 `orders` 权限；认证库连接池与业务连接池相互独立。
 - `ea_auth` 对 `agent_memory_fact` 的读写必须始终带 `owner` 条件；owner 来自认证主体，不能由客户端传入。

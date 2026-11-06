@@ -19,7 +19,7 @@ _SEED = _BACKEND / "scripts" / "seed_ci_data.py"
 _BOOTSTRAP_SH = _ROOT / "deploy" / "mysql" / "bootstrap-users.sh"
 _GRANT_SH = _ROOT / "deploy" / "mysql" / "apply-grants.sh"
 # Alembic head 由迁移树决定；测试不再写死单一 revision，避免新增迁移后漏改。
-_HEAD = "0007_data_import"
+_HEAD = "0008_data_import_cancel"
 # alembic CLI must run from repo root: backend/alembic/ can shadow the package
 _ALEMBIC_CWD = _ROOT
 
@@ -231,7 +231,10 @@ def test_table_level_grants_are_least_privilege():
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`agent_memory_episode\\`" in sh
     assert "GRANT SELECT, UPDATE ON \\`${DB_NAME}\\`.\\`data_state\\` TO 'ea_events'@'%'" in sh
     assert "GRANT SELECT, INSERT, UPDATE ON \\`${DB_NAME}\\`.\\`orders\\` TO 'ea_import'@'%'" in sh
+    # 过期清理只允许删除导入审计/暂存表，不能扩大到订单或事件账本。
+    assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`data_import_runs\\` TO 'ea_import'@'%'" in sh
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON \\`${DB_NAME}\\`.\\`data_import_rows\\` TO 'ea_import'@'%'" in sh
+    assert "DELETE ON \\`${DB_NAME}\\`.\\`orders\\` TO 'ea_import'" not in sh
     assert "DELETE ON \\`${DB_NAME}\\`.\\`data_state\\`" not in sh
     assert "auth_users" not in sh.split("GRANT SELECT ON")[1].split("ea_ai")[0]
 

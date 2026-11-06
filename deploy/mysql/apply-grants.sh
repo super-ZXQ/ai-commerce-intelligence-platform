@@ -87,7 +87,8 @@ GRANT SELECT, UPDATE ON \`${DB_NAME}\`.\`data_state\` TO 'ea_events'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`orders\` TO 'ea_import'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`order_events\` TO 'ea_import'@'%';
 GRANT SELECT, UPDATE ON \`${DB_NAME}\`.\`data_state\` TO 'ea_import'@'%';
-GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.\`data_import_runs\` TO 'ea_import'@'%';
+-- 过期清理需要删除终态运行及其暂存行；删除权限仅限导入审计/暂存表。
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`data_import_runs\` TO 'ea_import'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.\`data_import_rows\` TO 'ea_import'@'%';
 
 -- 认证账号：仅认证、服务凭据与审计表；无业务数据访问权限。

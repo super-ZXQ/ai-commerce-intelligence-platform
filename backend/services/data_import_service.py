@@ -20,7 +20,7 @@ import tempfile
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
@@ -42,6 +42,7 @@ from backend.models.import_schemas import (
     ImportResultResponse,
     ImportRowItem,
     ImportRowPage,
+    ImportRunListResponse,
     ImportRunStatus,
 )
 from backend.services.rfm_service import clear_rfm_snapshot_cache
@@ -61,6 +62,11 @@ RUN_CONFIRMED = "confirmed"
 RUN_RUNNING = "running"
 RUN_COMPLETED = "completed"
 RUN_FAILED = "failed"
+RUN_CANCELLED = "cancelled"
+
+# 活跃任务不参与过期清理：校验/执行中的记录可能仍被后台任务引用。
+_ACTIVE_STATUSES = (RUN_VALIDATING, RUN_RUNNING)
+_CLEANUP_BATCH_SIZE = 200
 
 ROW_VALID = "valid"
 ROW_CONFLICT = "conflict"
@@ -806,8 +812,9 @@ def build_run_status(run: DataImportRun) -> ImportRunStatus:
     done = (run.rows_inserted or 0) + (run.rows_skipped or 0) + (run.rows_rejected or 0)
     if run.status == RUN_COMPLETED:
         progress = 100.0
-    elif run.status == RUN_RUNNING and rows_read:
-        progress = min(round(done / rows_read * 100, 1), 99.9)
+    elif run.status in (RUN_RUNNING, RUN_CANCELLED) and rows_read:
+        # 取消后也展示真实已完成比例，避免被误读成 0 或 100。
+        progress = min(round(done / rows_read * 100, 1), 99.9 if run.status == RUN_RUNNING else 100.0)
     else:
         progress = 0.0
     return ImportRunStatus(
@@ -836,6 +843,7 @@ def build_run_status(run: DataImportRun) -> ImportRunStatus:
         error_message=run.error_message or "",
         can_confirm=run.status == RUN_VALIDATED and (run.rows_valid or 0) > 0,
         can_execute=run.status == RUN_CONFIRMED,
+        cancel_requested=bool(run.cancel_requested),
         progress_percent=progress,
     )
 
@@ -876,6 +884,129 @@ async def load_run(db: AsyncSession, run_id: int) -> DataImportRun:
     run = await db.get(DataImportRun, run_id)
     if run is None:
         raise ImportFileError("IMPORT_RUN_NOT_FOUND", "导入任务不存在", http_status=404)
+    return run
+
+
+async def cleanup_expired_imports(db: AsyncSession) -> tuple[int, int]:
+    """清理超过保留期的导入记录与暂存行，返回 (删除行数, 删除任务数)。
+
+    只在新建导入前触发一次，不引入调度器；活跃中的校验/执行任务绝不删除。
+    每批最多 200 个任务，避免单次上传请求长时间占用事务。
+    """
+    ttl_days = settings.data_import_staging_ttl_days
+    if ttl_days < 1:
+        # 小于 1 天视为关闭清理，保留全部历史。
+        return 0, 0
+    cutoff = _utc_now_naive() - timedelta(days=ttl_days)
+    expired_ids = list(
+        (
+            await db.execute(
+                select(DataImportRun.id)
+                .where(
+                    DataImportRun.status.notin_(_ACTIVE_STATUSES),
+                    func.coalesce(
+                        DataImportRun.finished_at,
+                        DataImportRun.heartbeat_at,
+                        DataImportRun.started_at,
+                    )
+                    < cutoff,
+                )
+                .order_by(DataImportRun.id)
+                .limit(_CLEANUP_BATCH_SIZE)
+            )
+        ).scalars()
+    )
+    if not expired_ids:
+        return 0, 0
+    rows_result = await db.execute(
+        delete(DataImportRow).where(DataImportRow.run_id.in_(expired_ids))
+    )
+    runs_result = await db.execute(
+        delete(DataImportRun).where(DataImportRun.id.in_(expired_ids))
+    )
+    await db.commit()
+    return (rows_result.rowcount or 0, runs_result.rowcount or 0)
+
+
+async def list_runs(
+    db: AsyncSession,
+    *,
+    principal_name: str,
+    is_admin: bool,
+    page: int,
+    page_size: int,
+) -> ImportRunListResponse:
+    """导入历史：普通账号仅本人任务，管理员可查看全部。"""
+    if page < 1:
+        raise ImportFileError("IMPORT_INVALID_PAGE", "页码必须从 1 开始")
+    if page_size < 1 or page_size > 100:
+        raise ImportFileError("IMPORT_INVALID_PAGE_SIZE", "每页最多 100 条")
+    condition = () if is_admin else (DataImportRun.operator == principal_name,)
+    total = int(
+        await db.scalar(
+            select(func.count()).select_from(DataImportRun).where(*condition)
+        )
+        or 0
+    )
+    total_pages = max((total + page_size - 1) // page_size, 0)
+    result = await db.execute(
+        select(DataImportRun)
+        .where(*condition)
+        .order_by(DataImportRun.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return ImportRunListResponse(
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+        items=[build_run_status(run) for run in result.scalars()],
+    )
+
+
+async def cancel_run(
+    db: AsyncSession,
+    run_id: int,
+    principal_name: str,
+    *,
+    is_admin: bool,
+) -> DataImportRun:
+    """请求取消：执行中只置标记，由执行任务在分块提交后停止。
+
+    已提交分块保留；已校验但未开始执行的任务可直接终止，不写入任何订单。
+    """
+    run = await load_run(db, run_id)
+    assert_run_owner(run, principal_name, is_admin)
+    if run.status == RUN_VALIDATING:
+        raise ImportFileError(
+            "IMPORT_CANCEL_NOT_ALLOWED",
+            "文件仍在校验中，暂不支持取消，请等待校验结束后重试",
+            http_status=409,
+        )
+    if run.status in (RUN_COMPLETED, RUN_FAILED, RUN_CANCELLED):
+        return run
+    now = _utc_now_naive()
+    if run.status == RUN_RUNNING:
+        await db.execute(
+            update(DataImportRun)
+            .where(DataImportRun.id == run_id, DataImportRun.status == RUN_RUNNING)
+            .values(cancel_requested=1, heartbeat_at=now)
+        )
+    else:
+        await db.execute(
+            update(DataImportRun)
+            .where(DataImportRun.id == run_id)
+            .values(
+                status=RUN_CANCELLED,
+                cancel_requested=1,
+                finished_at=now,
+                error_code="IMPORT_CANCELLED",
+                error_message="已取消：尚未开始执行，未写入任何订单",
+            )
+        )
+    await db.commit()
+    await db.refresh(run)
     return run
 
 
@@ -1390,7 +1521,18 @@ async def _consistency_mismatch_count(db: AsyncSession, run_id: int) -> int:
     return int(value or 0)
 
 
-async def _finalize_execution(db: AsyncSession, run: DataImportRun) -> None:
+async def _is_cancel_requested(db: AsyncSession, run_id: int) -> bool:
+    """读取取消标记；每个分块提交后检查一次，避免跨事务缓存旧值。"""
+    return bool(
+        await db.scalar(
+            select(DataImportRun.cancel_requested).where(DataImportRun.id == run_id)
+        )
+    )
+
+
+async def _finalize_execution(
+    db: AsyncSession, run: DataImportRun, *, cancelled: bool = False
+) -> None:
     counts_result = await db.execute(
         select(DataImportRow.status, func.count())
         .where(DataImportRow.run_id == run.id)
@@ -1425,6 +1567,12 @@ async def _finalize_execution(db: AsyncSession, run: DataImportRun) -> None:
             status=RUN_FAILED,
             error_code="IMPORT_CONSISTENCY_FAILED",
             error_message=f"导入后一致性校验失败：{mismatches} 行的订单状态与事件账本不一致",
+        )
+    elif cancelled:
+        values.update(
+            status=RUN_CANCELLED,
+            error_code="IMPORT_CANCELLED",
+            error_message="已取消：已提交的分块保留，未处理的行未写入",
         )
     else:
         values.update(status=RUN_COMPLETED, error_code="", error_message="")
@@ -1461,7 +1609,8 @@ async def _execute_run(db: AsyncSession, run: DataImportRun) -> None:
 
     await _apply_conflict_policy(db, run)
 
-    while True:
+    cancelled = await _is_cancel_requested(db, run.id)
+    while not cancelled:
         result = await db.execute(
             select(DataImportRow)
             .where(DataImportRow.run_id == run.id, DataImportRow.status == ROW_VALID)
@@ -1472,8 +1621,10 @@ async def _execute_run(db: AsyncSession, run: DataImportRun) -> None:
         if not rows:
             break
         await _execute_chunk(db, run, rows)
+        # 只在分块提交后读取标记：已提交的分块不会被回滚。
+        cancelled = await _is_cancel_requested(db, run.id)
 
-    await _finalize_execution(db, run)
+    await _finalize_execution(db, run, cancelled=cancelled)
     await _safe_invalidate_import_caches()
 
 
