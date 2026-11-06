@@ -11,7 +11,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from openpyxl import Workbook
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from backend.database import async_session_factory, auth_session_factory, import_session_factory
 from backend.main import app
@@ -622,6 +622,89 @@ async def test_viewer_cannot_upload(client: AsyncClient):
     finally:
         async with auth_session_factory() as session:
             await session.execute(delete(AuthUser).where(AuthUser.username == username))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_consistency_flags_null_refund_flag():
+    """退款订单的 is_refund 为 NULL 时必须判为不一致。
+
+    旧写法 `is_refund <> '是'` 对 NULL 恒为 NULL，退款事件存在也会漏判；
+    这里用「已退款但退款标记缺失」这一真实坏数据形态做回归。
+    """
+    from backend.services.data_import_service import _consistency_mismatch_count
+
+    order_id = _unique_order_id()
+    seq_id = 300000 + uuid.uuid4().int % 100000
+    run_id = 800000 + uuid.uuid4().int % 100000
+    occurred = datetime(2025, 4, 1, 12, 0, 0)
+
+    try:
+        # 已退款账本 + 退款标记为 NULL 的坏数据。
+        async with async_session_factory() as session:
+            session.add(
+                Order(
+                    id=seq_id,
+                    order_no=order_id,
+                    order_status="REFUNDED",
+                    event_version=2,
+                    is_refunded=None,
+                )
+            )
+            session.add_all(
+                [
+                    OrderEvent(
+                        event_id=uuid.uuid4().hex,
+                        order_no=order_id,
+                        event_type="ORDER_CREATED",
+                        occurred_at=occurred,
+                        sequence=1,
+                        source="loadtest",
+                        payload={"order_id": order_id},
+                        processing_status="processed",
+                    ),
+                    OrderEvent(
+                        event_id=uuid.uuid4().hex,
+                        order_no=order_id,
+                        event_type="ORDER_REFUNDED",
+                        occurred_at=occurred + timedelta(seconds=5),
+                        sequence=2,
+                        source="loadtest",
+                        payload={"order_id": order_id},
+                        processing_status="processed",
+                    ),
+                ]
+            )
+            await session.commit()
+
+        async with import_session_factory() as session:
+            session.add(
+                DataImportRow(
+                    run_id=run_id,
+                    row_no=1,
+                    order_id=order_id,
+                    status="imported",
+                )
+            )
+            await session.commit()
+
+        async with async_session_factory() as session:
+            assert await _consistency_mismatch_count(session, run_id) == 1
+            await session.execute(
+                update(Order).where(Order.order_no == order_id).values(is_refunded="是")
+            )
+            await session.commit()
+
+        # 补齐退款标记后，正常退款数据的判定结果不变。
+        async with async_session_factory() as session:
+            assert await _consistency_mismatch_count(session, run_id) == 0
+    finally:
+        async with import_session_factory() as session:
+            await session.execute(delete(DataImportRow).where(DataImportRow.run_id == run_id))
+            await session.commit()
+        async with async_session_factory() as session:
+            await session.execute(delete(OrderEvent).where(OrderEvent.order_no == order_id))
+            await session.execute(delete(Order).where(Order.order_no == order_id))
             await session.commit()
 
 

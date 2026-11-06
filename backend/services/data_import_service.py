@@ -1515,7 +1515,10 @@ async def _consistency_mismatch_count(db: AsyncSession, run_id: int) -> int:
                     WHERE e.order_id = o.order_id
                 )
                 OR (o.is_refund = '是' AND (o.order_status <> 'REFUNDED' OR o.event_version <> 2))
-                OR (o.is_refund <> '是' AND (o.order_status <> 'ACTIVE' OR o.event_version <> 1))
+                OR (
+                    (o.is_refund IS NULL OR o.is_refund <> '是')
+                    AND (o.order_status <> 'ACTIVE' OR o.event_version <> 1)
+                )
                 OR (
                     o.is_refund = '是' AND NOT EXISTS (
                         SELECT 1 FROM order_events e
@@ -1523,7 +1526,7 @@ async def _consistency_mismatch_count(db: AsyncSession, run_id: int) -> int:
                     )
                 )
                 OR (
-                    o.is_refund <> '是' AND EXISTS (
+                    (o.is_refund IS NULL OR o.is_refund <> '是') AND EXISTS (
                         SELECT 1 FROM order_events e
                         WHERE e.order_id = o.order_id AND e.event_type = 'ORDER_REFUNDED'
                     )
