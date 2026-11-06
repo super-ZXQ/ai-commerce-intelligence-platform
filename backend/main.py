@@ -24,7 +24,19 @@ from backend.database import (
     engine,
     event_engine,
 )
-from backend.routes import ai, analytics, auth, bi, export, monitor, order_events, orders, products, rfm
+from backend.routes import (
+    ai,
+    analytics,
+    auth,
+    bi,
+    data_import,
+    export,
+    monitor,
+    order_events,
+    orders,
+    products,
+    rfm,
+)
 from backend.routes.monitor import (
     _load_rag_stats,
     detailed_health,
@@ -344,6 +356,7 @@ async def rfm_unavailable_handler(request: Request, exc: RfmDataUnavailableError
 app.include_router(auth.router)
 app.include_router(orders.router)
 app.include_router(order_events.router)
+app.include_router(data_import.router)
 app.include_router(products.router)
 app.include_router(analytics.router)
 app.include_router(bi.router)
