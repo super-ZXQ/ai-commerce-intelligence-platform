@@ -1,19 +1,10 @@
-"""从真实评测数据生成首页 Agent Query Studio 的双模式快照（不入库，临时构建器）。
-
-- 精简模式 (lite)：3 条核心链路（data / knowledge / blocked），字段裁剪到首屏必需。
-- 完整模式 (full)：4 条链路 + 节点元数据 + SQL 高亮词表 + 运行汇总。
-
-设计原则：
-  1. 字段全来自真实评测（docs/evaluation/glm-4-flash-250414.json 与
-     agent_core/eval/*.jsonl），不写编造的数字。
-  2. 没有实测数据时显式标 ghost，不留空字段。
-  3. blocked 文案取自 runtime._safe_response，与代码完全一致。
-"""
+"""从评测记录生成首页回放，缺少实测的历史案例保留说明。"""
 import json
 from pathlib import Path
 
-ROOT = Path(r"D:\ai-commerce-intelligence-platform-integration")
+ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "docs" / "evaluation" / "glm-4-flash-250414.json"
+WORKFLOW_EVAL = ROOT / "docs" / "evaluation" / "ai-workflow-mysql-deepseek.json"
 AGENT_CASES = ROOT / "agent_core" / "eval" / "agent_cases.jsonl"
 OUT_DIR = ROOT / "backend" / "static" / "data"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -30,8 +21,38 @@ def load_jsonl(path: Path):
     return out
 
 
+def _refund_replay(report: dict) -> dict:
+    case = next(item for item in report["cases"] if item["id"] == "refund-breakdown")
+    steps = case["steps"]
+    tools = iter(case["analysis_evidence"])
+    sql_by_step = {
+        index: next(tools)["sql"] for index, step in enumerate(steps)
+        if step["name"] == "analysis_execute" and step["status"] == "success"
+    }
+    evidence = []
+    for tool in case["analysis_evidence"]:
+        evidence.append([tool["label"], f"返回 {len(tool['rows'])} 行"])
+        for row in tool["rows"][:2 if tool["tool"] == "platform" else 1]:
+            label = row.get("platform_type") or row.get("product_id") or "整体"
+            evidence.append([
+                label, f"本期 {row['current_refunds']}/{row['current_orders']}，"
+                f"上期 {row['previous_refunds']}/{row['previous_orders']}",
+            ])
+    evidence.append(["评测输入", f"隔离 MySQL · {report['fixture']['rows']} 条合成订单"])
+    usage = case["usage"]
+    return {
+        "id": case["id"], "intent": case["intent"], "label": "退款率多步分析", "text": case["query"],
+        "src": "MySQL 流式实测 · refund-breakdown",
+        "replayLabel": f"{report['model']} · 合成订单",
+        "path": [step["name"] for step in steps], "stepDetails": steps, "sqlByStep": sql_by_step,
+        "latency": usage["latency_ms"], "tokens": usage["total_tokens"], "attempts": None,
+        "answer": case["answer"], "evidence": evidence,
+    }
+
+
 def main():
     eval_doc = json.loads(EVAL.read_text(encoding="utf-8"))
+    workflow_doc = json.loads(WORKFLOW_EVAL.read_text(encoding="utf-8"))
     details_by_id = {d["id"]: d for d in eval_doc["details"]}
     agent_cases = load_jsonl(AGENT_CASES)
 
@@ -55,6 +76,7 @@ def main():
     blocked_count = sum(1 for c in agent_cases if c.get("expected_intent") == "blocked")
 
     queries = [
+        _refund_replay(workflow_doc),
         {
             "id": "sql-003",
             "intent": "data",
@@ -63,7 +85,7 @@ def main():
             "src": "live_model_cases.jsonl · sql-003",
             "path": ["input_safety", "load_history", "route", "load_schema", "generate_sql", "validate_sql", "execute_sql", "synthesize", "save_session", "finalize"],
             "sql": data003["generated_sql"],
-            "sqlNote": "generate_sql 的原始输出。validate_sql 之后会追加 LIMIT 500 与 MAX_EXECUTION_TIME(10000)。",
+            "sqlNote": "旧版 SQLite 模型评测保存的候选 SQL。",
             "latency": data003["latency_ms"],
             "attempts": data003["attempts"],
             "rows": data003["candidate_row_count"],

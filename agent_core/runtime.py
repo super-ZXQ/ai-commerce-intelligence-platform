@@ -119,6 +119,7 @@ class AgentRuntime:
         memory_max_chars: int = 600,
         sql_timeout_seconds: float = 10,
         sql_dialect: str = "mysql",
+        exclude_cancelled_orders: bool = False,
     ):
         self._retriever = retriever
         self._schema_loader = schema_loader
@@ -134,6 +135,7 @@ class AgentRuntime:
         self._memory_max_chars = memory_max_chars
         self._sql_timeout_seconds = sql_timeout_seconds
         self._sql_dialect = sql_dialect
+        self._exclude_cancelled_orders = exclude_cancelled_orders
 
         graph = StateGraph(RuntimeState)
         graph.add_node("input_safety", self._input_safety)
@@ -476,7 +478,9 @@ class AgentRuntime:
     async def _validate_sql(self, state: RuntimeState) -> dict[str, Any]:
         started = time.perf_counter()
         try:
-            sql = validate_and_limit_sql(state["generated_sql"])
+            sql = validate_and_limit_sql(
+                state["generated_sql"], exclude_cancelled_orders=self._exclude_cancelled_orders,
+            )
             # 把执行时限一并下推到数据库；state["sql"] 即真正执行的语句，便于审计。
             sql = apply_execution_guard(sql, int(self._sql_timeout_seconds * 1000), self._sql_dialect)
             return {

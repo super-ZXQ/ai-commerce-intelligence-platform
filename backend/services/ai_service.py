@@ -249,6 +249,7 @@ def _build_runtime(adapter: OpenAIModelAdapter) -> AgentRuntime:
         episode_writer=_runtime_write_episode if settings.agent_episode_enabled else None,
         memory_max_chars=settings.agent_memory_max_chars,
         sql_timeout_seconds=_SQL_TIMEOUT_SECONDS,
+        exclude_cancelled_orders=True,
         # 方言决定能否把执行时限下推到数据库（MySQL 用 MAX_EXECUTION_TIME）。
         sql_dialect=dialect_from_url(settings.ai_database_url),
     )

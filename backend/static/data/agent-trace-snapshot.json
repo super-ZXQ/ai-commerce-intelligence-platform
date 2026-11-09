@@ -121,6 +121,159 @@
   },
   "queries": [
     {
+      "id": "refund-breakdown",
+      "intent": "data",
+      "label": "退款率多步分析",
+      "text": "退款率为什么上升？按平台和商品拆开看，给出比较窗口、分子分母和商品样本范围。",
+      "src": "MySQL 流式实测 · refund-breakdown",
+      "replayLabel": "deepseek-flash · 合成订单",
+      "path": [
+        "input_safety",
+        "load_history",
+        "route",
+        "load_schema",
+        "analysis_plan",
+        "analysis_execute",
+        "analysis_plan",
+        "analysis_execute",
+        "analysis_plan",
+        "analysis_execute",
+        "analysis_plan",
+        "synthesize",
+        "save_session",
+        "save_episode"
+      ],
+      "stepDetails": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "选择整体退款率对比"
+        },
+        {
+          "name": "analysis_execute",
+          "status": "success",
+          "duration_ms": 4,
+          "summary": "整体退款率对比：返回 1 行"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 961,
+          "summary": "选择按平台对比"
+        },
+        {
+          "name": "analysis_execute",
+          "status": "success",
+          "duration_ms": 5,
+          "summary": "按平台对比：返回 2 行"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 1287,
+          "summary": "选择按商品对比"
+        },
+        {
+          "name": "analysis_execute",
+          "status": "success",
+          "duration_ms": 5,
+          "summary": "按商品对比：返回 50 行"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "选择结束分析"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 33975,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 3,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "sqlByStep": {
+        "5": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+        "7": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ o.platform_type, b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY o.platform_type, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+        "9": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ o.product_id, b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY o.product_id, b.end_date ORDER BY current_refunds DESC LIMIT 50"
+      },
+      "latency": 36248,
+      "tokens": 7509,
+      "attempts": null,
+      "answer": "数据分析只能反映关联，不能证明退款原因。\n\n**结论：退款率上升主要与“退款订单数增加、订单总数持平”有关；分平台看，APP 是主要变化来源，Web 持平；商品拆解显示可见高退款样本中 SKU-001 及多个小单量 SKU 出现退款，但商品结果有截断且单量小，不能据此证明退款原因。**\n\n**口径与窗口**  \n- 退款率 = 退款订单数 / 订单数；剔除 `CANCELLED` 订单，订单去重。  \n- 当前窗口：2025-03-31 至 2025-04-29；上期窗口：2025-03-01 至 2025-03-30。  \n- 以下数据只能显示关联，不能证明退款原因。\n\n**整体**  \n| 窗口 | 退款/订单 | 退款率 |\n|---|---:|---:|\n| 当前 | 18/60 | 30% |\n| 上期 | 6/60 | 10% |\n| 变化 | +12 笔退款/订单持平 | +20 个百分点 |\n\n**按平台拆解（平台结果完整，total_rows=2）**  \n| 平台 | 当前退款/订单 | 当前退款率 | 上期退款/订单 | 上期退款率 | 变化 |\n|---|---:|---:|---:|---:|---:|\n| APP | 16/40 | 40% | 4/40 | 10% | +30pp |\n| Web网站 | 2/20 | 10% | 2/20 | 10% | 0pp |\n\n整体退款率上升主要与 APP 退款订单数由 4 增至 16、订单数维持 40 相关；Web 未变化。\n\n**按商品拆解（有截断，需限定样本范围）**  \n- 商品 SQL 按本期退款订单数排序，最多返回 50 个商品分组；`total_rows=50`，但提示结果只展示 14 个商品行，存在截断。  \n- 因此以下只基于可见 14 个高退款样本，不能覆盖全量商品，也不能声称代表所有商品。\n\n| 商品/商品组 | 当前退款/订单 | 当前退款率 | 上期退款/订单 | 上期退款率 | 说明 |\n|---|---:|---:|---:|---:|---|\n| SKU-001 | 3/3 | 100% | 0/1 | 0% | 可见样本中当前退款量最大 |\n| SKU-042、SKU-041、SKU-004、SKU-005 | 各 1/1 | 各 100% | 各 1/1 | 各 100% | 可见样本中持平 |\n| SKU-006 至 SKU-014（9 个） | 各 1/1 | 各 100% | 各 0/1 | 各 0% | 可见样本中本期出现退款 |\n| 可见样本合计 | 16/16 | 100% | 4/14 | 约 28.6% | 仅可见样本，非全量商品 |\n\n商品层面可见样本的退款集中在少量 SKU，且多数 SKU 订单量仅 1 单，退款率波动很大；结合商品拆解被截断，不能把个别商品变化直接归因于全量退款率上升。",
+      "evidence": [
+        [
+          "整体退款率对比",
+          "返回 1 行"
+        ],
+        [
+          "整体",
+          "本期 18/60，上期 6/60"
+        ],
+        [
+          "按平台对比",
+          "返回 2 行"
+        ],
+        [
+          "APP",
+          "本期 16/40，上期 4/40"
+        ],
+        [
+          "Web网站",
+          "本期 2/20，上期 2/20"
+        ],
+        [
+          "按商品对比",
+          "返回 50 行"
+        ],
+        [
+          "SKU-001",
+          "本期 3/3，上期 0/1"
+        ],
+        [
+          "评测输入",
+          "隔离 MySQL · 121 条合成订单"
+        ]
+      ]
+    },
+    {
       "id": "sql-003",
       "intent": "data",
       "label": "数据查询",
@@ -139,7 +292,7 @@
         "finalize"
       ],
       "sql": "SELECT platform_type, SUM(payment_amount) AS sales_amount FROM orders GROUP BY platform_type ORDER BY sales_amount DESC",
-      "sqlNote": "generate_sql 的原始输出。validate_sql 之后会追加 LIMIT 500 与 MAX_EXECUTION_TIME(10000)。",
+      "sqlNote": "旧版 SQLite 模型评测保存的候选 SQL。",
       "latency": 1104,
       "attempts": 1,
       "rows": 6,

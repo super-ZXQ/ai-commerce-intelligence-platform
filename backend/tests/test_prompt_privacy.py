@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from agent_core.model_adapter import OpenAIModelAdapter
 from agent_core.models import AgentResult
 from agent_core.prompt_privacy import (
@@ -106,6 +108,41 @@ def test_answer_prompt_sends_only_pseudonyms() -> None:
     assert "13800000000" not in prompt
     assert "用户#" in prompt
     assert "199.5" in prompt
+
+
+@pytest.mark.parametrize(("sql", "value"), [
+    ("SELECT user_name AS label FROM orders", "假客户"),
+    ("SELECT o.order_id AS label FROM orders AS o", "ORDER-SENSITIVE"),
+    ("WITH names AS (SELECT user_name AS n FROM orders) SELECT LEFT(n, 2) AS label FROM names", "假客"),
+    ("SELECT ASCII(user_name) AS label FROM orders", 203),
+    ("SELECT (SELECT user_name FROM orders LIMIT 1) AS label", "假客户"),
+    ("SELECT COUNT(*) AS label FROM orders UNION ALL SELECT ASCII(user_name) FROM orders", 203),
+    ("SELECT COUNT(*) + MAX(ASCII(user_name)) AS label FROM orders", 203),
+    ("SELECT future_secret_column AS label FROM orders", "未来新增的敏感值"),
+])
+def test_answer_prompt_masks_sensitive_projections_by_source(sql: str, value: str | int) -> None:
+    rows = [{"label": value}]
+    with masking_scope(_KEY) as masker:
+        prompt = _adapter()._answer_prompt("按客户分组", "data", [], [], sql, rows)
+
+    block = json.loads(prompt.split("结果：", 1)[1].split("\n", 1)[0])
+    masked = block[0]["label"]
+    assert masked != value and "#" in masked
+    assert masker.restore(masked) == str(value)
+    assert rows == [{"label": value}]
+
+
+def test_result_masking_preserves_aggregates_and_business_fields() -> None:
+    masker = PromptMasker(_KEY)
+    sql = "SELECT COUNT(DISTINCT user_name), platform_type AS label FROM orders GROUP BY platform_type"
+    rows = [{"COUNT(DISTINCT user_name)": 9, "label": "APP"}]
+    assert masker.mask_rows(rows, sql) == rows
+
+
+def test_average_order_value_does_not_expose_an_order_identifier() -> None:
+    sql = "SELECT ROUND(SUM(payment_amount) / NULLIF(COUNT(DISTINCT order_id), 0), 2) AS aov FROM orders"
+    rows = [{"aov": 143.33}]
+    assert PromptMasker(_KEY).mask_rows(rows, sql) == rows
 
 
 async def test_refund_planner_prompt_sends_only_pseudonyms() -> None:

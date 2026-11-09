@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import socket
 from collections.abc import Callable, Sequence
+from functools import partial
+from itertools import zip_longest
 
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
@@ -24,6 +26,7 @@ from agent_core.provider_policy import (
     validate_model_name,
     validate_provider_url,
 )
+from agent_core.refund_analysis import TOOLS
 from agent_core.session import Message
 from agent_core.streaming import emit_token
 
@@ -41,6 +44,7 @@ class _AnalysisChoice(BaseModel):
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 # 发给模型的行数上限；数据库侧另有 LIMIT 收敛到 500 行。
 _ANSWER_ROWS = 50
+_compact_json = partial(json.dumps, ensure_ascii=False, separators=(",", ":"), default=str)
 
 
 def _content_text(content) -> str:
@@ -159,7 +163,7 @@ class OpenAIModelAdapter:
         prompt = f"""你是电商退款分析助手。根据证据选择下一步，仅输出 JSON：{{"action":"platform|product|finish"}}。
 问题：{query}
 已执行工具：{json.dumps(tools, ensure_ascii=False)}
-已完成工具及数据：{self._prompt_json(evidence)}
+已完成工具及数据：{self._refund_prompt_json(evidence)}
 整体对比已经完成。平台或商品可各查一次；已查过的工具不可重复。
 用户明确要求按平台或商品分析时，必须先选择尚未执行的对应工具；要求两者时依次执行两者，即使样本较少也应查询并说明局限。
 若未指定拆解维度且证据已足够或样本不足，选择 finish。不要把相关性表述为因果。"""
@@ -174,26 +178,45 @@ class OpenAIModelAdapter:
         result.content = parsed.action
         return result
 
-    def _prompt_json(self, payload: object) -> str:
-        """出域数据的唯一序列化出口：先假名化、再按字符预算截断。
+    def _prompt_json(self, rows: list[dict], sql: str | None) -> str:
+        """查数结果先按字段来源假名化，再按字符预算截断。
 
         行数据还要原样返回前端，因此 mask 只作用于这份副本。优先使用调用方
         为本轮请求打开的映射域（见 prompt_privacy.masking_scope），它能把答案里的
         假名还原回真实值；评测脚本等没有请求域时退化为一次性脱敏。
         """
         masker = active_masker() or PromptMasker(self._masking_key)
-        items = payload if isinstance(payload, list) else [payload]
-        body, kept = fit_json_rows(
-            [masker.mask(item) for item in items],
-            self._prompt_rows_max_chars,
-        )
-        if kept < len(items):
+        body, kept = fit_json_rows(masker.mask_rows(rows, sql), self._prompt_rows_max_chars)
+        if kept < len(rows):
             # 说明必须另起一行：直接拼在 JSON 尾部会让「结果：」这一行不再是合法 JSON，
             # 模型可能把截断提示当成数据的一部分。
             body += (
                 f"\n[数据说明] 提示词预算 {self._prompt_rows_max_chars} 字符，"
-                f"仅发送前 {kept}/{len(items)} 条。"
+                f"仅发送前 {kept}/{len(rows)} 条。"
             )
+        return body
+
+    def _refund_prompt_json(self, evidence: list[dict]) -> str:
+        """逐轮为每个退款工具保留一行。SQL 和完整行仍随执行轨迹返回。"""
+        masker = active_masker() or PromptMasker(self._masking_key)
+        steps = [{"tool": entry["tool"], "total_rows": len(entry["rows"]), "rows": []} for entry in evidence]
+        used = len(_compact_json(steps))
+        if used > self._prompt_rows_max_chars:
+            return "[]\n[数据说明] 提示词预算过小，各步骤仅发送前 0 条。"
+
+        for index, rows in enumerate(zip_longest(*(entry["rows"] for entry in evidence))):
+            for step, row in zip(steps, rows, strict=True):
+                if row is None or len(step["rows"]) != index:
+                    continue
+                masked = masker.mask(row)
+                size = len(_compact_json(masked)) + int(index > 0)
+                if used + size <= self._prompt_rows_max_chars:
+                    step["rows"].append(masked)
+                    used += size
+
+        body = _compact_json(steps)
+        if any(len(step["rows"]) < step["total_rows"] for step in steps):
+            body += "\n[数据说明] 各步骤仅发送前若干行，total_rows 是 SQL 返回的行数。请注明拆解样本范围。"
         return body
 
     def _history_json(self, history: list[Message]) -> str:
@@ -253,15 +276,20 @@ class OpenAIModelAdapter:
         source_context = "\n".join(
             f"[{item.filename} / {item.section}] {item.snippet}" for item in sources
         )
+        refund_evidence = rows and all(
+            item.get("tool") in TOOLS and isinstance(item.get("rows"), list) for item in rows
+        )
+        result = self._refund_prompt_json(rows) if refund_evidence else self._prompt_json(rows[:_ANSWER_ROWS], sql)
         return f"""你是电商数据分析助手。根据已验证的工具结果用中文简洁回答，不得编造。
 问题：{query}
 意图：{intent}
 会话上下文：{self._history_json(history)}
 引用知识：{source_context or '无'}
 SQL：{sql or '未执行'}
-结果：{self._prompt_json(rows[:_ANSWER_ROWS])}
+结果：{result}
 若结果为空，请明确说明。知识问答先用中文业务术语解释，再按需附公式；
-如果结果是多步退款分析，严格引用各步骤数据，说明比较窗口和分子分母；数据只能显示关联，不能证明退款原因；数据不足时明确说明。
+如果结果是多步退款分析，严格引用各步骤数据，说明比较窗口和分子分母；数据只能显示关联，不能证明退款原因。
+拆解工具按本期退款订单数最多返回 50 个分组，提示词可能只带其中一部分；有截断时必须说明，避免声称覆盖全量商品。
 只要使用了引用知识，答案末尾必须使用“【来源】文件名 / 章节”列出至少一个实际来源。"""
 
     async def answer(

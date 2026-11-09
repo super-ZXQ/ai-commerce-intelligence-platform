@@ -4,6 +4,8 @@
 - 日期：2026-09-05
 - 决策人：项目维护者
 
+2026-11-09 实现更新。Streamlit 经 FastAPI 提交问答，后端主链路接入 `MarkdownKnowledgeRetriever`。Chroma 与 BGE 保留为独立向量检索对照，以下记录原决策时的实现背景。参见 [后端检索配置](../../backend/services/ai_service.py)。
+
 ## 背景
 
 项目中存在两套知识检索实现，能力重叠但技术路线不同：

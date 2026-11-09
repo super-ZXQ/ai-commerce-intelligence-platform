@@ -1,6 +1,6 @@
 # 基于大模型的智能电商数据决策平台
 
-🐍 **Python 3.12** · 🚀 **FastAPI** · 📊 **Streamlit** · 🦜 **LangChain** · 🧠 **Chroma** · 🐬 **MySQL 8** · 🔴 **Redis 7** · 🐳 **Docker** · 📄 **MIT License**
+🐍 **Python 3.12** · 🚀 **FastAPI** · 📊 **Streamlit** · 🦜 **LangGraph** · 🐬 **MySQL 8** · 🔴 **Redis 7** · 🐳 **Docker** · 📄 **MIT License**
 
 [![CI](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/ci.yml)
 [![Release](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/release.yml/badge.svg)](https://github.com/super-ZXQ/ai-commerce-intelligence-platform/actions/workflows/release.yml)
@@ -9,18 +9,24 @@
 
 基于 **102,287 条公开电商订单样本**，完成从数据清洗、特征工程到多维分析与可视化的完整链路。系统采用前后端分离架构，提供交互式 BI 看板、分节点 Agent 智能查询、RAG 业务知识检索、RESTful API、RFM 用户画像和实时监控。
 
+### 先看一条退款率分析
+
+> 退款率为什么上升？按平台和商品拆开看，给出比较窗口、分子分母和商品样本范围。
+
+首页提供这条问题的评测回放。先看整体退款率，再逐步检查平台、商品聚合 SQL 和订单计数。要发起实时查询，按[快速开始](#快速开始)启动服务并登录 AI 助手。回放数据和评测方法见 [FastAPI / MySQL 实测报告](docs/evaluation/ai-workflow-mysql.md)。
+
 ## 功能概览
 
 | 模块 | 技术栈 | 功能 |
 |------|--------|------|
 | **BI 数据看板** | Streamlit + Plotly | 交互式数据大屏，多维度交叉筛选 |
-| **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot + Chroma | 分节点路由、结构化 Text-to-SQL、一次纠错、多轮会话、长期偏好、历史情节、引用与公开轨迹 |
-| **FastAPI 后端** | FastAPI + SQLAlchemy | 48 个 API 操作，含认证/限流/缓存/监控/RFM、BI 数据/导出、订单事件摄入与长期记忆管理 |
+| **AI 分析助手 + RAG** | LangGraph + LangChain + SQLGlot | 分节点路由、结构化 Text-to-SQL、退款率多步分析、多轮会话、长期记忆、引用与执行轨迹 |
+| **FastAPI 后端** | FastAPI + SQLAlchemy | 认证/限流/缓存/监控/RFM、BI 数据/导出、订单事件摄入与长期记忆管理 |
 | **订单事件摄入** | MySQL 事务 + 幂等账本 | 创建/退款/取消事件、版本水位乱序保护、精准缓存失效与新鲜度查询 |
 | **RFM 用户画像** | SQLAlchemy + 量化分群 | R/F/M 五分位评分 → 8 类用户分群 + 流失预警 |
 | **数据分析 Notebook** | Jupyter + Pandas | 数据清洗、销售/时间/用户多维分析 |
-| **RAG 业务知识库** | Chroma + BGE-small-zh-v1.5 | 6 份业务文档（术语/数据字典/KPI/规则/API/黄金查询）向量检索 |
-| **测试 & 评估** | pytest + 离线/真实模型评估器 | 501 项自动化测试（后端 412：409 passed + 3 skipped；AI/RAG 89；隔离 MySQL 实收）+ 135 条路由回归（100 curated + 25 鲁棒性 + 10 留出）+ 15 条词法检索回归 + Text-to-SQL 评估 + 15 条 GLM 真实评测 |
+| **RAG 业务知识库** | Markdown + 中文字符 bigram | 后端在 6 份业务文档中检索 Top 3 来源；Chroma / BGE 保留为向量检索对照 |
+| **测试 & 评估** | pytest + 离线/真实模型评估器 | 自动化回归、135 条意图路由样本、15 条词法检索样本、真实模型 MySQL 流式问答评测 |
 
 ### AI 长期记忆（P1/P2）
 
@@ -30,15 +36,15 @@
 - 偏好与情节都按登录主体隔离；用户可通过 `GET/DELETE /api/ai/memories` 与 `GET/DELETE /api/ai/episodes` 查看、删除自己的数据。
 - 可用 `AGENT_MEMORY_*`、`AGENT_EPISODE_*` 调整 TTL、召回条数与阈值。
 
-## 在线演示
+## 本地演示
 
 | 应用 | 链接 | 说明 |
 |------|------|------|
-| **Docker 统一入口** | `http://localhost/` | 导航页（默认入口） |
+| **Docker 统一入口** | `http://localhost/` | 导航页与评测回放 |
 | **统一登录页** | `http://localhost/login` | 四角色交互登录；写入 HttpOnly 会话 Cookie |
 | **经营工作台** | `http://localhost/workspace` | 登录后默认落地页：总览、AI 问答、销售、RFM、订单、监控 |
 | **BI 数据看板** | `http://localhost/BI/` | 交互式数据大屏 |
-| **AI 分析助手** | `http://localhost/ai/` | 自然语言查数 + RAG 知识库 |
+| **AI 分析助手** | `http://localhost/ai/` | 登录后实时查数和知识问答 |
 | **API 文档** | `http://localhost/docs` | Swagger UI |
 | **API 体验页** | `http://localhost/demo` | 可视化大屏 + AI 查询 |
 | **系统监控** | `http://localhost/monitor` | 实时监控面板 |
@@ -113,7 +119,7 @@ docker compose up -d
 | `/health` `/metrics` | backend:8000 | 公开健康检查与聚合 Prometheus 指标 |
 | `/health/detailed` `/monitor` `/health-panel` | backend:8000 | 详细健康与监控页面（需 `admin:manage`） |
 
-部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入、业务上传导入、认证和数据同步分别创建最小权限账号；`db-migrate` 完成 Alembic 升级后，`db-grant` 再按表授予权限：`ea_app` 只读业务表，`ea_ai` 只能读 `orders`，`ea_events` 只能写 `orders`/`order_events`/`data_state`，`ea_import` 只能写订单、事件、数据版本与导入审计/暂存表，`ea_auth` 只能访问认证与审计表。统一会话由 FastAPI 签发 HttpOnly Cookie，Nginx `auth_request` 保护 `/ai/` 与 `/BI/`（含 WebSocket 握手），后端在每次业务操作时重新校验账号状态、角色与权限。AI 助手只通过 `BACKEND_API_URL` 调用后端，不接触数据库、模型密钥或直连 LLM，页面也不缓存业务答案，每次提问都按当前数据版本实时生成。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。BI 看板同样不持有数据库凭据：页面携带当前账号的 HttpOnly Cookie 调用 `/api/bi/orders` 读取非取消订单，RFM 客户明细导出调用 `/api/export/rfm-segment`；后端每次请求都重新校验账号状态与 `data:read` / `data:export`，会话失效或无权限时直接拒绝，不回退本地快照。销售总览、商品/用户排行与 BI 快照统一排除取消订单，退款订单仍保留在销售额与订单数中。BI 分页读取绑定 `data_state.data_version`：首屏返回版本，后续页必须携带；读取期间新增或取消订单导致版本变化时后端返回 409，页面丢弃已拼接结果并整次重读（最多 3 次），不会交付漏单或仍含已取消订单的快照。RFM 页面的“最近消费(天)”按日历日期计算，与后端 `DATEDIFF` 一致（参考日当天订单为 0 天）；客户明细只在点击“生成导出文件”后调用后端，浏览分群或调整日期/阈值不会消耗导出额度。页面缓存 30 秒，侧边栏可手动刷新。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；默认单次最多 200,000 行，Excel 因工作簿格式限制需在内存中生成，默认最多 50,000 行（`EXPORT_MAX_ROWS` / `EXPORT_EXCEL_MAX_ROWS` 可调）。限流同时按 IP 与登录主体执行，AI/导出/事件写入的主体桶不会因同一出口 IP 被他人挤占。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。AI 助手的 Chroma 数据与 RAG 指标快照写入命名卷 `chroma_data`，后端以只读方式挂载同一卷用于监控。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
+部署模式下仅 Nginx 对宿主机暴露 80 端口，业务服务、数据库和缓存只通过 Docker 内部网络通信。`db-bootstrap` 会为 API、AI、事件摄入、业务上传导入、认证和数据同步分别创建最小权限账号；`db-migrate` 完成 Alembic 升级后，`db-grant` 再按表授予权限：`ea_app` 只读业务表，`ea_ai` 只能读 `orders`，`ea_events` 只能写 `orders`/`order_events`/`data_state`，`ea_import` 只能写订单、事件、数据版本与导入审计/暂存表，`ea_auth` 只能访问认证与审计表。统一会话由 FastAPI 签发 HttpOnly Cookie，Nginx `auth_request` 保护 `/ai/` 与 `/BI/`（含 WebSocket 握手），后端在每次业务操作时重新校验账号状态、角色与权限。AI 助手只通过 `BACKEND_API_URL` 调用后端，不接触数据库、模型密钥或直连 LLM，页面也不缓存业务答案，每次提问都按当前数据版本实时生成。后端启动前会按 CSV SHA-256 校验订单版本；CSV 是公开初始化快照，不是运行期唯一数据入口。新增订单、退款和取消通过事件 API 写入 MySQL。BI 看板同样不持有数据库凭据：页面携带当前账号的 HttpOnly Cookie 调用 `/api/bi/orders` 读取非取消订单，RFM 客户明细导出调用 `/api/export/rfm-segment`；后端每次请求都重新校验账号状态与 `data:read` / `data:export`，会话失效或无权限时直接拒绝，不回退本地快照。销售总览、商品/用户排行与 BI 快照统一排除取消订单，退款订单仍保留在销售额与订单数中。BI 分页读取绑定 `data_state.data_version`：首屏返回版本，后续页必须携带；读取期间新增或取消订单导致版本变化时后端返回 409，页面丢弃已拼接结果并整次重读（最多 3 次），不会交付漏单或仍含已取消订单的快照。RFM 页面的“最近消费(天)”按日历日期计算，与后端 `DATEDIFF` 一致（参考日当天订单为 0 天）；客户明细只在点击“生成导出文件”后调用后端，浏览分群或调整日期/阈值不会消耗导出额度。页面缓存 30 秒，侧边栏可手动刷新。订单 CSV 导出按 5,000 行分块查询并流式返回，不会将整个导出文件同时留在应用内存中；默认单次最多 200,000 行，Excel 因工作簿格式限制需在内存中生成，默认最多 50,000 行（`EXPORT_MAX_ROWS` / `EXPORT_EXCEL_MAX_ROWS` 可调）。限流同时按 IP 与登录主体执行，AI/导出/事件写入的主体桶不会因同一出口 IP 被他人挤占。RFM 完整用户明细使用后端进程内有界快照复用，Redis 只保存小型汇总结果，避免产生十几 MB 的单 Key。向量检索对照工具可将 Chroma 数据和指标快照写入 `chroma_data`，后端以只读方式读取快照。实时问答从 Markdown 文档检索。Nginx 已配置 `proxy_http_version 1.1`、`Upgrade` 和 `Connection` 头，支持 Streamlit WebSocket，避免反向代理后页面白屏。
 
 生产加固与验收：
 
@@ -268,19 +274,19 @@ Migration 过程：
 
 Migration **不写入**业务测试数据；seed 仅在 CI 测试脚本中执行。
 
-### 架构定位（避免误解）
+### 应用架构
 
 ```text
 Client → Nginx
            ├─ FastAPI (/api, /docs, /monitor)  → MySQL / Redis / Agent Runtime
-           ├─ BI Dashboard Streamlit (/BI/)    → 数据服务 / MySQL（内部经营分析）
-           └─ AI Assistant Streamlit (/ai/)    → agent_core（RAG + Text-to-SQL）
+           ├─ BI Dashboard Streamlit (/BI/)    → FastAPI 数据接口
+           └─ AI Assistant Streamlit (/ai/)    → FastAPI /api/ai/stream
 ```
 
 - **FastAPI** = API / Business Service Layer
-- **Streamlit** = BI / Internal Analytics Dashboard（不是系统唯一驱动）
+- **Streamlit** = BI 看板与 AI 助手界面
 - **Agent Runtime** (`agent_core`) = AI capability layer
-- **Chroma embedded + BGE** = V1 知识库（当前规模合理；多实例/高并发再评估 Qdrant/Milvus，见 Roadmap，本次不换栈）
+- **Markdown 词法检索** = FastAPI 实时知识问答的检索器；向量检索评估可独立运行
 
 ## RAG 业务知识检索增强
 
@@ -288,7 +294,7 @@ AI 分析助手内置 RAG 能力，能同时利用**业务知识库**和**SQL �
 
 ### 架构
 
-FastAPI 与 Streamlit 只负责各自的配置和展示，统一调用 `agent_core.AgentRuntime`。执行轨迹只记录节点动作、耗时和脱敏错误类型，不包含模型隐藏思维链。
+FastAPI 调用 `agent_core.AgentRuntime` 执行检索、查询和模型调用。Streamlit 消费同一后端的流式事件，展示节点动作、耗时、脱敏错误类型及结构化结果。
 
 ```text
 用户请求
@@ -315,14 +321,16 @@ FastAPI 与 Streamlit 只负责各自的配置和展示，统一调用 `agent_co
 
 安全边界包括输入拦截、SQL AST 校验、SQLAlchemy 执行前拦截和数据库只读账号。SQL 仅能访问 `orders`，禁止多语句、写操作、锁表、`SLEEP`、`BENCHMARK`、`LOAD_FILE`，并自动限制最多 500 行。
 
+AI 经营查数在每个 `orders` 数据源上排除取消订单，与 BI 指标口径一致，退款订单仍计入。发送查数结果前按 SQL 投影来源处理用户名、订单号等标识符，涵盖列别名、CTE 和表达式；无法确认来源的值按敏感值处理。
+
 ### 关键技术决策与取舍
 
-- **共享 Runtime**：FastAPI 与 Streamlit 注入同一张 LangGraph，避免两套 Agent 行为漂移；代价是核心层必须保持 Web 框架无关。
+- **共享 Runtime**：FastAPI 运行一张 LangGraph，Streamlit 和经营工作台通过同一 API 取得结果与轨迹。
 - **确定性路由优先**：安全、澄清和常见业务意图不消耗模型额度，结果可重复；复杂语义仍受规则覆盖范围限制。
 - **JSON Mode + Pydantic**：兼容不同 OpenAI 协议提供方，同时拒绝 Markdown SQL；结构正确不代表结果正确，因此还要执行结果评测。
 - **四层 SQL 防护**：输入规则、SQLGlot AST、SQLAlchemy 执行拦截、数据库只读账号互相独立，单层失效不会直接获得写权限。
 - **数据库侧执行时限**：MySQL 查询注入 `MAX_EXECUTION_TIME`，由数据库终止慢查询并释放连接；`asyncio.wait_for` 只保留为宽限兜底。SQLite 演示模式不声称具备同等数据库侧保护。
-- **真实结果评测**：候选 SQL 与参考 SQL 比较 102,287 行数据上的结果集，不要求字符串相同；模型评测显式运行，不在 CI 偷用 Key。
+- **真实结果评测**：隔离 MySQL 上通过实际流式接口比较数据金标，分别记录工具、查询结果和回答规则检查。外部模型调用需显式启用。
 - **有界降级**：Redis 不可用时回落到最多 1,000 个内存会话；SQL 只纠错一次，避免无限 Agent 循环。
 - **编排边界**：常规查询使用固定 LangGraph 工作流；退款率变化归因问题可进入受限多步分析，由模型在固定聚合工具中选择下一步。系统不具备开放式多 Agent 协作能力。
 
@@ -330,7 +338,7 @@ FastAPI 与 Streamlit 只负责各自的配置和展示，统一调用 `agent_co
 
 对于未指定具体时段的“退款率为什么上升”问题，系统先以订单数据中的最新日期为锚点，比较最近 30 天和之前 30 天的订单数与退款订单数。数据不足或退款率没有上升时直接结束；若观察到上升，模型可选择按平台、按商品继续分析，也可提前结束。整体、平台、商品各最多查询一次，单次分析最多三次数据库查询；每次仍经过 SQL 只读校验和数据库侧超时保护。
 
-工具 SQL 固定生成，按当前窗口退款订单数排序并最多返回 50 行，分组较多时不能视为完整归因。回答强调数据关联不能证明因果。API 的 `analysis_evidence` 和 Streamlit「多步分析数据依据」提供各步骤 SQL、窗口、分子和分母。指定具体日期、月份等时间条件的问题仍走原有查询路径；真实模型已有小规模合成案例评测，仍需独立留出集验证。
+工具 SQL 固定生成，按当前窗口退款订单数排序并最多返回 50 行。提示词按工具轮流保留窗口、分子分母和样本行，超出预算时标注截断。API 的 `analysis_evidence` 和 Streamlit「多步分析数据依据」提供每步完整返回的 SQL 和结果。回答描述数据关联及样本范围。指定具体日期、月份的问题走常规查数分支。
 
 评测与复现：
 
@@ -417,7 +425,7 @@ git show archive-react-v1:ai-ecommerce-assistant/rag/extractor.py
 | `gold_queries.md` | 黄金 SQL 查询样例（按问题类型分类） |
 | `api_docs.md` | 平台 API 用法、Swagger 入口 |
 
-### 构建向量库
+### 构建向量检索对照库
 
 ```bash
 # 全量重建
@@ -443,8 +451,8 @@ python ai-ecommerce-assistant/build_knowledge_base.py --kb-dir ./my_kb
 | `agent_core/model_adapter.py` | OpenAI 兼容模型、结构化 SQL 输出和 Token 元数据 |
 | `agent_core/session.py` | Redis 优先、有界内存降级的隔离会话存储 |
 | `agent_core/sql_safety.py` | SQLGlot AST 白名单与自动 LIMIT |
-| `agent_core/rag/` | 后端零外部服务 Markdown 检索基线 |
-| `ai-ecommerce-assistant/rag/` | Streamlit 的 Chroma/BGE 检索、缓存和监控兼容层 |
+| `agent_core/rag/` | FastAPI 实时链路的 Markdown 中文 bigram 检索 |
+| `ai-ecommerce-assistant/rag/` | Chroma/BGE 向量检索对照、缓存和监控兼容层 |
 | `metrics.py` | 跨进程 stats 共享：原子写入 JSON、综合 Prometheus 渲染、结构化事件日志（JSONL 可选） |
 
 ### 决策树
@@ -458,7 +466,7 @@ python ai-ecommerce-assistant/build_knowledge_base.py --kb-dir ./my_kb
 
 ## 检索监控与指标埋点
 
-RAG 模块内置轻量级监控层，把"检索质量 + 性能 + 用户反馈"三类信号汇总到 JSON / JSONL 文件，FastAPI 再以 Prometheus 格式暴露给监控系统。**不依赖 Redis / Kafka，本地开发 + Docker 双环境统一**。
+本节描述 Chroma / BGE 向量检索工具的监控。该工具把检索质量、性能和反馈汇总到 JSON / JSONL，FastAPI 可读取快照并暴露 Prometheus 指标。实时 Markdown 检索的命中条数与耗时在问答执行轨迹中查看。
 
 ### 1. 三类指标
 
@@ -521,7 +529,7 @@ rag_score_bucket{range="[0.8,1.0]"} 12
 
 | Workflow | 触发 | 职责 |
 |----------|------|------|
-| `.github/workflows/ci.yml` | PR / push main | AI 助手 89 项测试（Python 3.12 + 3.13）+ 后端 322 项测试（MySQL 8）+ Ruff + 编译 + 离线 Agent 评测；日志管道启用 `pipefail`，测试失败不会被 `tee` 掩盖 |
+| `.github/workflows/ci.yml` | PR / push main | AI 助手测试（Python 3.12 + 3.13）、后端 MySQL 8 测试、Ruff、编译和离线 Agent 评测 |
 | `.github/workflows/docker-smoke.yml` | PR / push main | 空卷构建全栈、断言 102,287 行、验证 7 个入口与 WebSocket 握手 |
 | `.github/workflows/release.yml` | push main / tag `v*.*.*` / 手动 | 构建 backend / streamlit / ai-assistant 三个 Docker 镜像，**多架构**（linux/amd64 + linux/arm64），推送到 `ghcr.io/super-zxq/ai-commerce-intelligence-platform-{backend,streamlit,ai-assistant}` |
 
@@ -622,24 +630,25 @@ docker compose pull && docker compose up -d
 
 ## 测试与评估
 
-### 自动化测试（411 项，实收 409 passed / 2 skipped）
+### 自动化测试
 
 ```bash
-# 后端（322 项，完整运行需要 MySQL）
+# 后端（完整运行需要 MySQL）
 python -m pytest backend/tests/ -v
 
-# AI/RAG（89 项）
+# AI/RAG
 python -m pytest ai-ecommerce-assistant/tests/ -v
 ```
 
 **测试覆盖：**
 
-后端（322 项）：
+后端测试包括以下入口。
 - `test_agent_runtime_core.py` — 分支工具顺序、SQL AST、一次重试、用户会话隔离（含重新生成的末轮回删）、Redis WATCH/MULTI 原子写入与冲突重试、Redis 降级、Token `null` 语义和 API 兼容
 - `test_agent_memory.py` — 长期偏好白名单提取、歧义拒绝、情节摘要压缩、历史指代触发、提示词注入、向量/写入失败降级与主体隔离
 - `test_agent_workflow.py` / `test_agent_evaluation.py` — 意图路由和离线发布门槛；安全短路与工具顺序由 Runtime 测试覆盖
 - `test_routing_ab.py` — 路由 A/B 三层基线回归：curated ≥97% / dev ≥92%（加固后）/ 留出集 ≥50%（冻结 gold，真实泛化下限）
 - `test_agent_streaming.py` — 流式步骤与 Token 增量下发，返回值与非流式调用一致
+- `test_prompt_budget.py` / `test_prompt_privacy.py` — 大分组退款证据分配、SQL 投影来源脱敏及派生指标保留
 - `test_live_model_evaluation.py` — 真实评测集约束、结果集比较与共享 Schema 描述
 - `test_api.py` / `test_core_safety.py` / `test_order_event_producer.py` / `test_security_hardening.py` / `test_mysql_execution_timeout.py` — API 契约、订单事件幂等/乱序/事务回滚、统一非取消指标口径（退款保留在毛额、取消剔除）、`data_state.data_version` 单调与并发递增、BI 分页版本冲突（分页期间新增/取消订单返回 409）、页面与后端 RFM 客户名单/数值一致性、版本化缓存键、主体限流隔离、导出上限、缓存标签失效、合成流可复现、SQL 只读防护（含 FOR SHARE/NOWAIT 锁子句）与数据库侧执行时限
 - `test_auth_ai_gateway.py` / `test_bi_client.py` — Cookie 会话、角色/服务凭据/账号停用后的 BI 读写边界、`data:export` 后端强制校验、用户名按 `data:pii` 字段级脱敏、BI 分页完整性与版本冲突整次重试、导出权限映射与显式按钮触发、`/api/ai/test` 的额度/并发/审计闭环、AI 页面无业务答案缓存、BI 页面无数据库直连；另含 `/workspace` 未登录跳转、`data:read` 角色边界、登录页 no-store 与静态资源回归
@@ -657,15 +666,7 @@ AI/RAG（89 项）：
 
 AI/RAG 测试不依赖真实 BGE 模型，用 `tests/conftest.py` 里的 `FakeEmbeddings` 生成确定性归一化向量。
 
-**测试规模（实收，非估填）** — 2026-11-02 在本仓库 `.venv`（Python 3.12）与隔离 MySQL schema 实测：
-
-| 套件 | pytest 收集 | 结果 |
-|------|------------|------|
-| `backend/tests` | 322 | **320 passed / 2 skipped**（41.44s） |
-| `ai-ecommerce-assistant/tests` | 89 | **89 passed**（2.78s） |
-| **合计** | **411** | **409 passed / 2 skipped / 0 failed** |
-
-数字为参数化展开后的 pytest 实收用例数，非静态函数计数。
+2026-11-09 在 Python 3.12 和隔离 MySQL 8.0.46 上运行两个套件，**541 passed / 1 skipped**。跳过项是显式开启的本地依赖版本核对。
 后端套件需本地 MySQL 可连接（CI 中由 `alembic upgrade head` + `seed_ci_data.py` 建表后运行）；AI/RAG 套件不依赖网络与真实模型。
 
 前端：`backend/static/index.html` 拆分为 `css/studio.css` + `js/studio.js`，并经 Impeccable detector（0 critical/0 error）与桌面三视口（1366×768 / 1440×900 / 1920×1080）验收 `badCount=0`。登录页拆分为 `css/login.css` + `js/login.js`；经营工作台拆分为 `workspace.html` + `css/workspace.css` + `js/workspace.js`（数据请求封装在 `js/workspace-api.js`，SVG 图表在 `js/workspace-charts.js`），本次已用 Chrome 在 1440 / 1024 / 768 / 390 / 320 宽度截图检查，并完成真实登录、六视图、RFM 明细、订单弹窗与角色隐私态交互验收。
@@ -743,6 +744,8 @@ python eval/run_sql_eval.py --output eval/sql_eval_report.json
 
 ### 真实模型评测
 
+**当前流式链路**使用 121 条合成订单和 10 个问题，经 FastAPI `/api/ai/stream`、MySQL 8 和真实模型执行。覆盖混合问答、连续两轮查数、取消订单、退款多步工具和安全短路。逐例证据与复现步骤见 [FastAPI / MySQL 实测报告](docs/evaluation/ai-workflow-mysql.md)。
+
 真实模型评测需要用户显式配置 API Key 和 `--allow-network`，不会在 CI 中消耗额度。2026-09-01 的历史快照使用智谱 `glm-4-flash-250414`，在完整 102,287 行数据上的 15 条评测中通过 14 条（93.33%）。**该快照使用旧结果比较规则：它忽略列位置和行顺序。当前规则已修正，旧数字不代表新规则下的通过率，须重新运行才能获得新结果。**
 
 评测比较候选 SQL 与参考 SQL 的实际结果集，不使用 SQL 字符串相等或模型自评。唯一失败项及逐条输出保留在 [`docs/evaluation/`](docs/evaluation/README.md)；15 条小样本不代表所有真实问题的总体准确率。
@@ -753,7 +756,7 @@ python eval/run_sql_eval.py --output eval/sql_eval_report.json
 - Redis 不可用：自动降级到最多 1,000 个会话的内存存储；会话保留最近 6 轮、TTL 30 分钟。
 - RAG 无命中：继续执行可用分支并返回空来源，不伪造引用。
 - SQL 校验或执行失败：仅使用脱敏错误纠正一次，第二次失败后停止循环并返回明确错误。
-- 真实模型评测仅 15 条且输出具有随机性；当前快照有 1 条 SQL 在一次纠错后仍失败。
+- 真实模型报告覆盖固定样本，输出随模型版本和重复运行波动。
 - 本地演示可使用 SQLite；生产与完整 CI 使用 MySQL 8，只读账号是安全边界的一部分。
 
 ## 项目结构
@@ -794,7 +797,7 @@ ai-commerce-intelligence-platform/
 │   │   ├── init_ci_schema.py     # 本地兼容：alembic upgrade + seed
 │   │   ├── seed_ci_data.py       # 仅 CI 测试数据（不建表）
 │   │   └── import_orders.py      # 显式导入：staging 校验 + 备份表 + 原子换表（另见 reconcile_orders.py）
-│   ├── tests/                    # 322 项 API/事件集成测试
+│   ├── tests/                    # API / 事件集成与 Agent 回归测试
 │   ├── requirements.txt          # 后端生产依赖
 │   └── requirements-dev.txt      # 后端测试与静态检查依赖
 ├── streamlit_app.py              # BI 数据看板（Streamlit 多页面）
@@ -854,7 +857,7 @@ ai-commerce-intelligence-platform/
 | ORM / Schema | SQLAlchemy 2.0 (async) + **Alembic**（schema 版本化，`backend/alembic/`） |
 | 前端 | Streamlit（BI Dashboard + AI Assistant UI）+ Plotly |
 | AI | LangGraph + LangChain + OpenAI 兼容模型接口 |
-| RAG | embedded Chroma + BGE-small-zh-v1.5（V1；Roadmap 再评估独立向量服务） |
+| RAG | 主链路为 Markdown 中文 bigram；向量对照使用 Chroma + BGE-small-zh-v1.5 |
 | 数据库 | MySQL 8.0 |
 | 缓存 | Redis 7 |
 | 反代 | Nginx |

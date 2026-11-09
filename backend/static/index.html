@@ -16,7 +16,7 @@
   Seed: 5f9747fd | Mode: persuade | Surface: backend/static/index.html (/)
   比喻：把 Agent 执行过程当作可单步调试的程序。首屏即工作台，三栏固定职责：
         查询台 30%（换问题换链路）| 执行轨迹 35%（真实节点顺序）| 检查台 35%（真实 SQL/来源/答案）
-  真实图（agent_core/runtime.py，12 节点 / 5 条意图分支）：
+  常规查询图（agent_core/runtime.py）：
         input_safety → load_history → route
           ├ data        → load_schema → generate_sql → validate_sql → execute_sql → synthesize
           ├ knowledge   → retrieve → synthesize
@@ -50,16 +50,16 @@
 
 <!-- ================= Agent Query Studio（首屏）================= -->
 <section class="studio-head" id="studio">
-    <h1>一句中文提问，看它如何经过<span class="hl-safe">安全检查</span>、<span class="hl-rag">知识检索</span>与 <span class="hl-sql">SQL 生成</span>，变成一次可审计的数据查询。</h1>
-    <p class="studio-lede">这不是截图，也不是聊天框套壳：左侧问题取自仓库评测集，中间节点顺序来自 <code>agent_core/runtime.py</code>，右侧 SQL 与耗时来自 <code>docs/evaluation/glm-4-flash-250414.json</code> 的真实运行记录。加载后自动走一遍，停在业务答案。</p>
+    <h1>退款率为什么上升？逐步核对<span class="hl-rag">平台</span>与<span class="hl-sql">商品</span>数据。</h1>
+    <p class="studio-lede">首条回放来自 FastAPI、MySQL 8 与真实模型的合成订单评测。逐步查看整体对比、模型选工具、执行 SQL 和订单计数。登录 AI 助手即可在当前业务数据上实时查询。</p>
 </section>
 
 <section class="studio-section">
     <div class="debugger">
         <div class="dbg-titlebar">
             <span class="lights"><i></i><i></i><i></i></span>
-            <span class="path">agent_core/runtime.py — LangGraph StateGraph（12 节点 / 5 条意图分支）</span>
-            <span class="mode-badge">数据源 <b id="modeLabel">GLM 快照</b></span>
+            <span class="path">Agent 执行轨迹回放</span>
+            <span class="mode-badge">样本 <b id="modeLabel">评测回放</b></span>
         </div>
         <div class="dbg-body">
 
@@ -67,7 +67,7 @@
             <div class="col col-console">
                 <div class="col-head">查询台 <span class="hint">点任一问题切换链路</span></div>
                 <div id="qList"></div>
-                <div class="col-foot">orders 单表 · 102,287 行 · 只读账号</div>
+                <div class="col-foot">只读查询 · 回放样本见各案例</div>
             </div>
 
             <!-- 中 35%：执行轨迹 -->
@@ -114,9 +114,9 @@
 
         </div>
         <div class="dbg-statusbar">
-            <span>thread_id <b class="mono">demo-session</b></span>
+            <span>模式 <b class="mono">回放</b></span>
             <span>steps <b id="sbSteps" class="num">0 / 0</b></span>
-            <span>elapsed <b id="sbElapsed" class="num">0 ms</b></span>
+            <span>节点耗时 <b id="sbElapsed" class="num">—</b></span>
             <span class="sb-progress" aria-hidden="true"><i id="sbBar"></i></span>
         </div>
     </div>
@@ -129,7 +129,7 @@
     </div>
 
     <div class="studio-cta">
-        <a class="btn btn-primary" href="/ai/" target="_blank">打开 AI 助手</a>
+        <a class="btn btn-primary" href="/ai/" target="_blank">登录后实时查询</a>
         <a class="btn btn-ghost" href="/BI/" target="_blank">BI 看板</a>
         <a class="btn btn-ghost" href="/docs" target="_blank">查看 API 文档</a>
         <a class="btn btn-ghost" href="https://github.com/super-ZXQ/ai-commerce-intelligence-platform" target="_blank" rel="noopener">源代码</a>
@@ -147,24 +147,24 @@
             <div class="m-note">data/cleaned_orders.csv，行数可复核</div>
         </div>
         <div class="metric-card accent-blue rise">
-            <div class="m-label">API 操作</div>
-            <div class="m-value num" data-count="34">0</div>
-            <div class="m-note">OpenAPI schema 中的操作数</div>
+            <div class="m-label">退款分析查询上限</div>
+            <div class="m-value num" data-count="3">0</div>
+            <div class="m-note">整体、平台、商品各最多一次</div>
         </div>
         <div class="metric-card accent-purple rise">
-            <div class="m-label">评测样本</div>
-            <div class="m-value num"><span data-count="100">0</span><span class="unit">+15+15</span></div>
-            <div class="m-note">路由 100 · 词法检索 15 · 模型评测 15 条</div>
+            <div class="m-label">路由样本</div>
+            <div class="m-value num" data-count="135">0</div>
+            <div class="m-note">常规 100 · 调优 25 · 留出 10</div>
         </div>
         <div class="metric-card accent-orange rise">
-            <div class="m-label">真实模型历史快照</div>
-            <div class="m-value num">14<span class="unit">/15 通过 · P50</span> 1,508<span class="unit">ms</span></div>
-            <div class="m-note">旧版比较规则，修正后待重跑</div>
+            <div class="m-label">MySQL 端到端评测</div>
+            <div class="m-value num" data-count="10">0</div>
+            <div class="m-note">121 条合成订单 · 真实流式接口</div>
         </div>
         <div class="metric-card rise">
-            <div class="m-label">pytest 用例</div>
-            <div class="m-value num" id="pytestMetric"><span data-count="252">0</span></div>
-            <div class="m-note">2026-09-18 历史实测，当前用例数以测试输出为准</div>
+            <div class="m-label">普通查数行数上限</div>
+            <div class="m-value num" data-count="500">0</div>
+            <div class="m-note">AST 与数据库读取层双重限制</div>
         </div>
     </div>
 </section>
@@ -182,7 +182,7 @@
         <div class="frame-card rise">
             <span class="f-kind k-knowledge">Knowledge · 知识问答（15 条样本）</span>
             <div class="f-q">「复购率如何计算？」</div>
-            <div class="f-route">route → <b>retrieve</b>（Chroma + BGE-small-zh-v1.5，k=3，阈值 0.4）→ synthesize<br>意图 <b>knowledge</b> · 不经过 load_schema 与 execute_sql</div>
+            <div class="f-route">route → <b>retrieve</b>（Markdown 中文 bigram，Top 3）→ synthesize<br>意图 <b>knowledge</b> · 返回实际检索来源</div>
         </div>
         <div class="frame-card rise">
             <span class="f-kind k-hybrid">Hybrid · 混合（15 条样本）</span>
@@ -227,8 +227,8 @@
 
 <!-- ================= 评测证据 ================= -->
 <section>
-    <h2 class="section-title">评测是断言结果集，不是感觉</h2>
-    <p class="section-sub">真实模型评测包含 SQL 结果集比较与知识问答关键词检查；以下为历史快照，修正比较规则后待重跑。</p>
+    <h2 class="section-title">按工具、数据与回答检查</h2>
+    <p class="section-sub">当前流式评测覆盖混合问答、多轮查数、取消订单、退款拆解和安全短路。逐例结果随仓库保存。</p>
     <table class="eval-table">
         <thead>
             <tr><th>评测集</th><th>规模</th><th>断言方式</th><th>最近结果</th></tr>
@@ -253,10 +253,10 @@
                 <td><span class="pass-badge">14/15</span> <span class="mono-cell" style="color: var(--ink-3);">P50 1,508ms · P95 8,941ms · 6,894 tokens</span></td>
             </tr>
             <tr>
-                <td>单元 / 集成测试</td>
-                <td class="mono-cell">历史 252 条（后端 164 + AI 助手 88）</td>
-                <td>pytest 收集数</td>
-                <td><span class="pass-badge">252 passed</span> <span style="color: var(--ink-3); font-size: 12px;">2026-09-18 隔离环境历史结果</span></td>
+                <td>FastAPI / MySQL 流式评测</td>
+                <td class="mono-cell">10 个问题 · 121 条合成订单</td>
+                <td>工具路径、数据金标、回答数字及引用</td>
+                <td><a href="https://github.com/super-ZXQ/ai-commerce-intelligence-platform/blob/main/docs/evaluation/ai-workflow-mysql.md">查看报告</a></td>
             </tr>
         </tbody>
     </table>
@@ -288,7 +288,7 @@
 /          → <span class="c-blue">FastAPI</span>  ← 本页（作品集门面）
 /BI/      → <span class="c-teal">Streamlit :8501</span>  BI 看板（Operate · 浅色）
 /ai/      → <span class="c-purple">AI 助手 :8502</span>   对话式分析（Operate · 轨迹面板）
-/api/*    → <span class="c-blue">FastAPI :8000</span>   32 个 RESTful 操作（JWT）
+/api/*    → <span class="c-blue">FastAPI :8000</span>   RESTful API（JWT）
 /docs     → Swagger UI（Read · 保持可用）
 
 <span class="c-dim"># 共享 Agent Runtime（agent_core/runtime.py）</span>
@@ -296,7 +296,7 @@
   → <span class="c-teal">generate_sql → validate_sql → execute_sql</span> → synthesize → save_session → finalize
 
 <span class="c-dim"># 数据与基础设施</span>
-MySQL 8（只读账号） · Redis 7（缓存/会话） · Chroma + BGE-small-zh-v1.5（RAG）</div>
+MySQL 8（只读账号） · Redis 7（缓存/会话） · Markdown 中文 bigram 检索</div>
 </section>
 
 <!-- ================= 全部入口 ================= -->
@@ -315,7 +315,7 @@ MySQL 8（只读账号） · Redis 7（缓存/会话） · Chroma + BGE-small-zh
         </a>
         <a class="entry-card rise" href="/docs" target="_blank">
             <h3>API 文档</h3>
-            <p>Swagger UI 在线调试全部 32 个 RESTful 操作。</p>
+            <p>Swagger UI 查看和调试 RESTful API。</p>
             <span class="e-path">/docs · OpenAPI 3</span>
         </a>
         <a class="entry-card rise" href="/demo" target="_blank">

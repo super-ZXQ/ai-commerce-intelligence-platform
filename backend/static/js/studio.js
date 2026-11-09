@@ -5,8 +5,7 @@
    因此统一包进 initStudio()，由 DOMContentLoaded 或立即执行触发。*/
 function initStudio() {
 /* ===== Agent Query Studio =====
-   节点名与分支顺序：agent_core/runtime.py 的 LangGraph 图（12 节点 / 5 条意图分支）
-   SQL、来源数、耗时、attempts：docs/evaluation/glm-4-flash-250414.json 的真实运行记录
+   退款率案例来自 FastAPI / MySQL 的实测事件，历史案例来自 GLM 快照和路由样本。
    路由样本：agent_core/eval/agent_cases.jsonl
    纪律：只展示能在仓库里复核的字段；某条链路没有实测数据时，用 ghost 说明缺什么，不填占位数字。 */
 
@@ -21,6 +20,8 @@ const NODE_META = {
     generate_sql:  { group: "sql",    tag: "LLM",    note: "生成结构化 SQL 候选；生成或校验失败时最多回到本节点重试 1 次。" },
     validate_sql:  { group: "sql",    tag: "AST",    note: "SQLGlot 解析语法树：仅 SELECT 放行，JOIN 上限 3，自动改写 LIMIT 500 并注入 MAX_EXECUTION_TIME(10000)。" },
     execute_sql:   { group: "sql",    tag: "只读",   note: "只读账号执行查询，返回结构化结果集。" },
+    analysis_plan: { group: "route",  tag: "选择",   note: "根据聚合证据选择下一步或结束。" },
+    analysis_execute: { group: "sql", tag: "聚合",   note: "执行有界退款率聚合工具。" },
     synthesize:    { group: "route",  tag: "LLM",    note: "根据工具结果合成回答，附来源与 trace。" },
     save_session:  { group: "sys",    tag: "会话",   note: "保存本轮会话，供下一轮对话使用。" },
     finalize:      { group: "sys",    tag: "收尾",   note: "汇总 trace：节点序列、耗时、token 用量，写入响应。" },
@@ -34,7 +35,7 @@ function paintSql(sql) {
         .replace(/\b(\d+)\b/g, '<span class="lit">$1</span>');
 }
 
-/* 四条真实链路。path 按 runtime.py 的边逐条推导，不是示意图。 */
+/* 内联回退保留历史案例，完整实测轨迹从快照加载。 */
 const QUERIES = [
     {
         id: "sql-003", intent: "data", label: "数据查询",
@@ -146,7 +147,7 @@ function renderNodes() {
     const q = QUERIES[curQ];
     nodeList.innerHTML = "";
     q.path.forEach((name, i) => {
-        const meta = NODE_META[name];
+        const meta = NODE_META[name] || { group: "sys", tag: "记录" };
         const div = document.createElement("div");
         div.className = "node group-" + meta.group;
         div.id = "node-" + i;
@@ -184,23 +185,26 @@ function setCurrent(idx) {
 
     const name = q.path[idx];
     const meta = NODE_META[name];
+    const detail = q.stepDetails?.[idx];
     const isLast = idx === q.path.length - 1;
     $("inspNode").textContent = name || "—";
+    $("modeLabel").textContent = q.replayLabel || "历史评测与路由示例";
 
     const show = (id, on) => { $(id).style.display = on ? "" : "none"; };
 
     show("fieldIntent", name === "route" || isLast);
     if (name === "route" || isLast) $("inspIntent").textContent = q.intent;
 
-    show("fieldNote", !!meta);
-    $("inspNote").textContent = meta ? meta.note : "";
+    show("fieldNote", !!(detail || meta));
+    $("inspNote").textContent = detail ? `${detail.summary} · ${detail.duration_ms} ms` : (meta?.note || "");
 
     const sqlNodes = ["generate_sql", "validate_sql", "execute_sql"];
-    const showSql = !!q.sql && sqlNodes.indexOf(name) >= 0;
-    show("fieldSql", showSql);
-    if (showSql) {
-        $("sqlLabel").textContent = name === "generate_sql" ? "SQL（生成候选）" : "SQL（校验并执行）";
-        $("inspSql").innerHTML = paintSql(q.sql);
+    const toolSql = q.sqlByStep?.[idx];
+    const sql = toolSql || (sqlNodes.includes(name) ? q.sql : null);
+    show("fieldSql", !!sql);
+    if (sql) {
+        $("sqlLabel").textContent = toolSql ? "SQL（实测执行）" : "SQL（历史候选）";
+        $("inspSql").innerHTML = paintSql(sql);
     }
 
     const showSrc = !!q.sources && (name === "retrieve" || isLast);
@@ -229,10 +233,10 @@ function setCurrent(idx) {
     }
 
     /* usage 只在有实测值时出现 */
-    const hasUsage = q.latency !== null && ["synthesize", "save_session", "finalize"].indexOf(name) >= 0;
+    const hasUsage = q.latency !== null && isLast;
     show("inspUsage", hasUsage);
     if (hasUsage) {
-        $("uTok").textContent = q.intent === "data" || q.intent === "knowledge" ? "见快照汇总" : "—";
+        $("uTok").textContent = q.tokens?.toLocaleString() ?? "—";
         $("uLat").textContent = q.latency.toLocaleString() + " ms";
         $("uRet").textContent = q.attempts === null ? "—" : String(q.attempts);
     }
@@ -240,8 +244,8 @@ function setCurrent(idx) {
     /* 状态条 */
     const done = idx + 1;
     $("sbSteps").textContent = done + " / " + q.path.length;
-    const elapsed = q.latency !== null ? Math.round((q.latency * done) / q.path.length) : Math.round(done * 120);
-    $("sbElapsed").textContent = elapsed.toLocaleString() + " ms" + (q.latency === null ? "（示意）" : "");
+    const elapsed = q.stepDetails?.slice(0, done).reduce((total, step) => total + step.duration_ms, 0);
+    $("sbElapsed").textContent = elapsed == null ? "—" : elapsed.toLocaleString() + " ms";
     $("sbBar").style.width = Math.round((done / q.path.length) * 100) + "%";
 
     /* 轨迹列是固定高度内滚动的（11 节点的 hybrid 链路装不满一屏），
@@ -326,8 +330,7 @@ syncQueryList();
 renderNodes();
 
 /* ===== 加载真实快照（双模式）=====
-   默认请求完整模式：4 条链路 + 节点元数据 + 运行汇总；
-   ?mode=lite 走精简模式：3 条核心链路 + 裁掉 SQL 词表（更省流量，弱网首屏更快）。
+   默认请求完整模式，?mode=lite 只加载核心案例与必要字段。
    失败/超时回退到内联 QUERIES：用户首屏绝不能因 fetch 失败而空白。
    这里用同步写法初始化渲染，异步拿到快照后增量重绘。*/
 const SNAPSHOT_URL = (() => {
@@ -336,7 +339,7 @@ const SNAPSHOT_URL = (() => {
 })();
 /* 给快照打 bust 戳：避免旧浏览器 / Service Worker 缓存上一份 full，
    同时 mode 切换也能立即生效。生产 CDN 可以加 hash 后再部署。 */
-const SNAPSHOT_BUST = "?v=1";
+const SNAPSHOT_BUST = "?v=2";
 const SNAPSHOT_TIMEOUT_MS = 2500;
 
 async function applySnapshot() {
@@ -366,14 +369,6 @@ async function applySnapshot() {
         setHint("已按减少动效偏好直接呈现终态。可用单步逐节点回看。");
     } else {
         setCurrent(0);
-    }
-    /* 标题区右上角的"数据源 GLM 快照"模式徽标：显示模型 + 通过率 + 快照生成时间。
-       真实数据替换"GLM 快照"占位文字。*/
-    const label = document.getElementById("modeLabel");
-    if (label && snap.source && snap.runSummary) {
-        const r = snap.runSummary;
-        const stamp = (snap.source.runAtUtc || "").slice(0, 10);
-        label.textContent = (snap.source.model || "GLM") + " · " + (r.passed || 0) + "/" + (r.total || 0) + " 通过 · " + stamp;
     }
 }
 

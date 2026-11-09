@@ -67,6 +67,35 @@ def test_answer_prompt_never_sends_more_rows_than_the_cap() -> None:
     assert len(json.loads(block)) == 50
 
 
+def test_refund_prompt_keeps_evidence_for_each_tool() -> None:
+    counts = {
+        "current_start": "2025-12-02", "current_end": "2025-12-31",
+        "previous_start": "2025-11-02", "previous_end": "2025-12-01",
+        "current_orders": 10145, "current_refunds": 1382,
+        "previous_orders": 11018, "previous_refunds": 1472,
+    }
+    evidence = [
+        {"tool": "overall", "sql": "SELECT 整体", "rows": [counts]},
+        {"tool": "product", "sql": "SELECT 商品", "rows": [
+            {**counts, "product_id": f"SKU-{i:03d}"} for i in range(50)
+        ]},
+        {"tool": "platform", "sql": "SELECT 平台", "rows": [{**counts, "platform_type": "APP"}]},
+    ]
+    prompt = _adapter(prompt_rows_max_chars=4000)._answer_prompt("分析退款率", "data", [], [], None, evidence)
+    block = prompt.split("结果：", 1)[1].split("\n", 1)[0]
+    steps = {step["tool"]: step for step in json.loads(block)}
+
+    assert len(block) <= 4000
+    assert steps["overall"]["rows"] == [counts]
+    assert steps["platform"]["rows"][0]["platform_type"] == "APP"
+    assert steps["product"]["total_rows"] == 50
+    assert 0 < len(steps["product"]["rows"]) < 50
+    assert steps["product"]["rows"][0] == evidence[1]["rows"][0]
+    assert "SELECT 商品" not in block
+    assert "请注明拆解样本范围" in prompt
+    assert len(evidence[1]["rows"]) == 50
+
+
 async def test_planner_keeps_the_full_tool_list_even_when_data_is_clipped() -> None:
     """工具清单被裁掉会让规划器重复执行已经跑过的工具。"""
     captured: dict[str, str] = {}

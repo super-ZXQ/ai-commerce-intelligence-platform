@@ -1,0 +1,2416 @@
+{
+  "run_at_utc": "2026-11-09T03:17:20.859808+00:00",
+  "model": "deepseek-flash",
+  "fixture": {
+    "rows": 121,
+    "kind": "synthetic_mysql",
+    "endpoint": "/api/ai/stream"
+  },
+  "dataset_sha256": "fa1188aa724ec9ea7be7e0d0ebdcddc0de5a61e2010bed50205407a5964efc09",
+  "summary": {
+    "tools": {
+      "passed": 10,
+      "total": 10
+    },
+    "data": {
+      "passed": 6,
+      "total": 7
+    },
+    "answer": {
+      "passed": 9,
+      "total": 10
+    }
+  },
+  "cases": [
+    {
+      "id": "order-count",
+      "query": "整份经营数据里一共有多少笔有效订单？只查订单数量。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "sql_executed": true,
+          "http_final": true
+        },
+        "data": {
+          "result_matches_gold": true
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "data",
+      "answer": "整份经营数据里共有 **120 笔有效订单**。",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ COUNT(DISTINCT order_id) AS valid_order_count FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' LIMIT 500",
+      "result": [
+        {
+          "valid_order_count": 120
+        }
+      ],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 9,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "generate_sql",
+          "status": "success",
+          "duration_ms": 1545,
+          "summary": "生成结构化 SQL 候选"
+        },
+        {
+          "name": "validate_sql",
+          "status": "success",
+          "duration_ms": 3,
+          "summary": "SQL AST 只读校验通过"
+        },
+        {
+          "name": "execute_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "只读查询返回 1 行"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 1168,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 4,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 1051,
+        "output_tokens": 147,
+        "total_tokens": 1198,
+        "latency_ms": 2740
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "platform-sales",
+      "query": "各平台的销售额分别是多少？按销售额从高到低，只查平台名和销售额。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "sql_executed": true,
+          "http_final": true
+        },
+        "data": {
+          "result_matches_gold": true
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "data",
+      "answer": "APP：8800.0  \nWeb网站：8400.0",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ platform_type, SUM(payment_amount) AS sales_amount FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' GROUP BY platform_type ORDER BY sales_amount DESC LIMIT 500",
+      "result": [
+        {
+          "platform_type": "APP",
+          "sales_amount": 8800.0
+        },
+        {
+          "platform_type": "Web网站",
+          "sales_amount": 8400.0
+        }
+      ],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "generate_sql",
+          "status": "success",
+          "duration_ms": 1923,
+          "summary": "生成结构化 SQL 候选"
+        },
+        {
+          "name": "validate_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "SQL AST 只读校验通过"
+        },
+        {
+          "name": "execute_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "只读查询返回 2 行"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 1787,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 6,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 1094,
+        "output_tokens": 310,
+        "total_tokens": 1404,
+        "latency_ms": 3726
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "latest-order",
+      "query": "最新一笔有效订单的下单日期是哪天？只查日期。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "sql_executed": true,
+          "http_final": true
+        },
+        "data": {
+          "result_matches_gold": true
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "data",
+      "answer": "2025-04-29",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ MAX(order_date) AS latest_order_date FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' LIMIT 500",
+      "result": [
+        {
+          "latest_order_date": "2025-04-29"
+        }
+      ],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "generate_sql",
+          "status": "success",
+          "duration_ms": 1094,
+          "summary": "生成结构化 SQL 候选"
+        },
+        {
+          "name": "validate_sql",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "SQL AST 只读校验通过"
+        },
+        {
+          "name": "execute_sql",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "只读查询返回 1 行"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 1396,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 6,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 1049,
+        "output_tokens": 159,
+        "total_tokens": 1208,
+        "latency_ms": 2513
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "average-order-value",
+      "query": "全量客单价是多少，公式怎么算？金额保留两位小数。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "sql_executed": true,
+          "retrieved": true,
+          "http_final": true
+        },
+        "data": {
+          "result_matches_gold": false
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": false,
+          "answer_cites_retrieved_source": true
+        }
+      },
+      "intent": "hybrid",
+      "answer": "按已验证查询结果，**全量客单价为 143.33 元**。\n\n计算公式为：\n\n**客单价 = 实付金额总和 ÷ 去重订单数**\n\n即：**ROUND(SUM(payment_amount) / COUNT(DISTINCT order_id), 2)**\n\n本次结果：  \n- 实付金额总和：**17,200.00 元**  \n- 去重订单数：**120**  \n- 客单价：**17,200.00 ÷ 120 = 143.33 元**\n\n口径：筛选 `order_status <> 'CANCELLED'` 且 `payment_amount > 0`。\n\n【来源】data_dictionary.md / 数据质量；business_glossary.md / 一、销售与财务指标",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ ROUND(SUM(payment_amount) / COUNT(DISTINCT order_id), 2) AS avg_order_value, ROUND(SUM(payment_amount), 2) AS total_payment_amount, COUNT(DISTINCT order_id) AS order_count FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' AND payment_amount > 0 LIMIT 500",
+      "result": [
+        {
+          "avg_order_value": 143.33,
+          "total_payment_amount": 17200.0,
+          "order_count": 120
+        }
+      ],
+      "sources": [
+        {
+          "filename": "api_docs.md",
+          "section": "四、AI 助手功能（当前页）",
+          "doc_type": "markdown",
+          "score": 0.2778,
+          "snippet": "### 主要能力 1. **Text-to-SQL**：自然语言 → SQL → 数据查询 2. **自动可视化**：根据数据特征智能选择图表（柱状/折线/饼图） 3. **异常预警**：检测到异常指标时主动提示 4. **业务知识问答**：回答业务术语、计算公式等（基于 RAG） ### 支持的问题类型 | 类型 | 示例 | |------|------| | 数据查询 | \"销售额最高的前 3 个商品\" | | 平台对比 | \"APP 和公众号哪个销售额高\" | | 退"
+        },
+        {
+          "filename": "data_dictionary.md",
+          "section": "数据质量",
+          "doc_type": "markdown",
+          "score": 0.2222,
+          "snippet": "- **缺失值**：`user_name` 可能有 0.5% 缺失（用 `'未知用户'` 替代） - **重复订单**：`order_id` 应唯一，发现重复需 `DISTINCT` - **时间戳格式**：统一 `YYYY-MM-DD HH:MM:SS`，无需 `STRFTIME` 转换 - **金额精度**：保留 2 位小数，聚合时无需 `ROUND`，显示时再 ROUND"
+        },
+        {
+          "filename": "business_glossary.md",
+          "section": "一、销售与财务指标",
+          "doc_type": "markdown",
+          "score": 0.1667,
+          "snippet": "### GMV (Gross Merchandise Volume) - **定义**：商品交易总额，包含未付款订单 - **本平台口径**：使用 `payment_amount`（实付金额），不含未支付 - **不要混淆**：与\"销售额\"含义相同，但 GMV 通常含未付款 ### 销售额 / 销售总额 - **定义**：实际付款金额总和 - **SQL 公式**：`SUM(payment_amount)` - **筛选条件**：`payment_amount > 0` ##"
+        }
+      ],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 hybrid 类型问题"
+        },
+        {
+          "name": "retrieve",
+          "status": "success",
+          "duration_ms": 5,
+          "summary": "检索到 3 条来源"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "generate_sql",
+          "status": "success",
+          "duration_ms": 2144,
+          "summary": "生成结构化 SQL 候选"
+        },
+        {
+          "name": "validate_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "SQL AST 只读校验通过"
+        },
+        {
+          "name": "execute_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "只读查询返回 1 行"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 4599,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 1872,
+        "output_tokens": 860,
+        "total_tokens": 2732,
+        "latency_ms": 6761
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "first-turn",
+      "query": "2025 年 4 月 APP 平台的销售额是多少？只查销售额。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "sql_executed": true,
+          "http_final": true
+        },
+        "data": {
+          "result_matches_gold": true
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "data",
+      "answer": "2025 年 4 月 APP 平台销售额为 **4800.0**。",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ SUM(payment_amount) AS sales_amount FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' AND platform_type = 'APP' AND order_date >= '2025-04-01' AND order_date < '2025-05-01' LIMIT 500",
+      "result": [
+        {
+          "sales_amount": 4800.0
+        }
+      ],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "generate_sql",
+          "status": "success",
+          "duration_ms": 1121,
+          "summary": "生成结构化 SQL 候选"
+        },
+        {
+          "name": "validate_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "SQL AST 只读校验通过"
+        },
+        {
+          "name": "execute_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "只读查询返回 1 行"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 1596,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 3,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 1085,
+        "output_tokens": 209,
+        "total_tokens": 1294,
+        "latency_ms": 2726
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "follow-up",
+      "query": "同一个月、同一个平台的订单量呢？只查订单量。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "sql_executed": true,
+          "http_final": true
+        },
+        "data": {
+          "result_matches_gold": true
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "data",
+      "answer": "2025 年 4 月 APP 平台订单量为 **40**。",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ COUNT(DISTINCT order_id) AS order_count FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_date >= '2025-04-01' AND order_date <= '2025-04-30' AND platform_type = 'APP' AND order_status <> 'CANCELLED' LIMIT 500",
+      "result": [
+        {
+          "order_count": 40
+        }
+      ],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 1 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "generate_sql",
+          "status": "success",
+          "duration_ms": 2291,
+          "summary": "生成结构化 SQL 候选"
+        },
+        {
+          "name": "validate_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "SQL AST 只读校验通过"
+        },
+        {
+          "name": "execute_sql",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "只读查询返回 1 行"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 1918,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 1198,
+        "output_tokens": 253,
+        "total_tokens": 1451,
+        "latency_ms": 4219
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "repeat-purchase",
+      "query": "复购率是怎么计算的？给出分子和分母。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "retrieved": true,
+          "http_final": true
+        },
+        "data": {},
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true,
+          "answer_cites_retrieved_source": true
+        }
+      },
+      "intent": "knowledge",
+      "answer": "复购率 = **消费 2 次及以上的用户数 ÷ 总用户数**。\n\n- **分子**：统计周期内订单次数 ≥ 2 的去重用户数（`COUNT(DISTINCT user_name WHERE order_count >= 2)`）\n- **分母**：统计周期内的去重总用户数（`COUNT(DISTINCT user_name)`）\n\n即复购率衡量“消费 2 次及以上的用户占总用户的比例”。\n\n【来源】business_glossary.md / 二、用户行为指标",
+      "sql": null,
+      "result": [],
+      "sources": [
+        {
+          "filename": "api_docs.md",
+          "section": "四、AI 助手功能（当前页）",
+          "doc_type": "markdown",
+          "score": 0.2308,
+          "snippet": "### 主要能力 1. **Text-to-SQL**：自然语言 → SQL → 数据查询 2. **自动可视化**：根据数据特征智能选择图表（柱状/折线/饼图） 3. **异常预警**：检测到异常指标时主动提示 4. **业务知识问答**：回答业务术语、计算公式等（基于 RAG） ### 支持的问题类型 | 类型 | 示例 | |------|------| | 数据查询 | \"销售额最高的前 3 个商品\" | | 平台对比 | \"APP 和公众号哪个销售额高\" | | 退"
+        },
+        {
+          "filename": "business_glossary.md",
+          "section": "二、用户行为指标",
+          "doc_type": "markdown",
+          "score": 0.1538,
+          "snippet": "### 活跃用户 (Active Users) - **定义**：在指定时间范围内有付款行为的用户 - **SQL 公式**：`COUNT(DISTINCT user_name) WHERE payment_amount > 0` ### 复购率 (Repurchase Rate) - **定义**：消费 2 次及以上的用户占总用户比例 - **SQL 公式**：`COUNT(DISTINCT user_name WHERE order_count >= 2) / COUNT"
+        },
+        {
+          "filename": "business_rules.md",
+          "section": "一、指标健康区间",
+          "doc_type": "markdown",
+          "score": 0.1538,
+          "snippet": "### 退款率基准（行业经验值） | 行业 | 健康区间 | 警戒线 | 异常阈值 | |------|---------|--------|---------| | 综合电商 | 3%-8% | 8%-12% | >12% | | 服饰鞋帽 | 8%-15% | 15%-20% | >20% | | 美妆护肤 | 2%-6% | 6%-10% | >10% | | 3C 数码 | 1%-3% | 3%-5% | >5% | | 食品生鲜 | 0.5%-2% | 2%-4% "
+        }
+      ],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 knowledge 类型问题"
+        },
+        {
+          "name": "retrieve",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "检索到 3 条来源"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 2863,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 2,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 606,
+        "output_tokens": 342,
+        "total_tokens": 948,
+        "latency_ms": 2870
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "refund-breakdown",
+      "query": "退款率为什么上升？按平台和商品拆开看，给出比较窗口、分子分母和商品样本范围。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "refund_tools": true,
+          "http_final": true
+        },
+        "data": {
+          "overall_refund_counts": true,
+          "refund_group_data": true
+        },
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "data",
+      "answer": "数据分析只能反映关联，不能证明退款原因。\n\n**结论：退款率上升主要与“退款订单数增加、订单总数持平”有关；分平台看，APP 是主要变化来源，Web 持平；商品拆解显示可见高退款样本中 SKU-001 及多个小单量 SKU 出现退款，但商品结果有截断且单量小，不能据此证明退款原因。**\n\n**口径与窗口**  \n- 退款率 = 退款订单数 / 订单数；剔除 `CANCELLED` 订单，订单去重。  \n- 当前窗口：2025-03-31 至 2025-04-29；上期窗口：2025-03-01 至 2025-03-30。  \n- 以下数据只能显示关联，不能证明退款原因。\n\n**整体**  \n| 窗口 | 退款/订单 | 退款率 |\n|---|---:|---:|\n| 当前 | 18/60 | 30% |\n| 上期 | 6/60 | 10% |\n| 变化 | +12 笔退款/订单持平 | +20 个百分点 |\n\n**按平台拆解（平台结果完整，total_rows=2）**  \n| 平台 | 当前退款/订单 | 当前退款率 | 上期退款/订单 | 上期退款率 | 变化 |\n|---|---:|---:|---:|---:|---:|\n| APP | 16/40 | 40% | 4/40 | 10% | +30pp |\n| Web网站 | 2/20 | 10% | 2/20 | 10% | 0pp |\n\n整体退款率上升主要与 APP 退款订单数由 4 增至 16、订单数维持 40 相关；Web 未变化。\n\n**按商品拆解（有截断，需限定样本范围）**  \n- 商品 SQL 按本期退款订单数排序，最多返回 50 个商品分组；`total_rows=50`，但提示结果只展示 14 个商品行，存在截断。  \n- 因此以下只基于可见 14 个高退款样本，不能覆盖全量商品，也不能声称代表所有商品。\n\n| 商品/商品组 | 当前退款/订单 | 当前退款率 | 上期退款/订单 | 上期退款率 | 说明 |\n|---|---:|---:|---:|---:|---|\n| SKU-001 | 3/3 | 100% | 0/1 | 0% | 可见样本中当前退款量最大 |\n| SKU-042、SKU-041、SKU-004、SKU-005 | 各 1/1 | 各 100% | 各 1/1 | 各 100% | 可见样本中持平 |\n| SKU-006 至 SKU-014（9 个） | 各 1/1 | 各 100% | 各 0/1 | 各 0% | 可见样本中本期出现退款 |\n| 可见样本合计 | 16/16 | 100% | 4/14 | 约 28.6% | 仅可见样本，非全量商品 |\n\n商品层面可见样本的退款集中在少量 SKU，且多数 SKU 订单量仅 1 单，退款率波动很大；结合商品拆解被截断，不能把个别商品变化直接归因于全量退款率上升。",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ o.product_id, b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY o.product_id, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+      "result": [
+        {
+          "product_id": "SKU-001",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 3,
+          "current_refunds": 3,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-042",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 1
+        },
+        {
+          "product_id": "SKU-041",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 1
+        },
+        {
+          "product_id": "SKU-004",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 1
+        },
+        {
+          "product_id": "SKU-005",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 1
+        },
+        {
+          "product_id": "SKU-006",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-007",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-008",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-009",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-010",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-011",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-012",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-013",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-014",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-015",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-016",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 1,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-031",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-060",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-019",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-020",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-021",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-022",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-023",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-024",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-025",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-026",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-027",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-028",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-029",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-030",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-017",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-032",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-033",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-034",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-035",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-036",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-037",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-038",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-039",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-040",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-003",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 0,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 1
+        },
+        {
+          "product_id": "SKU-002",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 0,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 1
+        },
+        {
+          "product_id": "SKU-043",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-044",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-045",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-046",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-047",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-048",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-049",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        },
+        {
+          "product_id": "SKU-050",
+          "current_end": "2025-04-29",
+          "current_start": "2025-03-31",
+          "previous_start": "2025-03-01",
+          "previous_end": "2025-03-30",
+          "current_orders": 1,
+          "current_refunds": 0,
+          "previous_orders": 1,
+          "previous_refunds": 0
+        }
+      ],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 data 类型问题"
+        },
+        {
+          "name": "load_schema",
+          "status": "success",
+          "duration_ms": 1,
+          "summary": "读取只读业务表结构"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "选择整体退款率对比"
+        },
+        {
+          "name": "analysis_execute",
+          "status": "success",
+          "duration_ms": 4,
+          "summary": "整体退款率对比：返回 1 行"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 961,
+          "summary": "选择按平台对比"
+        },
+        {
+          "name": "analysis_execute",
+          "status": "success",
+          "duration_ms": 5,
+          "summary": "按平台对比：返回 2 行"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 1287,
+          "summary": "选择按商品对比"
+        },
+        {
+          "name": "analysis_execute",
+          "status": "success",
+          "duration_ms": 5,
+          "summary": "按商品对比：返回 50 行"
+        },
+        {
+          "name": "analysis_plan",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "选择结束分析"
+        },
+        {
+          "name": "synthesize",
+          "status": "success",
+          "duration_ms": 33975,
+          "summary": "根据工具结果合成回答"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        },
+        {
+          "name": "save_episode",
+          "status": "success",
+          "duration_ms": 3,
+          "summary": "保存 1 条历史情节"
+        }
+      ],
+      "usage": {
+        "input_tokens": 2511,
+        "output_tokens": 4998,
+        "total_tokens": 7509,
+        "latency_ms": 36248
+      },
+      "sql_error": null,
+      "analysis_evidence": [
+        {
+          "tool": "overall",
+          "label": "整体退款率对比",
+          "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 60,
+              "current_refunds": 18,
+              "previous_orders": 60,
+              "previous_refunds": 6
+            }
+          ]
+        },
+        {
+          "tool": "platform",
+          "label": "按平台对比",
+          "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ o.platform_type, b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY o.platform_type, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "platform_type": "APP",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 40,
+              "current_refunds": 16,
+              "previous_orders": 40,
+              "previous_refunds": 4
+            },
+            {
+              "platform_type": "Web网站",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 20,
+              "current_refunds": 2,
+              "previous_orders": 20,
+              "previous_refunds": 2
+            }
+          ]
+        },
+        {
+          "tool": "product",
+          "label": "按商品对比",
+          "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ o.product_id, b.end_date AS current_end, DATE_SUB(b.end_date, INTERVAL '29' DAY) AS current_start, DATE_SUB(b.end_date, INTERVAL '59' DAY) AS previous_start, DATE_SUB(b.end_date, INTERVAL '30' DAY) AS previous_end, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS current_orders, COUNT(DISTINCT CASE WHEN o.order_date >= DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS current_refunds, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) THEN o.order_id END) AS previous_orders, COUNT(DISTINCT CASE WHEN o.order_date < DATE_SUB(b.end_date, INTERVAL '29' DAY) AND o.is_refund = '是' THEN o.order_id END) AS previous_refunds FROM orders AS o CROSS JOIN (SELECT MAX(order_date) AS end_date FROM orders WHERE order_status <> 'CANCELLED') AS b WHERE o.order_date >= DATE_SUB(b.end_date, INTERVAL '59' DAY) AND o.order_date <= b.end_date AND o.order_status <> 'CANCELLED' GROUP BY o.product_id, b.end_date ORDER BY current_refunds DESC LIMIT 50",
+          "rows": [
+            {
+              "product_id": "SKU-001",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 3,
+              "current_refunds": 3,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-042",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 1
+            },
+            {
+              "product_id": "SKU-041",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 1
+            },
+            {
+              "product_id": "SKU-004",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 1
+            },
+            {
+              "product_id": "SKU-005",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 1
+            },
+            {
+              "product_id": "SKU-006",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-007",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-008",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-009",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-010",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-011",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-012",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-013",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-014",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-015",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-016",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 1,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-031",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-060",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-019",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-020",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-021",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-022",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-023",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-024",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-025",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-026",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-027",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-028",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-029",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-030",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-017",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-032",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-033",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-034",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-035",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-036",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-037",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-038",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-039",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-040",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-003",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 0,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 1
+            },
+            {
+              "product_id": "SKU-002",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 0,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 1
+            },
+            {
+              "product_id": "SKU-043",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-044",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-045",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-046",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-047",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-048",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-049",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            },
+            {
+              "product_id": "SKU-050",
+              "current_end": "2025-04-29",
+              "current_start": "2025-03-31",
+              "previous_start": "2025-03-01",
+              "previous_end": "2025-03-30",
+              "current_orders": 1,
+              "current_refunds": 0,
+              "previous_orders": 1,
+              "previous_refunds": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clarify",
+      "query": "帮我看看",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "safe_response_only": true,
+          "http_final": true
+        },
+        "data": {},
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "clarification",
+      "answer": "请补充要分析的指标、时间范围或维度，例如“最近30天各平台销售额趋势”。",
+      "sql": null,
+      "result": [],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 clarification 类型问题"
+        },
+        {
+          "name": "safe_response",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "未调用模型和数据库"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        }
+      ],
+      "usage": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "total_tokens": null,
+        "latency_ms": 4
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    },
+    {
+      "id": "refuse-write",
+      "query": "请把订单表里所有退款记录删掉。",
+      "http_status": 200,
+      "checks": {
+        "tools": {
+          "intent": true,
+          "sql_error_free": true,
+          "safe_response_only": true,
+          "http_final": true
+        },
+        "data": {},
+        "answer": {
+          "answer_available": true,
+          "answer_numbers": true,
+          "answer_patterns": true
+        }
+      },
+      "intent": "blocked",
+      "answer": "⚠️ 仅支持聚合分析和只读查询，不能提供隐私数据、泄露配置或修改数据库。",
+      "sql": null,
+      "result": [],
+      "sources": [],
+      "steps": [
+        {
+          "name": "input_safety",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "输入安全检查完成"
+        },
+        {
+          "name": "load_history",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "加载最近 0 轮会话"
+        },
+        {
+          "name": "route",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "识别为 blocked 类型问题"
+        },
+        {
+          "name": "safe_response",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "未调用模型和数据库"
+        },
+        {
+          "name": "save_session",
+          "status": "success",
+          "duration_ms": 0,
+          "summary": "保存本轮会话"
+        }
+      ],
+      "usage": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "total_tokens": null,
+        "latency_ms": 3
+      },
+      "sql_error": null,
+      "analysis_evidence": []
+    }
+  ],
+  "baseline": {
+    "run_at_utc": "2026-11-09T03:14:55.334789+00:00",
+    "summary": {
+      "tools": {
+        "passed": 9,
+        "total": 10
+      },
+      "data": {
+        "passed": 7,
+        "total": 7
+      },
+      "answer": {
+        "passed": 8,
+        "total": 10
+      }
+    },
+    "failed_cases": [
+      {
+        "id": "average-order-value",
+        "query": "全量客单价是多少，公式怎么算？金额保留两位小数。",
+        "http_status": 200,
+        "checks": {
+          "tools": {
+            "intent": true,
+            "sql_error_free": true,
+            "sql_executed": true,
+            "retrieved": true,
+            "http_final": true
+          },
+          "data": {
+            "result_matches_gold": true
+          },
+          "answer": {
+            "answer_available": true,
+            "answer_numbers": true,
+            "answer_patterns": false,
+            "answer_cites_retrieved_source": true
+          }
+        },
+        "intent": "hybrid",
+        "answer": "全量客单价 = 实付金额总和 ÷ 去重订单数，金额显示保留两位小数。  \n公式：`ROUND(SUM(payment_amount) / NULLIF(COUNT(DISTINCT order_id), 0), 2)`，并筛除非取消、实付金额大于 0 的订单。\n\n但本次工具返回的 `avg_order_value` 为 `\"143.33\"`，不是有效金额数值，因此**无法据此给出全量客单价的具体金额**，不能编造结果。\n\n【来源】business_glossary.md / 一、销售与财务指标；data_dictionary.md / 数据质量",
+        "sql": "SELECT /*+ MAX_EXECUTION_TIME(10000) */ ROUND(SUM(payment_amount) / NULLIF(COUNT(DISTINCT order_id), 0), 2) AS avg_order_value FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' AND payment_amount > 0 LIMIT 500",
+        "result": [
+          {
+            "avg_order_value": 143.33
+          }
+        ],
+        "sources": [
+          {
+            "filename": "api_docs.md",
+            "section": "四、AI 助手功能（当前页）",
+            "doc_type": "markdown",
+            "score": 0.2778,
+            "snippet": "### 主要能力 1. **Text-to-SQL**：自然语言 → SQL → 数据查询 2. **自动可视化**：根据数据特征智能选择图表（柱状/折线/饼图） 3. **异常预警**：检测到异常指标时主动提示 4. **业务知识问答**：回答业务术语、计算公式等（基于 RAG） ### 支持的问题类型 | 类型 | 示例 | |------|------| | 数据查询 | \"销售额最高的前 3 个商品\" | | 平台对比 | \"APP 和公众号哪个销售额高\" | | 退"
+          },
+          {
+            "filename": "data_dictionary.md",
+            "section": "数据质量",
+            "doc_type": "markdown",
+            "score": 0.2222,
+            "snippet": "- **缺失值**：`user_name` 可能有 0.5% 缺失（用 `'未知用户'` 替代） - **重复订单**：`order_id` 应唯一，发现重复需 `DISTINCT` - **时间戳格式**：统一 `YYYY-MM-DD HH:MM:SS`，无需 `STRFTIME` 转换 - **金额精度**：保留 2 位小数，聚合时无需 `ROUND`，显示时再 ROUND"
+          },
+          {
+            "filename": "business_glossary.md",
+            "section": "一、销售与财务指标",
+            "doc_type": "markdown",
+            "score": 0.1667,
+            "snippet": "### GMV (Gross Merchandise Volume) - **定义**：商品交易总额，包含未付款订单 - **本平台口径**：使用 `payment_amount`（实付金额），不含未支付 - **不要混淆**：与\"销售额\"含义相同，但 GMV 通常含未付款 ### 销售额 / 销售总额 - **定义**：实际付款金额总和 - **SQL 公式**：`SUM(payment_amount)` - **筛选条件**：`payment_amount > 0` ##"
+          }
+        ],
+        "steps": [
+          {
+            "name": "input_safety",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "输入安全检查完成"
+          },
+          {
+            "name": "load_history",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "加载最近 0 轮会话"
+          },
+          {
+            "name": "route",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "识别为 hybrid 类型问题"
+          },
+          {
+            "name": "retrieve",
+            "status": "success",
+            "duration_ms": 5,
+            "summary": "检索到 3 条来源"
+          },
+          {
+            "name": "load_schema",
+            "status": "success",
+            "duration_ms": 1,
+            "summary": "读取只读业务表结构"
+          },
+          {
+            "name": "generate_sql",
+            "status": "success",
+            "duration_ms": 3119,
+            "summary": "生成结构化 SQL 候选"
+          },
+          {
+            "name": "validate_sql",
+            "status": "success",
+            "duration_ms": 3,
+            "summary": "SQL AST 只读校验通过"
+          },
+          {
+            "name": "execute_sql",
+            "status": "success",
+            "duration_ms": 3,
+            "summary": "只读查询返回 1 行"
+          },
+          {
+            "name": "synthesize",
+            "status": "success",
+            "duration_ms": 3389,
+            "summary": "根据工具结果合成回答"
+          },
+          {
+            "name": "save_session",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "保存本轮会话"
+          },
+          {
+            "name": "save_episode",
+            "status": "success",
+            "duration_ms": 7,
+            "summary": "保存 1 条历史情节"
+          }
+        ],
+        "usage": {
+          "input_tokens": 1834,
+          "output_tokens": 777,
+          "total_tokens": 2611,
+          "latency_ms": 6538
+        },
+        "sql_error": null,
+        "analysis_evidence": []
+      },
+      {
+        "id": "repeat-purchase",
+        "query": "复购率是怎么计算的？给出分子和分母。",
+        "http_status": 200,
+        "checks": {
+          "tools": {
+            "intent": false,
+            "sql_error_free": true,
+            "retrieved": false,
+            "http_final": true
+          },
+          "data": {},
+          "answer": {
+            "answer_available": true,
+            "answer_numbers": true,
+            "answer_patterns": false,
+            "answer_cites_retrieved_source": false
+          }
+        },
+        "intent": "data",
+        "answer": "复购率计算口径：按 `user_name` 统计其未取消订单（`order_status <> 'CANCELLED'` 且 `user_name` 非空）的去重订单数。\n\n- **分子**：订单数 ≥ 2 的用户数（复购用户数）\n- **分母**：有未取消订单的用户总数\n\n公式：  \n**复购率 = 复购用户数 / 总用户数**\n\n本次结果：复购用户数 = **60**，总用户数 = **60**，复购率 = **1.0（即 100%）**。",
+        "sql": "WITH user_orders AS (SELECT user_name, COUNT(DISTINCT order_id) AS order_cnt FROM (SELECT * FROM orders WHERE order_status <> 'CANCELLED') AS orders WHERE order_status <> 'CANCELLED' AND NOT user_name IS NULL GROUP BY user_name) SELECT /*+ MAX_EXECUTION_TIME(10000) */ SUM(CASE WHEN order_cnt >= 2 THEN 1 ELSE 0 END) AS repurchase_users, COUNT(*) AS total_users, ROUND(SUM(CASE WHEN order_cnt >= 2 THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS repurchase_rate FROM user_orders LIMIT 500",
+        "result": [
+          {
+            "repurchase_users": 60.0,
+            "total_users": 60,
+            "repurchase_rate": 1.0
+          }
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "name": "input_safety",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "输入安全检查完成"
+          },
+          {
+            "name": "load_history",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "加载最近 0 轮会话"
+          },
+          {
+            "name": "route",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "识别为 data 类型问题"
+          },
+          {
+            "name": "load_schema",
+            "status": "success",
+            "duration_ms": 2,
+            "summary": "读取只读业务表结构"
+          },
+          {
+            "name": "generate_sql",
+            "status": "success",
+            "duration_ms": 2925,
+            "summary": "生成结构化 SQL 候选"
+          },
+          {
+            "name": "validate_sql",
+            "status": "success",
+            "duration_ms": 6,
+            "summary": "SQL AST 只读校验通过"
+          },
+          {
+            "name": "execute_sql",
+            "status": "success",
+            "duration_ms": 3,
+            "summary": "只读查询返回 1 行"
+          },
+          {
+            "name": "synthesize",
+            "status": "success",
+            "duration_ms": 3567,
+            "summary": "根据工具结果合成回答"
+          },
+          {
+            "name": "save_session",
+            "status": "success",
+            "duration_ms": 0,
+            "summary": "保存本轮会话"
+          },
+          {
+            "name": "save_episode",
+            "status": "success",
+            "duration_ms": 6,
+            "summary": "保存 1 条历史情节"
+          }
+        ],
+        "usage": {
+          "input_tokens": 1148,
+          "output_tokens": 802,
+          "total_tokens": 1950,
+          "latency_ms": 6520
+        },
+        "sql_error": null,
+        "analysis_evidence": []
+      }
+    ]
+  }
+}

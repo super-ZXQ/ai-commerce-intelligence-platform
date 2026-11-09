@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 from decimal import Decimal
 from inspect import Signature, signature
 from types import SimpleNamespace
@@ -80,6 +81,24 @@ def test_limit_is_rewritten_to_hard_cap(sql):
 def test_qualified_table_is_rejected():
     with pytest.raises(SQLValidationError, match="库名"):
         validate_and_limit_sql("SELECT * FROM otherdb.orders LIMIT 500")
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT COUNT(DISTINCT orders.order_id) FROM orders",
+    "WITH t AS (SELECT o.order_id FROM orders AS o) SELECT COUNT(DISTINCT order_id) FROM t",
+    "SELECT COUNT(DISTINCT o.order_id) FROM orders o JOIN orders p ON p.order_id = o.order_id",
+    "SELECT COUNT(DISTINCT order_id) FROM (SELECT order_id FROM orders UNION SELECT order_id FROM orders) t",
+])
+def test_ai_business_sql_excludes_cancelled_orders_at_every_source(sql):
+    query = validate_and_limit_sql(sql, exclude_cancelled_orders=True)
+    assert is_read_only_sql(query)
+    db = sqlite3.connect(":memory:")
+    try:
+        db.execute("CREATE TABLE orders (order_id TEXT, order_status TEXT)")
+        db.executemany("INSERT INTO orders VALUES (?, ?)", [("a", "ACTIVE"), ("b", "CANCELLED"), ("c", "REFUNDED")])
+        assert db.execute(query).fetchone() == (2,)
+    finally:
+        db.close()
 
 
 @pytest.mark.parametrize("sql", [

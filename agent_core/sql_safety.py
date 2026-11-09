@@ -70,6 +70,8 @@ def validate_and_limit_sql(
     max_rows: int = DEFAULT_MAX_ROWS,
     allowed_tables: tuple[str, ...] = ("orders",),
     max_joins: int = 3,
+    *,
+    exclude_cancelled_orders: bool = False,
 ) -> str:
     """校验只读性并改写 LIMIT；JOIN 数量超限一律拒绝。
 
@@ -128,6 +130,19 @@ def validate_and_limit_sql(
     table_names = {table.name.lower() for table in tables} - cte_names
     if table_names - allowed_names:
         raise SQLValidationError("查询访问了未授权的数据表")
+
+    if exclude_cancelled_orders:
+        for table in tables:
+            if table.name.lower() != "orders":
+                continue
+            # 在每个数据源上应用 BI 口径，覆盖子查询、CTE 和 JOIN，保留原表别名。
+            alias = table.args.get("alias") or exp.TableAlias(this=table.this.copy())
+            source = table.copy()
+            source.set("alias", None)
+            filtered = exp.select("*").from_(source).where(exp.NEQ(
+                this=exp.column("order_status"), expression=exp.Literal.string("CANCELLED"),
+            ))
+            table.replace(exp.Subquery(this=filtered, alias=alias.copy()))
 
     limit = expression.args.get("limit")
     if limit is None:
