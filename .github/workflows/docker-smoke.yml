@@ -84,12 +84,22 @@ jobs:
 
       - name: 验证数据、主要入口与 WebSocket
         run: |
-          # Schema 权威：Alembic
+          # 从本次构建的迁移树读取目标版本，避免新增迁移后断言过期。
+          expected_version="$(docker compose exec -T backend python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+
+          print(ScriptDirectory.from_config(Config("backend/alembic.ini")).get_current_head())
+          PY
+          )"
           version="$(docker compose exec -T mysql mysql \
             -uroot -pci-root-password -Nse \
             'SELECT version_num FROM ai_commerce_intelligence_platform.alembic_version')"
-          echo "alembic_version=$version"
-          test "$version" = "0007_data_import"
+          echo "alembic_version=$version expected=$expected_version"
+          if [ "$version" != "$expected_version" ]; then
+            echo "::error::数据库迁移版本为 $version，预期为 $expected_version"
+            exit 1
+          fi
 
           for t in orders order_events app_metadata alembic_version data_state \
                    data_import_runs data_import_rows order_status_reconciliation \
